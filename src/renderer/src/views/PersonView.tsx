@@ -4,6 +4,7 @@ import { useRouter } from '../router'
 import type { PersonConfig, PerfilData, ArtifactMeta, PautaMeta, AgendaResult } from '../types/ipc'
 import { MarkdownPreview } from '../components/MarkdownPreview'
 import { labelNivel, labelRelacao, labelSaude, labelTipo } from '../lib/utils'
+import { CycleTab } from './CycleReportView'
 
 // Styles declared at module top level so all sub-components can access them safely
 const styles = {
@@ -52,7 +53,7 @@ export function PersonView() {
   const [perfil,        setPerfil]        = useState<PerfilData | null>(null)
   const [artifacts,     setArtifacts]     = useState<ArtifactMeta[]>([])
   const [pautas,        setPautas]        = useState<PautaMeta[]>([])
-  const [activeTab,     setActiveTab]     = useState<'perfil' | 'artefatos' | 'pautas'>('perfil')
+  const [activeTab,     setActiveTab]     = useState<'perfil' | 'artefatos' | 'pautas' | 'ciclo'>('perfil')
   const [generatingAgenda, setGeneratingAgenda] = useState(false)
   const [agendaError,   setAgendaError]   = useState<string | null>(null)
 
@@ -153,7 +154,7 @@ export function PersonView() {
             {generatingAgenda ? 'Gerando…' : 'Gerar pauta'}
           </button>
           <button
-            onClick={() => navigate('cycle-report', { slug: person.slug })}
+            onClick={() => setActiveTab('ciclo')}
             style={styles.btnPrimary}
           >
             <FileText size={12} /> Relatório de Ciclo
@@ -204,28 +205,33 @@ export function PersonView() {
             <div>
               {/* Tabs */}
               <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 22 }}>
-                {(['perfil', 'artefatos', 'pautas'] as const).map((tab) => (
+                {([
+                  { id: 'perfil',    label: 'Perfil vivo' },
+                  { id: 'artefatos', label: 'Artefatos' },
+                  { id: 'pautas',    label: 'Pautas' },
+                  { id: 'ciclo',     label: 'Relatório de Ciclo' },
+                ] as const).map(({ id, label }) => (
                   <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
+                    key={id}
+                    onClick={() => setActiveTab(id)}
                     style={{
                       padding: '9px 18px',
                       fontSize: 13.5,
-                      fontWeight: activeTab === tab ? 500 : 400,
-                      color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
+                      fontWeight: activeTab === id ? 500 : 400,
+                      color: activeTab === id ? 'var(--text-primary)' : 'var(--text-secondary)',
                       background: 'none', border: 'none',
-                      borderBottom: activeTab === tab ? '2px solid var(--accent)' : '2px solid transparent',
+                      borderBottom: activeTab === id ? '2px solid var(--accent)' : '2px solid transparent',
                       marginBottom: -1, cursor: 'pointer',
                       fontFamily: 'var(--font)',
                     }}
                   >
-                    {tab === 'perfil' ? 'Perfil vivo' : tab.charAt(0).toUpperCase() + tab.slice(1)}
-                    {tab === 'artefatos' && artifacts.length > 0 && (
+                    {label}
+                    {id === 'artefatos' && artifacts.length > 0 && (
                       <span style={{ marginLeft: 6, fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
                         {artifacts.length}
                       </span>
                     )}
-                    {tab === 'pautas' && pautas.length > 0 && (
+                    {id === 'pautas' && pautas.length > 0 && (
                       <span style={{ marginLeft: 6, fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
                         {pautas.length}
                       </span>
@@ -246,6 +252,7 @@ export function PersonView() {
               {activeTab === 'perfil'    && <PerfilTab perfil={perfil} />}
               {activeTab === 'artefatos' && <ArtifactsTab artifacts={artifacts} />}
               {activeTab === 'pautas'    && <PautasTab pautas={pautas} onGenerate={handleGenerateAgenda} generating={generatingAgenda} hasPerfil={!!perfil} />}
+              {activeTab === 'ciclo'     && <CycleTab slug={person.slug} person={person} />}
             </div>
 
           </div>

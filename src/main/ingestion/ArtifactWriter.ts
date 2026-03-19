@@ -141,6 +141,8 @@ ultimo_1on1: ${result.tipo === '1on1' ? `"${result.data_artefato}"` : 'null'}
 acoes_pendentes_count: ${pendingCount}
 alertas_ativos: []
 saude: "${result.indicador_saude}"
+necessita_1on1: ${result.necessita_1on1 ?? false}
+motivo_1on1: ${result.motivo_1on1 ? `"${result.motivo_1on1}"` : 'null'}
 ---
 
 # Perfil Vivo — ${slug}
@@ -238,6 +240,16 @@ ${SECTION.historico.close}
 
     // saude
     fm = fm.replace(/saude:.*/, `saude: "${result.indicador_saude}"`)
+
+    // necessita_1on1 + motivo_1on1
+    const necessita = result.necessita_1on1 ?? false
+    const motivo    = result.motivo_1on1 ? `"${result.motivo_1on1}"` : 'null'
+    if (/necessita_1on1:/.test(fm)) {
+      fm = fm.replace(/necessita_1on1:.*/, `necessita_1on1: ${necessita}`)
+      fm = fm.replace(/motivo_1on1:.*/, `motivo_1on1: ${motivo}`)
+    } else {
+      fm += `\nnecessita_1on1: ${necessita}\nmotivo_1on1: ${motivo}`
+    }
 
     // acoes_pendentes_count: recalculate from block
     const acoesBlock = this.extractBlock(content, 'acoes')

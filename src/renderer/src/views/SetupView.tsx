@@ -54,7 +54,7 @@ export function SetupView() {
           fontFamily: 'var(--font)',
           fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)',
         }}>
-          MgrCockpit
+          Pulse Cockpit
         </span>
         <span style={{
           width: 6, height: 6, borderRadius: '50%',

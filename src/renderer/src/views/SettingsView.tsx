@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FolderOpen, Cpu, Bell, CheckCircle2, XCircle, User } from 'lucide-react'
+import { FolderOpen, Cpu, CheckCircle2, XCircle, User } from 'lucide-react'
 import type { AppSettings } from '../types/ipc'
 
 export function SettingsView() {
@@ -93,6 +93,14 @@ export function SettingsView() {
                 placeholder="Ex: Gerente de Engenharia"
               />
             </Field>
+            <Field label="Empresa">
+              <input
+                style={styles.input}
+                value={form.managerCompany ?? ''}
+                onChange={(e) => set('managerCompany', e.target.value)}
+                placeholder="Ex: Acme Corp"
+              />
+            </Field>
           </Section>
 
           {/* Workspace */}
@@ -149,26 +157,6 @@ export function SettingsView() {
               {!form.claudeBinPath && (
                 <StatusLine ok={false}>Binário não configurado — instale o Claude Code CLI</StatusLine>
               )}
-            </Field>
-          </Section>
-
-          {/* Notificações */}
-          <Section
-            icon={<Bell size={14} />}
-            title="Notificações"
-            desc="Alertas sobre liderados sem contato recente"
-          >
-            <Field label="Alertar quando liderado sem 1:1 por">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <input
-                  type="number"
-                  style={{ ...styles.input, width: 80 }}
-                  value={form.alert1on1Days}
-                  onChange={(e) => set('alert1on1Days', parseInt(e.target.value, 10))}
-                  min={1}
-                />
-                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>dias</span>
-              </div>
             </Field>
           </Section>
 

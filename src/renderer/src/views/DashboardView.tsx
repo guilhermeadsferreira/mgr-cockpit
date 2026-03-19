@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { UserPlus, Pencil, ChevronRight, X, UserCheck } from 'lucide-react'
+import { UserPlus, Pencil, ChevronRight, X, UserCheck, AlertCircle } from 'lucide-react'
 import { useRouter } from '../router'
 import type { PersonConfig, PerfilFrontmatter, DetectedPerson } from '../types/ipc'
 import { labelNivel, labelRelacao } from '../lib/utils'
@@ -302,6 +302,23 @@ function PersonCard({
               alignSelf: 'center',
             }}>
               {alert1on1.label}
+            </span>
+          )}
+          {perfil.necessita_1on1 && (
+            <span
+              title={perfil.motivo_1on1 ?? '1:1 necessário'}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 3,
+                fontSize: 10, fontWeight: 600,
+                padding: '2px 7px', borderRadius: 20,
+                background: 'rgba(192,135,58,0.1)',
+                border: '1px solid rgba(192,135,58,0.3)',
+                color: 'var(--accent)',
+                alignSelf: 'center', cursor: 'default',
+              }}
+            >
+              <AlertCircle size={9} />
+              1:1
             </span>
           )}
         </div>

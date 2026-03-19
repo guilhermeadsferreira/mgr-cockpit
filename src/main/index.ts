@@ -59,6 +59,12 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('settings:setup-workspace', async (_event, workspacePath: string) => {
     await setupWorkspace(workspacePath)
+    // Restart file watcher pointing at the new workspace
+    if (fileWatcher) {
+      fileWatcher.stop()
+      fileWatcher = new FileWatcher(workspacePath)
+      fileWatcher.start()
+    }
   })
 
   ipcMain.handle('settings:select-folder', async () => {

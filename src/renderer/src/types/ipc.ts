@@ -4,9 +4,9 @@
 export interface AppSettings {
   workspacePath: string
   claudeBinPath: string
-  alert1on1Days: number
   managerName?: string
   managerRole?: string
+  managerCompany?: string
 }
 
 export type PersonLevel   = 'junior' | 'pleno' | 'senior' | 'staff' | 'principal' | 'manager'
@@ -58,6 +58,8 @@ export interface PerfilFrontmatter {
   acoes_pendentes_count: number
   alertas_ativos:        string[]
   saude:                 'verde' | 'amarelo' | 'vermelho'
+  necessita_1on1:        boolean
+  motivo_1on1:           string | null
 }
 
 export interface PerfilData {

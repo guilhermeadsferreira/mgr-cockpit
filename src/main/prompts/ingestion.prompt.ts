@@ -47,6 +47,8 @@ Regras obrigatórias:
 - "temas_atualizados": array com os temas recorrentes COMPLETO e deduplicado, mesclando os temas anteriores (do perfil) com os novos detectados neste artefato
 - "indicador_saude": "verde" | "amarelo" | "vermelho" — baseado no que foi observado
 - "motivo_indicador": 1 frase explicando o indicador de saúde
+- "necessita_1on1": true se este artefato evidencia que um 1:1 é urgente. Marque true quando houver qualquer um destes sinais: bloqueio sem resolução aparente, tema sensível (carreira, saúde, conflito interpessoal), ação comprometida há muito tempo sem follow-up, ou indicador amarelo/vermelho com causa identificada. Para 1:1s já realizados neste artefato, retorne false (o 1:1 já aconteceu). Caso contrário, false.
+- "motivo_1on1": se necessita_1on1 for true, 1 frase curta descrevendo o motivo (ex: "Bloqueio técnico sem resolução há 2 semanas"). Se false, null.
 
 JSON esperado:
 {
@@ -63,7 +65,9 @@ JSON esperado:
   "resumo_evolutivo": "string",
   "temas_atualizados": ["string"],
   "indicador_saude": "verde|amarelo|vermelho",
-  "motivo_indicador": "string"
+  "motivo_indicador": "string",
+  "necessita_1on1": true | false,
+  "motivo_1on1": "string ou null"
 }`
 }
 
@@ -82,4 +86,6 @@ export interface IngestionAIResult {
   temas_atualizados: string[]
   indicador_saude: 'verde' | 'amarelo' | 'vermelho'
   motivo_indicador: string
+  necessita_1on1: boolean
+  motivo_1on1: string | null
 }

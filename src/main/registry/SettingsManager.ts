@@ -6,28 +6,35 @@ import { execSync } from 'child_process'
 export interface AppSettings {
   workspacePath: string
   claudeBinPath: string
-  alert1on1Days: number
   managerName?: string
   managerRole?: string
+  managerCompany?: string
 }
 
-const SETTINGS_DIR  = join(homedir(), '.mgrcockpit')
+const SETTINGS_DIR  = join(homedir(), '.pulsecockpit')
 const SETTINGS_FILE = join(SETTINGS_DIR, 'settings.json')
 
 function detectClaudeBin(): string {
-  try {
-    return execSync('which claude', { encoding: 'utf-8' }).trim()
-  } catch {
-    return ''
+  // When launched as a packaged app, PATH is limited and doesn't include
+  // paths set in .zshrc/.bashrc. Use a login shell to get the full PATH.
+  for (const shell of ['zsh', 'bash']) {
+    try {
+      const result = execSync(`${shell} -l -c "which claude"`, {
+        encoding: 'utf-8',
+        timeout: 5000,
+      }).trim()
+      if (result) return result
+    } catch { /* try next */ }
   }
+  return ''
 }
 
 const DEFAULTS: AppSettings = {
-  workspacePath:  join(homedir(), 'MgrCockpit'),
+  workspacePath:  join(homedir(), 'PulseCockpit'),
   claudeBinPath:  detectClaudeBin(),
-  alert1on1Days:  21,
   managerName:    '',
   managerRole:    '',
+  managerCompany: '',
 }
 
 export const SettingsManager = {

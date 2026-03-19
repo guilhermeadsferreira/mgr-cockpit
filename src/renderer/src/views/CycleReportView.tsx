@@ -1,30 +1,21 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { FileText, ExternalLink, Loader2 } from 'lucide-react'
-import { useRouter } from '../router'
 import type { PersonConfig, CycleReportParams, CycleReportResult } from '../types/ipc'
 import { MarkdownPreview } from '../components/MarkdownPreview'
 import { fmtDate } from '../lib/utils'
 
-export function CycleReportView() {
-  const { params } = useRouter()
-  const [people,    setPeople]    = useState<PersonConfig[]>([])
-  const [slug,      setSlug]      = useState(params.slug ?? '')
-  const [dateFrom,  setDateFrom]  = useState(() => {
-    // default: 3 months ago
+/** Embedded tab used inside PersonView — no person selector needed. */
+export function CycleTab({ slug, person }: { slug: string; person: PersonConfig }) {
+  const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date()
     d.setMonth(d.getMonth() - 3)
     return d.toISOString().slice(0, 10)
   })
-  const [dateTo,    setDateTo]    = useState(() => new Date().toISOString().slice(0, 10))
-  const [loading,   setLoading]   = useState(false)
-  const [result,    setResult]    = useState<CycleReportResult | null>(null)
-
-  useEffect(() => {
-    window.api.people.list().then(setPeople)
-  }, [])
+  const [dateTo,  setDateTo]  = useState(() => new Date().toISOString().slice(0, 10))
+  const [loading, setLoading] = useState(false)
+  const [result,  setResult]  = useState<CycleReportResult | null>(null)
 
   async function handleGenerate() {
-    if (!slug) return
     setLoading(true)
     setResult(null)
     try {
@@ -38,115 +29,48 @@ export function CycleReportView() {
     }
   }
 
-  const person = people.find(p => p.slug === slug)
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Period + generate */}
       <div style={{
-        padding: '28px 40px 22px',
-        borderBottom: '1px solid var(--border-subtle)',
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 6, overflow: 'hidden',
       }}>
-        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>
-          Norte estrela
-        </div>
-        <h1 style={{ fontFamily: 'var(--font)', fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.025em', lineHeight: 1.1 }}>
-          Relatório de Ciclo
-        </h1>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
-          Gere a narrativa para o fórum de calibração
-        </div>
-      </div>
-
-      {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '28px 40px' }}>
-        <div style={{ maxWidth: 680 }}>
-
-          {/* Config card */}
-          <div style={{
-            background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 6, overflow: 'hidden', marginBottom: 24,
-          }}>
-            <div style={{
-              padding: '13px 20px', borderBottom: '1px solid var(--border-subtle)',
-              fontSize: 13, fontWeight: 600, color: 'var(--text-primary)',
-            }}>
-              Configurar relatório
-              <div style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-secondary)', marginTop: 2 }}>
-                Selecione a pessoa e o período de avaliação
-              </div>
-            </div>
-
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 6 }}>Pessoa</div>
-              <select
-                value={slug}
-                onChange={e => setSlug(e.target.value)}
-                style={{
-                  width: '100%', background: 'var(--surface-2)', border: '1px solid var(--border)',
-                  borderRadius: 6, padding: '8px 12px',
-                  fontFamily: 'var(--font)', fontSize: 13,
-                  color: slug ? 'var(--text-primary)' : 'var(--text-muted)', outline: 'none', cursor: 'pointer',
-                }}
-              >
-                <option value="">Selecionar pessoa…</option>
-                {people.map(p => (
-                  <option key={p.slug} value={p.slug}>
-                    {p.nome} — {p.cargo} · {p.squad ?? p.area ?? ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Período</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>Início e fim do ciclo de avaliação</div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={e => setDateFrom(e.target.value)}
-                  style={inputStyle}
-                />
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={e => setDateTo(e.target.value)}
-                  style={inputStyle}
-                />
-              </div>
-            </div>
-
-            <div style={{ padding: '16px 20px' }}>
-              <button
-                onClick={handleGenerate}
-                disabled={!slug || loading}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  padding: '10px', borderRadius: 6, border: 'none',
-                  background: slug && !loading ? 'var(--accent)' : 'var(--surface-3)',
-                  color: slug && !loading ? '#09090c' : 'var(--text-muted)',
-                  fontSize: 13, fontFamily: 'var(--font)', fontWeight: 600,
-                  cursor: slug && !loading ? 'pointer' : 'not-allowed',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {loading
-                  ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Gerando relatório…</>
-                  : <><FileText size={14} /> Gerar relatório de ciclo</>}
-              </button>
-            </div>
+        <div style={{ padding: '13px 20px', borderBottom: '1px solid var(--border-subtle)', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+          Período de avaliação
+          <div style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-secondary)', marginTop: 2 }}>
+            Início e fim do ciclo a sintetizar
           </div>
-
-          {/* Result */}
-          {result && (
-            result.success && result.result
-              ? <CycleResultView result={result} person={person} />
-              : <ErrorCard error={result.error ?? 'Erro desconhecido.'} />
-          )}
-
+        </div>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', gap: 8 }}>
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={inputStyle} />
+          <input type="date" value={dateTo}   onChange={e => setDateTo(e.target.value)}   style={inputStyle} />
+        </div>
+        <div style={{ padding: '16px 20px' }}>
+          <button
+            onClick={handleGenerate}
+            disabled={loading}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              padding: '10px', borderRadius: 6, border: 'none',
+              background: loading ? 'var(--surface-3)' : 'var(--accent)',
+              color: loading ? 'var(--text-muted)' : '#09090c',
+              fontSize: 13, fontFamily: 'var(--font)', fontWeight: 600,
+              cursor: loading ? 'not-allowed' : 'pointer', transition: 'all 0.15s ease',
+            }}
+          >
+            {loading
+              ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Gerando relatório…</>
+              : <><FileText size={14} /> Gerar relatório de ciclo</>}
+          </button>
         </div>
       </div>
+
+      {result && (
+        result.success && result.result
+          ? <CycleResultView result={result} person={person} />
+          : <ErrorCard error={result.error ?? 'Erro desconhecido.'} />
+      )}
     </div>
   )
 }

@@ -1,10 +1,10 @@
-# PRD_TECH — MgrCockpit
+# PRD_TECH — Pulse Cockpit
 
 > Documento vivo — atualizar a cada mudança de stack, arquitetura, schema ou convenção técnica relevante.
 
 **Criado em:** 2026-03-18
-**Status:** Fases 0, 1 e 2 concluídas · Fase 3 em andamento
-**Última atualização:** 2026-03-18
+**Status:** V1 completa · bugs pós-V1 corrigidos · V2 planejada
+**Última atualização:** 2026-03-19
 
 ---
 
@@ -32,24 +32,43 @@
 
 ```
 Main Process (Node.js)
-├── FileWatcher (chokidar) — monitora inbox/
-├── IngestionPipeline — orquestra o processamento
-│   ├── FileReader — lê e normaliza o conteúdo
-│   ├── ClaudeRunner — spawn do CLI headless
-│   └── ArtifactWriter — escreve arquivos resultado
-├── PersonRegistry — gerencia perfis de pessoas
-├── SettingsManager — lê/escreve ~/.mgrcockpit/settings.json
-└── IPC Handlers — expõe ações ao Renderer
+├── index.ts — BrowserWindow, lifecycle, todos os IPC handlers (em um único arquivo)
+├── ingestion/
+│   ├── FileWatcher — chokidar, monitora inbox/
+│   ├── IngestionPipeline — orquestra fila sequencial
+│   ├── FileReader — lê .md/.txt/.pdf
+│   ├── ClaudeRunner — spawn do CLI headless + retry + parse JSON
+│   └── ArtifactWriter — escreve artefato e atualiza perfil.md
+├── registry/
+│   ├── PersonRegistry — CRUD de pessoas (config.yaml, perfil.md, historico/, pautas/)
+│   ├── DetectedRegistry — pessoas detectadas nos artefatos ainda não cadastradas
+│   └── SettingsManager — ~/.pulsecockpit/settings.json
+├── prompts/ — funções puras: recebem contexto, retornam string do prompt
+│   ├── ingestion.prompt.ts
+│   ├── agenda.prompt.ts
+│   └── cycle.prompt.ts
+└── workspace/
+    └── WorkspaceSetup — cria estrutura de pastas do workspace
 
 Renderer Process (React)
-├── DashboardView — cards de pessoas
-├── InboxView — drop zone + fila de processamento
-├── PersonView — cockpit individual
-├── ArtifactView — visualização de artefato processado
-└── SettingsView — workspace, Claude CLI, notificações
+├── App.tsx — RouterProvider + Layout shell
+├── router.tsx — history stack simples (sem react-router)
+├── views/
+│   ├── DashboardView — grid de cards (suporta prop `relacao`: liderado/par/gestor)
+│   ├── InboxView — drop zone + fila de processamento
+│   ├── PersonView — cockpit individual (perfil, artefatos, pautas, relatório)
+│   ├── PersonFormView — formulário de cadastro/edição de pessoa
+│   ├── CycleReportView — seletor período + geração + exibição (a mover para PersonView em V2)
+│   ├── SettingsView — workspace, Claude CLI, notificações
+│   └── SetupView — tela de verificação do ambiente (primeira abertura)
+├── components/
+│   ├── Sidebar.tsx — nav principal + footer do gestor
+│   ├── Layout.tsx — wrapper com sidebar fixa
+│   └── MarkdownPreview.tsx — renderização de markdown com react-markdown
+└── lib/utils.ts — labelNivel, labelRelacao, etc.
 
-IPC Bridge (preload.ts)
-└── contextBridge → window.api (people, artifacts, ai, shell, ingestion)
+IPC Bridge (preload/index.ts)
+└── contextBridge → window.api (ping, settings, people, artifacts, detected, ingestion, ai, shell)
 ```
 
 ---
@@ -59,88 +78,70 @@ IPC Bridge (preload.ts)
 ```
 mgr-cockpit/
 ├── package.json
-├── tsconfig.json                    # base config
-├── tsconfig.main.json               # main process (Node target)
-├── tsconfig.renderer.json           # renderer (browser target)
-├── vite.config.ts                   # renderer bundle
-├── vite.main.config.ts              # main process bundle
+├── electron.vite.config.ts          # electron-vite (main + preload + renderer)
 ├── electron-builder.config.ts
-├── tailwind.config.ts
-├── .eslintrc.cjs
+├── tsconfig.json
+├── tsconfig.node.json
+├── tsconfig.web.json
 │
 ├── src/
 │   ├── main/
-│   │   ├── index.ts                 # BrowserWindow, app lifecycle
-│   │   ├── ipc/
-│   │   │   ├── index.ts             # registerAllHandlers()
-│   │   │   ├── people.handlers.ts
-│   │   │   ├── artifacts.handlers.ts
-│   │   │   ├── ai.handlers.ts
-│   │   │   └── shell.handlers.ts
+│   │   ├── index.ts                 # BrowserWindow, lifecycle, TODOS os IPC handlers
 │   │   ├── ingestion/
-│   │   │   ├── FileWatcher.ts       # chokidar wrapper
-│   │   │   ├── IngestionPipeline.ts # orquestra o fluxo
-│   │   │   ├── FileReader.ts        # lê .md/.txt/.pdf
-│   │   │   ├── ClaudeRunner.ts      # spawn + parse + retry
-│   │   │   └── ArtifactWriter.ts    # escreve artefato e perfil
+│   │   │   ├── FileWatcher.ts
+│   │   │   ├── IngestionPipeline.ts
+│   │   │   ├── FileReader.ts
+│   │   │   ├── ClaudeRunner.ts
+│   │   │   └── ArtifactWriter.ts
 │   │   ├── registry/
-│   │   │   ├── PersonRegistry.ts    # CRUD pessoas
-│   │   │   └── SettingsManager.ts   # ~/.mgrcockpit/settings.json
+│   │   │   ├── PersonRegistry.ts
+│   │   │   ├── DetectedRegistry.ts  # pessoas detectadas nos artefatos, não cadastradas
+│   │   │   └── SettingsManager.ts
 │   │   ├── prompts/
 │   │   │   ├── ingestion.prompt.ts
 │   │   │   ├── agenda.prompt.ts
 │   │   │   └── cycle.prompt.ts
 │   │   └── workspace/
-│   │       └── WorkspaceSetup.ts    # cria pastas do workspace
+│   │       └── WorkspaceSetup.ts
 │   │
 │   ├── preload/
-│   │   └── index.ts                 # contextBridge — API bridge
+│   │   └── index.ts                 # contextBridge — window.api
 │   │
 │   └── renderer/
 │       ├── index.html
-│       ├── main.tsx
-│       ├── App.tsx                  # Router + layout shell
-│       ├── types/
-│       │   ├── ipc.ts               # único arquivo compartilhado main/renderer
-│       │   ├── person.ts
-│       │   └── artifact.ts
-│       ├── views/
-│       │   ├── DashboardView.tsx
-│       │   ├── InboxView.tsx
-│       │   ├── PersonView.tsx
-│       │   ├── ArtifactView.tsx
-│       │   └── SettingsView.tsx
-│       ├── components/
-│       │   ├── PersonCard.tsx
-│       │   ├── PersonForm.tsx
-│       │   ├── HealthIndicator.tsx
-│       │   ├── InboxQueue.tsx
-│       │   ├── DropZone.tsx
-│       │   └── ArtifactList.tsx
-│       ├── hooks/
-│       │   ├── useIpc.ts
-│       │   ├── usePeople.ts
-│       │   └── useIngestion.ts
-│       └── lib/
-│           └── utils.ts
-│
-└── tests/
-    ├── unit/
-    │   ├── ClaudeRunner.test.ts
-    │   ├── FileReader.test.ts
-    │   └── PersonRegistry.test.ts
-    └── integration/
-        └── ingestion-pipeline.test.ts
+│       └── src/
+│           ├── main.tsx
+│           ├── App.tsx
+│           ├── router.tsx           # history stack simples (sem react-router)
+│           ├── types/
+│           │   ├── ipc.ts           # tipos compartilhados main/renderer
+│           │   └── global.d.ts      # tipagem de window.api
+│           ├── views/
+│           │   ├── DashboardView.tsx    # suporta prop relacao: liderado | par | gestor
+│           │   ├── InboxView.tsx
+│           │   ├── PersonView.tsx
+│           │   ├── PersonFormView.tsx
+│           │   ├── CycleReportView.tsx
+│           │   ├── SettingsView.tsx
+│           │   └── SetupView.tsx        # verificação de ambiente (primeira abertura)
+│           ├── components/
+│           │   ├── Sidebar.tsx
+│           │   ├── Layout.tsx
+│           │   └── MarkdownPreview.tsx
+│           └── lib/
+│               └── utils.ts
 ```
+
+> **Nota:** não há pasta `ipc/`, `hooks/` nem arquivos `types/person.ts` / `types/artifact.ts`. A estrutura do PRD original era a intenção inicial — o que foi implementado diferiu por razões pragmáticas.
 
 ---
 
 ## Modelagem de Dados
 
-### Workspace (~MgrCockpit/)
+### Workspace (~Pulse Cockpit/)
 
 ```
-~/MgrCockpit/
+~/Pulse Cockpit/
   inbox/                     ← drop zone monitorada pelo FileWatcher
   artefatos/
     1on1/
@@ -286,27 +287,44 @@ Os comentários `<!-- BLOCO GERENCIADO -->` são âncoras que o ArtifactWriter u
 
 | Channel | Direção | Descrição |
 |---------|---------|-----------|
-| `ingestion:started` | main → renderer | Arquivo entrou na fila |
-| `ingestion:completed` | main → renderer | Ingestão concluída com resultado |
-| `ingestion:failed` | main → renderer | Erro no processamento |
+| `ipc:ping` | renderer → main | Health check do IPC bridge |
+| `settings:load` | renderer → main | Carrega AppSettings |
+| `settings:save` | renderer → main | Persiste AppSettings |
+| `settings:detect-claude` | renderer → main | Roda `zsh -l -c "which claude"` |
+| `settings:setup-workspace` | renderer → main | Cria pastas + reinicia FileWatcher |
+| `settings:select-folder` | renderer → main | Abre dialog nativo de pasta |
 | `people:list` | renderer → main | Lista todas as pessoas |
 | `people:get` | renderer → main | Retorna uma pessoa por slug |
 | `people:save` | renderer → main | Cria ou atualiza config.yaml |
 | `people:delete` | renderer → main | Remove pessoa |
+| `people:get-perfil` | renderer → main | Lê perfil.md com frontmatter parseado |
+| `people:list-pautas` | renderer → main | Lista pautas de uma pessoa |
 | `artifacts:list` | renderer → main | Lista artefatos de uma pessoa |
+| `artifacts:read` | renderer → main | Lê conteúdo de um artefato por path |
+| `detected:list` | renderer → main | Lista pessoas detectadas não cadastradas |
+| `detected:dismiss` | renderer → main | Descarta uma pessoa detectada |
+| `ingestion:queue` | renderer → main | Retorna fila atual do FileWatcher |
+| `ingestion:enqueue` | renderer → main | Enfileira arquivo manualmente |
+| `ai:test` | renderer → main | Testa o Claude CLI com prompt simples |
 | `ai:generate-agenda` | renderer → main | Gera pauta de 1:1 |
 | `ai:cycle-report` | renderer → main | Relatório de ciclo/avaliação |
 | `shell:open` | renderer → main | Abre arquivo no editor externo |
+| `ingestion:started` | main → renderer | Arquivo entrou na fila |
+| `ingestion:completed` | main → renderer | Ingestão concluída com resultado |
+| `ingestion:failed` | main → renderer | Erro no processamento |
 
 ### window.api (preload)
 
 ```typescript
 window.api = {
-  people: { list, get, save, delete },
-  artifacts: { list },
-  ai: { generateAgenda, cycleReport },
-  shell: { open },
-  ingestion: { onStarted, onCompleted, onFailed, removeAllListeners },
+  ping: () => Promise<{ ok: boolean; ts: number }>,
+  settings: { load, save, detectClaude, setupWorkspace, selectFolder },
+  people:   { list, get, save, delete, getPerfil, listPautas },
+  artifacts:{ list, read },
+  detected: { list, dismiss },
+  ingestion:{ queue, enqueue, onStarted, onCompleted, onFailed, removeListeners },
+  ai:       { test, generateAgenda, cycleReport },
+  shell:    { open },
 }
 ```
 
@@ -334,7 +352,8 @@ spawn(claudeBin, ['-p', prompt], {
 - Max retries: 2 (backoff linear: `attempt * 2000ms`)
 
 **Detecção do binário:**
-- `SettingsManager.detectClaudeBin()` tenta `which claude` via `execSync`
+- `SettingsManager.detectClaudeBin()` tenta `zsh -l -c "which claude"` (login shell), com fallback para `bash -l`
+- Login shell necessário: app empacotado (.dmg) não herda o PATH do terminal (`.zshrc`/`.bashrc` não são carregados)
 - Armazena **path absoluto** em `settings.json` (ex: `/usr/local/bin/claude`)
 - Nunca depende do PATH em runtime — crítico para app empacotado (dmg)
 - Settings UI expõe o path detectado e permite override manual
@@ -391,7 +410,7 @@ Exportado como Markdown em `exports/YYYY-MM-DD-{slug}-ciclo.md`.
 4. `electron-builder.config.ts` — macOS dmg
 5. `src/main/index.ts` — BrowserWindow mínimo
 6. `src/preload/index.ts` — contextBridge skeleton com todos os channels declarados
-7. `WorkspaceSetup.ts` — cria `~/MgrCockpit/{inbox,artefatos/...,pessoas,exports}`
+7. `WorkspaceSetup.ts` — cria `~/Pulse Cockpit/{inbox,artefatos/...,pessoas,exports}`
 8. **PoC ClaudeRunner** — spawn, captura stdout, valida JSON parseável
 
 ### Fase 1 — Fundação
@@ -436,7 +455,7 @@ Exportado como Markdown em `exports/YYYY-MM-DD-{slug}-ciclo.md`.
 
 | Variável | Descrição | Padrão |
 |----------|-----------|--------|
-| `MGRCOCKPIT_WORKSPACE` | Caminho base do workspace | `~/MgrCockpit` |
+| `PULSECOCKPIT_WORKSPACE` | Caminho base do workspace | `~/Pulse Cockpit` |
 | `CLAUDE_BIN` | Caminho para o binário claude | auto-detect via `which claude` |
 
 ---

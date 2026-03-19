@@ -1,5 +1,5 @@
 {
-  "name": "mgr-cockpit",
+  "name": "pulse-cockpit",
   "version": "0.1.0",
   "description": "Segundo cérebro para gestores de tecnologia",
   "main": "out/main/index.js",
@@ -11,8 +11,9 @@
     "lint": "eslint . --ext .ts,.tsx --ignore-path .gitignore"
   },
   "build": {
-    "appId": "com.mgrcockpit.app",
-    "productName": "MgrCockpit",
+    "appId": "com.pulsecockpit.app",
+    "productName": "Pulse Cockpit",
+    "copyright": "Copyright © 2026 Pulse Cockpit",
     "directories": {
       "output": "dist"
     },
@@ -21,6 +22,8 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
       "target": [
         {
           "target": "dmg",
@@ -30,6 +33,13 @@
           ]
         }
       ]
+    },
+    "dmg": {
+      "title": "Pulse Cockpit",
+      "window": {
+        "width": 540,
+        "height": 380
+      }
     },
     "extraResources": [],
     "asar": true
