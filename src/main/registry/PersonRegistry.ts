@@ -211,6 +211,31 @@ export class PersonRegistry {
     }
   }
 
+  listAllArtifacts(): Array<{ fileName: string; tipo: string; date: string; path: string; personSlug: string; personNome: string; resumo: string }> {
+    const people = this.list()
+    const all: Array<{ fileName: string; tipo: string; date: string; path: string; personSlug: string; personNome: string; resumo: string }> = []
+    for (const person of people) {
+      const artifacts = this.listArtifacts(person.slug).map((a) => ({
+        ...a,
+        personSlug: person.slug,
+        personNome: person.nome,
+        resumo: this.extractResumo(a.path),
+      }))
+      all.push(...artifacts)
+    }
+    return all.sort((a, b) => b.date.localeCompare(a.date))
+  }
+
+  private extractResumo(filePath: string): string {
+    try {
+      const content = readFileSync(filePath, 'utf-8')
+      const body = content.replace(/^---\n[\s\S]*?\n---\n\n?/, '')
+      const match = body.match(/## Resumo\n([\s\S]*?)(?:\n##|$)/)
+      if (match) return match[1].trim().slice(0, 200)
+    } catch { /* skip */ }
+    return ''
+  }
+
   serializeForPrompt(): string {
     const people = this.list()
     if (people.length === 0) return 'Nenhuma pessoa cadastrada no time.'

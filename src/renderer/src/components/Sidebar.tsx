@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Grid2X2, Inbox, Settings, Users, UserCheck } from 'lucide-react'
+import { Grid2X2, Inbox, Settings, Users, UserCheck, ScrollText } from 'lucide-react'
 import { useRouter, type ViewName } from '../router'
 
 interface NavItem {
@@ -14,6 +14,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Time',     icon: <Grid2X2 size={14} /> },
   { id: 'pares',     label: 'Pares',    icon: <Users size={14} /> },
   { id: 'gestores',  label: 'Gestores', icon: <UserCheck size={14} /> },
+  { id: 'feed',      label: 'Reuniões', icon: <ScrollText size={14} /> },
 ]
 
 function getInitials(name: string): string {

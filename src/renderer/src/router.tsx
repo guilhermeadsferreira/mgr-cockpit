@@ -4,6 +4,7 @@ export type ViewName =
   | 'dashboard'
   | 'pares'
   | 'gestores'
+  | 'feed'
   | 'person'
   | 'person-form'
   | 'inbox'

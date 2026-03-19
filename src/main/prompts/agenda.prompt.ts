@@ -3,13 +3,22 @@ export interface AgendaPromptParams {
   perfilMd:          string
   today:             string
   pautasAnteriores?: Array<{ date: string; content: string }>
+  openActions?:      Array<{ texto: string; criadoEm: string }>
 }
 
 export function buildAgendaPrompt(params: AgendaPromptParams): string {
-  const { configYaml, perfilMd, today, pautasAnteriores = [] } = params
+  const { configYaml, perfilMd, today, pautasAnteriores = [], openActions = [] } = params
 
   const pautasSection = pautasAnteriores.length > 0
     ? `\n## Histórico de pautas anteriores\n${pautasAnteriores.map(p => `### Pauta de ${p.date}\n${p.content}`).join('\n\n')}\n`
+    : ''
+
+  const today_date = new Date(today)
+  const acoesSection = openActions.length > 0
+    ? `\n## Ações em aberto (Action Loop)\n${openActions.map(a => {
+        const daysOpen = Math.floor((today_date.getTime() - new Date(a.criadoEm).getTime()) / 86_400_000)
+        return `- [${daysOpen}d em aberto] ${a.texto}`
+      }).join('\n')}\n`
     : ''
 
   return `Você é o assistente de um gestor de tecnologia. Gere uma pauta estruturada para o próximo 1:1.
@@ -23,10 +32,10 @@ ${configYaml}
 
 ## Perfil vivo atual
 ${perfilMd}
-${pautasSection}
+${pautasSection}${acoesSection}
 ## Sua tarefa
 
-Com base no perfil acumulado${pautasAnteriores.length > 0 ? ', no histórico de pautas anteriores' : ''} e nas boas práticas de gestão, gere uma pauta completa e estruturada para o próximo 1:1. Retorne APENAS um JSON válido (sem texto antes ou depois):
+Com base no perfil acumulado${pautasAnteriores.length > 0 ? ', no histórico de pautas anteriores' : ''}${openActions.length > 0 ? ', nas ações em aberto do Action Loop' : ''} e nas boas práticas de gestão, gere uma pauta completa e estruturada para o próximo 1:1. Retorne APENAS um JSON válido (sem texto antes ou depois):
 
 {
   "follow_ups": ["string"],
@@ -37,7 +46,7 @@ Com base no perfil acumulado${pautasAnteriores.length > 0 ? ', no histórico de 
 }
 
 Regras:
-- "follow_ups": ações em aberto e acordos das pautas anteriores que precisam de acompanhamento. Seja específico e mencione o contexto.
+- "follow_ups": ações em aberto e acordos das pautas anteriores que precisam de acompanhamento. Priorize as ações do Action Loop mais antigas (mais dias em aberto). Seja específico e mencione o contexto.
 - "temas": assuntos recorrentes, pontos de atenção ou evolução de carreira que merecem discussão aprofundada. Priorize pelo impacto.
 - "perguntas_sugeridas": 4 a 6 perguntas abertas, específicas e contextualizadas para esta pessoa. Inclua perguntas sobre bem-estar, desafios técnicos, relacionamentos com o time e desenvolvimento profissional. NUNCA use perguntas genéricas — baseie-se no perfil real.
 - "alertas": pontos críticos que o gestor DEVE abordar (bloqueios, conflitos, risco de desengajamento, deadlines críticos). Array vazio se não houver urgências.

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { UserPlus, Pencil, ChevronRight, X, UserCheck, AlertCircle, TrendingDown, TrendingUp } from 'lucide-react'
 import { useRouter } from '../router'
-import type { PersonConfig, PerfilFrontmatter, DetectedPerson } from '../types/ipc'
+import type { PersonConfig, PerfilFrontmatter, DetectedPerson, Action } from '../types/ipc'
 import { labelNivel, labelRelacao, daysSince } from '../lib/utils'
 
 function fmtDate(iso: string | null | undefined): string {
@@ -32,6 +32,7 @@ export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
   const { navigate } = useRouter()
   const [people,   setPeople]   = useState<PersonConfig[]>([])
   const [perfis,   setPerfis]   = useState<Record<string, Partial<PerfilFrontmatter>>>({})
+  const [actionsMap, setActionsMap] = useState<Record<string, Action[]>>({})
   const [detected, setDetected] = useState<DetectedPerson[]>([])
   const [loading,  setLoading]  = useState(true)
 
@@ -67,14 +68,19 @@ export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
     setDetected(det.filter((d) => !registeredSlugs.has(d.slug)))
     setLoading(false)
 
-    // Load perfil frontmatter for each person in parallel
-    const results = await Promise.all(
-      filtered.map(async (p) => {
+    // Load perfil frontmatter and actions for each person in parallel
+    const [perfilResults, actionResults] = await Promise.all([
+      Promise.all(filtered.map(async (p) => {
         const perfil = await window.api.people.getPerfil(p.slug)
         return [p.slug, perfil?.frontmatter ?? {}] as const
-      })
-    )
-    setPerfis(Object.fromEntries(results))
+      })),
+      Promise.all(filtered.map(async (p) => {
+        const actions = await window.api.actions.list(p.slug)
+        return [p.slug, actions] as const
+      })),
+    ])
+    setPerfis(Object.fromEntries(perfilResults))
+    setActionsMap(Object.fromEntries(actionResults))
   }, [relacao])
 
   async function handleDismissDetected(slug: string) {
@@ -150,6 +156,7 @@ export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
                     key={p.slug}
                     person={p}
                     perfil={perfis[p.slug] ?? {}}
+                    actions={actionsMap[p.slug] ?? []}
                     onViewCockpit={() => navigate('person', { slug: p.slug })}
                     onEdit={() => navigate('person-form', { slug: p.slug })}
                   />
@@ -214,11 +221,13 @@ function calc1on1Alert(perfil: Partial<PerfilFrontmatter>, frequenciaDias: numbe
 function PersonCard({
   person,
   perfil,
+  actions,
   onViewCockpit,
   onEdit,
 }: {
   person: PersonConfig
   perfil: Partial<PerfilFrontmatter>
+  actions: Action[]
   onViewCockpit: () => void
   onEdit: () => void
 }) {
@@ -229,6 +238,10 @@ function PersonCard({
     amarelo:  'var(--yellow, #d4a843)',
     vermelho: 'var(--red)',
   }[perfil.saude ?? ''] ?? 'var(--surface-3)'
+
+  const overdueActions = actions.filter(
+    (a) => a.status === 'open' && daysSince(a.criadoEm) > 14
+  )
 
   const alert1on1  = calc1on1Alert(perfil, person.frequencia_1on1_dias)
   const alertColor = alert1on1?.urgent
@@ -319,6 +332,23 @@ function PersonCard({
             >
               <AlertCircle size={9} />
               1:1
+            </span>
+          )}
+          {/* Ações vencidas (abertas há > 14 dias) */}
+          {overdueActions.length > 0 && (
+            <span
+              title={`${overdueActions.length} ação${overdueActions.length > 1 ? 'ões' : ''} em aberto há mais de 14 dias`}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 3,
+                fontSize: 10, fontWeight: 600,
+                padding: '2px 7px', borderRadius: 20,
+                background: 'rgba(184,64,64,0.1)',
+                border: '1px solid rgba(184,64,64,0.3)',
+                color: 'var(--red)',
+                alignSelf: 'center', cursor: 'default',
+              }}
+            >
+              {overdueActions.length} ação{overdueActions.length > 1 ? 'ões' : ''} vencida{overdueActions.length > 1 ? 's' : ''}
             </span>
           )}
           {/* Negligência: no updates in 30+ days */}

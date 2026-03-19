@@ -1,4 +1,4 @@
-import type { AppSettings, PersonConfig, ArtifactMeta, PerfilData, QueueItem, CycleReportParams, DetectedPerson, PautaMeta, Action, ActionStatus } from './ipc'
+import type { AppSettings, PersonConfig, ArtifactMeta, ArtifactFeedItem, PerfilData, QueueItem, CycleReportParams, DetectedPerson, PautaMeta, Action, ActionStatus } from './ipc'
 
 declare global {
   interface Window {
@@ -25,6 +25,7 @@ declare global {
       artifacts: {
         list: (slug: string) => Promise<ArtifactMeta[]>
         read: (path: string) => Promise<string>
+        feed: () => Promise<ArtifactFeedItem[]>
       }
 
       ingestion: {

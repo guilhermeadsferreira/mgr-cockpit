@@ -49,6 +49,16 @@ export interface ArtifactMeta {
   date:      string
 }
 
+export interface ArtifactFeedItem {
+  path:       string
+  fileName:   string
+  tipo:       string
+  date:       string
+  personSlug: string
+  personNome: string
+  resumo:     string
+}
+
 export interface PerfilFrontmatter {
   slug:                  string
   schema_version:        number

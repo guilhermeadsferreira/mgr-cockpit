@@ -105,6 +105,10 @@ function registerIpcHandlers(): void {
     return getRegistry().listArtifacts(slug)
   })
 
+  ipcMain.handle('artifacts:feed', () => {
+    return getRegistry().listAllArtifacts()
+  })
+
   ipcMain.handle('artifacts:read', (_event, filePath: string) => {
     try {
       return readFileSync(filePath, 'utf-8')
@@ -172,7 +176,11 @@ function registerIpcHandlers(): void {
 
     const today = new Date().toISOString().slice(0, 10)
     const pautasAnteriores = registry.getLastPautas(slug, 2)
-    const prompt = buildAgendaPrompt({ configYaml: configRaw, perfilMd: perfilData.raw, today, pautasAnteriores })
+    const openActions = new ActionRegistry(settings.workspacePath)
+      .list(slug)
+      .filter((a) => a.status === 'open')
+      .map((a) => ({ texto: a.texto, criadoEm: a.criadoEm }))
+    const prompt = buildAgendaPrompt({ configYaml: configRaw, perfilMd: perfilData.raw, today, pautasAnteriores, openActions })
 
     const result = await runClaudePrompt(settings.claudeBinPath, prompt, 90_000)
     if (!result.success || !result.data) {
