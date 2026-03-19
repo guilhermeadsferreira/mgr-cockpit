@@ -5,6 +5,8 @@ export interface AppSettings {
   workspacePath: string
   claudeBinPath: string
   alert1on1Days: number
+  managerName?: string
+  managerRole?: string
 }
 
 export type PersonLevel   = 'junior' | 'pleno' | 'senior' | 'staff' | 'principal' | 'manager'
@@ -113,4 +115,40 @@ export interface CycleReportParams {
   personSlug:    string
   periodoInicio: string
   periodoFim:    string
+}
+
+export interface PautaMeta {
+  fileName: string
+  date:     string
+  path:     string
+}
+
+export interface AgendaResult {
+  success:  boolean
+  path?:    string
+  markdown?: string
+  result?: {
+    follow_ups:          string[]
+    temas:               string[]
+    perguntas_sugeridas: string[]
+    alertas:             string[]
+    reconhecimentos:     string[]
+  }
+  error?: string
+}
+
+export interface CycleReportResult {
+  success:  boolean
+  path?:    string
+  markdown?: string
+  result?: {
+    linha_do_tempo:            Array<{ data: string; evento: string }>
+    entregas_e_conquistas:     string[]
+    padroes_de_comportamento:  string[]
+    evolucao_frente_ao_cargo:  string
+    pontos_de_desenvolvimento:  string[]
+    conclusao_para_calibracao: string
+    flag_promovibilidade:      'sim' | 'nao' | 'avaliar'
+  }
+  error?: string
 }

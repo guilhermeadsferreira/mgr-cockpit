@@ -57,8 +57,8 @@ export class FileWatcher {
   }
 
   // Re-process pending items when a person is registered
-  reprocessPending(slug: string): Promise<number> {
-    return this.pipeline.reprocessPending(slug)
+  reprocessPending(slug: string): number {
+    return this.pipeline.syncPending(slug)
   }
 
   private handleFile(filePath: string): void {

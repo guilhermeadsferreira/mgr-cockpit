@@ -1,11 +1,56 @@
-import { useEffect } from 'react'
+import { useEffect, Component, type ReactNode, type ErrorInfo } from 'react'
 import { RouterProvider, useRouter } from './router'
 import { Layout } from './components/Layout'
-import { DashboardView }  from './views/DashboardView'
-import { PersonView }     from './views/PersonView'
-import { PersonFormView } from './views/PersonFormView'
-import { SettingsView }   from './views/SettingsView'
-import { InboxView }      from './views/InboxView'
+import { DashboardView }    from './views/DashboardView'
+import { PersonView }       from './views/PersonView'
+import { PersonFormView }   from './views/PersonFormView'
+import { SettingsView }     from './views/SettingsView'
+import { InboxView }        from './views/InboxView'
+import { CycleReportView }  from './views/CycleReportView'
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { error: null }
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[ErrorBoundary]', error, info.componentStack)
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{
+          padding: '40px', display: 'flex', flexDirection: 'column', gap: 12,
+          color: 'var(--text-primary)', fontFamily: 'var(--font)',
+        }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--red)' }}>Erro de renderização</div>
+          <pre style={{
+            fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)',
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 6, padding: 16, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          }}>
+            {this.state.error.message}
+          </pre>
+          <button
+            onClick={() => this.setState({ error: null })}
+            style={{
+              alignSelf: 'flex-start', padding: '6px 12px', borderRadius: 6,
+              background: 'var(--surface-2)', border: '1px solid var(--border)',
+              color: 'var(--text-primary)', fontSize: 12, cursor: 'pointer',
+              fontFamily: 'var(--font)',
+            }}
+          >
+            Tentar novamente
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 function AppContent() {
   const { view } = useRouter()
@@ -16,33 +61,10 @@ function AppContent() {
     'person-form':  <PersonFormView />,
     'settings':     <SettingsView />,
     'inbox':        <InboxView />,
-    'cycle-report': <PlaceholderView title="Relatório de Ciclo" fase="Fase 3" />,
+    'cycle-report': <CycleReportView />,
   }[view] ?? <DashboardView />
 
   return <Layout>{content}</Layout>
-}
-
-function PlaceholderView({ title, fase }: { title: string; fase: string }) {
-  return (
-    <div style={{ padding: '40px', textAlign: 'center' }}>
-      <div style={{
-        fontFamily: 'Inter, -apple-system, sans-serif',
-        fontSize: 26, fontWeight: 400,
-        color: 'var(--text-secondary)', marginBottom: 8,
-      }}>
-        {title}
-      </div>
-      <span style={{
-        fontSize: 10, fontWeight: 600, letterSpacing: '0.08em',
-        textTransform: 'uppercase' as const,
-        padding: '3px 8px', borderRadius: 20,
-        background: 'var(--surface-2)', border: '1px solid var(--border)',
-        color: 'var(--text-muted)',
-      }}>
-        {fase}
-      </span>
-    </div>
-  )
 }
 
 export function App() {
@@ -59,7 +81,9 @@ export function App() {
 
   return (
     <RouterProvider>
-      <AppContent />
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
     </RouterProvider>
   )
 }

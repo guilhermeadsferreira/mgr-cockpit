@@ -3,54 +3,224 @@
 @tailwind utilities;
 
 :root {
+  /* ── Palette ─────────────────────────────────── */
   --bg:             #0B0D11;
   --surface:        #131720;
   --surface-2:      #1A2030;
   --surface-3:      #222840;
   --border:         #252D40;
   --border-subtle:  #1C2238;
+
   --text-primary:   #DCE2EF;
   --text-secondary: #5E6E96;
   --text-muted:     #363F58;
+
   --accent:         #C0873A;
+  --accent-dim:     rgba(192, 135, 58, 0.12);
+  --accent-glow:    rgba(192, 135, 58, 0.25);
+
   --green:          #3A9A65;
+  --green-dim:      rgba(58, 154, 101, 0.12);
   --amber:          #C88A20;
+  --amber-dim:      rgba(200, 138, 32, 0.12);
   --yellow:         #D4A843;
   --red:            #B84040;
+  --red-dim:        rgba(184, 64, 64, 0.12);
   --blue:           #4080A8;
+  --blue-dim:       rgba(64, 128, 168, 0.12);
+
+  /* ── Typography ──────────────────────────────── */
+  --font:      'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* ── Radius ──────────────────────────────────── */
+  --r-xs:  4px;
+  --r-sm:  6px;
+  --r:     8px;
+  --r-lg:  12px;
+  --r-xl:  16px;
+
+  /* ── Transitions ─────────────────────────────── */
+  --t-fast: 0.1s ease;
+  --t:      0.15s ease;
+  --t-slow: 0.25s ease;
 }
 
-* {
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html,
-body,
-#root {
+html, body, #root {
   height: 100%;
   background: var(--bg);
   color: var(--text-primary);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar       { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 2px; }
+/* ── Base resets ───────────────────────────────── */
+button, input, select, textarea {
+  font-family: var(--font);
+  font-size: inherit;
+  color: inherit;
+}
 
-/* Animations */
+input, select, textarea {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 7px 11px;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color var(--t);
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent);
+}
+
+select {
+  cursor: pointer;
+  appearance: none;
+}
+
+/* ── Scrollbar ─────────────────────────────────── */
+::-webkit-scrollbar       { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ── Animations ────────────────────────────────── */
 @keyframes spin {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
 
-/* Electron drag region */
-.drag-region {
-  -webkit-app-region: drag;
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 4px var(--red), 0 0 8px rgba(184,64,64,0.3); }
+  50%       { box-shadow: 0 0 8px var(--red), 0 0 16px rgba(184,64,64,0.5); }
 }
-.no-drag {
-  -webkit-app-region: no-drag;
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ── Electron drag region ──────────────────────── */
+.drag-region  { -webkit-app-region: drag; }
+.no-drag      { -webkit-app-region: no-drag; }
+
+/* ── Markdown Preview ──────────────────────────── */
+.md-preview { word-break: break-word; }
+
+.md-preview h1,
+.md-preview h2,
+.md-preview h3,
+.md-preview h4 {
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 1.2em 0 0.4em;
+  line-height: 1.3;
+}
+.md-preview h1 { font-size: 17px; }
+.md-preview h2 { font-size: 14.5px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px; }
+.md-preview h3 { font-size: 13px; color: var(--text-secondary); }
+.md-preview h4 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+.md-preview p  { margin: 0.5em 0; color: var(--text-secondary); }
+
+.md-preview strong { color: var(--text-primary); font-weight: 600; }
+.md-preview em     { color: var(--text-secondary); font-style: italic; }
+
+.md-preview ul,
+.md-preview ol {
+  padding-left: 18px;
+  margin: 0.4em 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.md-preview li { color: var(--text-secondary); }
+.md-preview li::marker { color: var(--accent); }
+
+.md-preview code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--text-primary);
+}
+.md-preview pre {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 0.6em 0;
+}
+.md-preview pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.md-preview blockquote {
+  margin: 0.6em 0;
+  padding: 8px 14px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-dim);
+  border-radius: 0 4px 4px 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.md-preview hr {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 1em 0;
+}
+
+.md-preview table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12.5px;
+  margin: 0.6em 0;
+}
+.md-preview th,
+.md-preview td {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+.md-preview th {
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.md-preview tr:nth-child(even) td { background: var(--surface-2); }
+
+.md-preview a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.md-preview a:hover { text-decoration: underline; }
+
+/* First/last element margin reset */
+.md-preview > *:first-child { margin-top: 0; }
+.md-preview > *:last-child  { margin-bottom: 0; }

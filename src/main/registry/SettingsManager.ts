@@ -7,6 +7,8 @@ export interface AppSettings {
   workspacePath: string
   claudeBinPath: string
   alert1on1Days: number
+  managerName?: string
+  managerRole?: string
 }
 
 const SETTINGS_DIR  = join(homedir(), '.mgrcockpit')
@@ -24,6 +26,8 @@ const DEFAULTS: AppSettings = {
   workspacePath:  join(homedir(), 'MgrCockpit'),
   claudeBinPath:  detectClaudeBin(),
   alert1on1Days:  21,
+  managerName:    '',
+  managerRole:    '',
 }
 
 export const SettingsManager = {

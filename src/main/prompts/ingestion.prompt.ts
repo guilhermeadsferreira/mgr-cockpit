@@ -32,9 +32,12 @@ Analise o artefato e retorne APENAS um JSON válido (sem texto antes ou depois) 
 Regras obrigatórias:
 - "tipo": um de "1on1", "reuniao", "daily", "planning", "retro", "feedback", "outro"
 - "data_artefato": data da reunião/evento no formato YYYY-MM-DD (extrair do conteúdo ou usar data atual)
-- "pessoas_identificadas": array de slugs das pessoas do time cadastrado que aparecem no artefato
-- "pessoa_principal": slug da pessoa mais relevante no artefato — use slug do time cadastrado se estiver lá, senão use o slug sugerido em novas_pessoas_detectadas (ou null se nenhuma)
-- "novas_pessoas_detectadas": array de {"nome": "Nome Completo", "slug": "nome-sobrenome"} com pessoas mencionadas no artefato que NÃO estão no time cadastrado. Gere o slug em lowercase com hifens (ex: "Antonio Silva" → "antonio-silva"). Array vazio se não houver novas pessoas.
+- "pessoas_identificadas": slugs das pessoas do time cadastrado que PARTICIPARAM DIRETAMENTE do evento (estavam presentes). NÃO inclua pessoas apenas mencionadas durante a conversa ("o Pedro disse que...", "vamos falar com a Ana"). Regras por tipo:
+  - 1on1: máximo 1 pessoa (o liderado — o gestor é o usuário do sistema e não entra aqui)
+  - reuniao/planning/retro/daily: apenas participantes presentes, não mencionados
+  - feedback/outro: a pessoa que recebeu o feedback ou é o sujeito do artefato
+- "pessoa_principal": a pessoa SOBRE QUEM este artefato é mais relevante para o gestor. Para 1:1 é sempre o liderado presente. Para reuniões com múltiplos participantes, a pessoa cujo desenvolvimento é mais central (ou null se for evento coletivo sem foco individual claro). Use o slug do time cadastrado se disponível, senão o slug de novas_pessoas_detectadas.
+- "novas_pessoas_detectadas": array de {"nome": "Nome Completo", "slug": "nome-sobrenome"} com pessoas que PARTICIPARAM do evento mas NÃO estão no time cadastrado. Mesma regra: participantes, não mencionados. Para 1:1: o liderado se não cadastrado. Gere o slug em lowercase com hifens (ex: "Antonio Silva" → "antonio-silva"). Array vazio se não houver.
 - "resumo": 2–3 frases resumindo o que aconteceu
 - "acoes_comprometidas": array de strings, cada uma sendo uma ação pendente com responsável e prazo se mencionado
 - "pontos_de_atencao": array de strings com riscos, bloqueios ou preocupações identificadas (pode ser vazio)

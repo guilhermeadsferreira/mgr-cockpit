@@ -51,7 +51,7 @@ export function SetupView() {
       {/* Logo */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 40 }}>
         <span style={{
-          fontFamily: 'Inter, -apple-system, sans-serif',
+          fontFamily: 'var(--font)',
           fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)',
         }}>
           MgrCockpit
@@ -74,7 +74,7 @@ export function SetupView() {
           <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>
             Fase 0 — Setup técnico
           </p>
-          <h2 style={{ fontFamily: 'Inter, -apple-system, sans-serif', fontSize: 18, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+          <h2 style={{ fontFamily: 'var(--font)', fontSize: 18, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
             Verificação do ambiente
           </h2>
         </div>
@@ -109,7 +109,7 @@ export function SetupView() {
               padding: '10px 16px', borderRadius: 6, border: 'none',
               background: testState === 'loading' ? 'var(--surface-3)' : 'var(--accent)',
               color: testState === 'loading' ? 'var(--text-secondary)' : '#09090c',
-              fontSize: 13, fontFamily: 'Inter, -apple-system, sans-serif', fontWeight: 600,
+              fontSize: 13, fontFamily: 'var(--font)', fontWeight: 600,
               cursor: testState === 'loading' ? 'not-allowed' : 'pointer',
               transition: 'all 0.15s',
             }}
@@ -149,7 +149,7 @@ export function SetupView() {
                 </span>
               </div>
               <pre style={{
-                fontFamily: 'JetBrains Mono, monospace', fontSize: 11,
+                fontFamily: 'var(--font-mono)', fontSize: 11,
                 color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-all',
                 margin: 0,
               }}>
@@ -197,7 +197,7 @@ function ConfigRow({ label, value, hint, danger }: {
         <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{hint}</p>
       </div>
       <p style={{
-        fontFamily: 'JetBrains Mono, monospace', fontSize: 11,
+        fontFamily: 'var(--font-mono)', fontSize: 11,
         color: danger ? 'var(--red)' : 'var(--text-secondary)',
         textAlign: 'right', wordBreak: 'break-all', maxWidth: '55%',
       }}>

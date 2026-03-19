@@ -1,11 +1,15 @@
 import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
 import { join } from 'path'
+import { writeFileSync, readFileSync } from 'fs'
 import { SettingsManager } from './registry/SettingsManager'
 import { PersonRegistry } from './registry/PersonRegistry'
 import { DetectedRegistry } from './registry/DetectedRegistry'
 import { setupWorkspace } from './workspace/WorkspaceSetup'
 import { runClaudePrompt } from './ingestion/ClaudeRunner'
 import { FileWatcher } from './ingestion/FileWatcher'
+import { buildAgendaPrompt, renderAgendaMarkdown, type AgendaAIResult } from './prompts/agenda.prompt'
+import { buildCyclePrompt, renderCycleMarkdown, type CycleAIResult } from './prompts/cycle.prompt'
+import type { CycleReportParams } from '../renderer/src/types/ipc'
 
 let mainWindow: BrowserWindow | null = null
 let fileWatcher:  FileWatcher  | null = null
@@ -78,10 +82,10 @@ function registerIpcHandlers(): void {
   ipcMain.handle('people:save', async (_event, config) => {
     const isNew = !getRegistry().get(config.slug)
     getRegistry().save(config)
-    // If this is a newly registered person, reprocess any pending inbox items
+    // If this is a newly registered person, sync any pending inbox items
     if (isNew && fileWatcher) {
-      const count = await fileWatcher.reprocessPending(config.slug)
-      if (count > 0) console.log(`[people:save] triggered reprocess of ${count} pending item(s) for "${config.slug}"`)
+      const count = fileWatcher.reprocessPending(config.slug)
+      if (count > 0) console.log(`[people:save] synced ${count} pending item(s) for "${config.slug}"`)
     }
   })
 
@@ -92,6 +96,19 @@ function registerIpcHandlers(): void {
   // ── Artifacts ─────────────────────────────────────────────
   ipcMain.handle('artifacts:list', (_event, slug: string) => {
     return getRegistry().listArtifacts(slug)
+  })
+
+  ipcMain.handle('artifacts:read', (_event, filePath: string) => {
+    try {
+      return readFileSync(filePath, 'utf-8')
+    } catch {
+      return ''
+    }
+  })
+
+  // ── Pautas ────────────────────────────────────────────────
+  ipcMain.handle('people:list-pautas', (_event, slug: string) => {
+    return getRegistry().listPautas(slug)
   })
 
   // ── People: Perfil vivo ───────────────────────────────────
@@ -131,8 +148,72 @@ function registerIpcHandlers(): void {
     return runClaudePrompt(settings.claudeBinPath, prompt, 30_000)
   })
 
-  ipcMain.handle('ai:generate-agenda', () => ({ error: 'Not implemented — Fase 3' }))
-  ipcMain.handle('ai:cycle-report',    () => ({ error: 'Not implemented — Fase 3' }))
+  ipcMain.handle('ai:generate-agenda', async (_event, slug: string) => {
+    const settings = SettingsManager.load()
+    if (!settings.claudeBinPath) {
+      return { success: false, error: 'Claude CLI não configurado. Configure o caminho em Settings.' }
+    }
+    const registry = getRegistry()
+    const person = registry.get(slug)
+    if (!person) return { success: false, error: 'Pessoa não encontrada.' }
+
+    const configRaw = registry.getConfigRaw(slug)
+    const perfilData = registry.getPerfil(slug)
+    if (!perfilData) {
+      return { success: false, error: 'Perfil não encontrado. Ingira pelo menos um artefato primeiro.' }
+    }
+
+    const today = new Date().toISOString().slice(0, 10)
+    const pautasAnteriores = registry.getLastPautas(slug, 2)
+    const prompt = buildAgendaPrompt({ configYaml: configRaw, perfilMd: perfilData.raw, today, pautasAnteriores })
+
+    const result = await runClaudePrompt(settings.claudeBinPath, prompt, 90_000)
+    if (!result.success || !result.data) {
+      return { success: false, error: result.error || 'Falha ao gerar pauta.' }
+    }
+
+    const agendaResult = result.data as AgendaAIResult
+    const markdown = renderAgendaMarkdown(person.nome, today, agendaResult)
+    registry.savePauta(slug, today, markdown)
+
+    const filePath = join(settings.workspacePath, 'pessoas', slug, 'pautas', `${today}-pauta.md`)
+    return { success: true, path: filePath, markdown, result: agendaResult }
+  })
+
+  ipcMain.handle('ai:cycle-report', async (_event, params: CycleReportParams) => {
+    const { personSlug, periodoInicio, periodoFim } = params
+    const settings = SettingsManager.load()
+    if (!settings.claudeBinPath) {
+      return { success: false, error: 'Claude CLI não configurado. Configure o caminho em Settings.' }
+    }
+    const registry = getRegistry()
+    const person = registry.get(personSlug)
+    if (!person) return { success: false, error: 'Pessoa não encontrada.' }
+
+    const configRaw = registry.getConfigRaw(personSlug)
+    const perfilData = registry.getPerfil(personSlug)
+    if (!perfilData) {
+      return { success: false, error: 'Perfil não encontrado. Ingira artefatos antes de gerar o relatório.' }
+    }
+
+    const artifacts = registry.listArtifactsWithContent(personSlug, periodoInicio, periodoFim)
+    const prompt = buildCyclePrompt({ configYaml: configRaw, perfilMd: perfilData.raw, artifacts, periodoInicio, periodoFim })
+
+    const result = await runClaudePrompt(settings.claudeBinPath, prompt, 120_000)
+    if (!result.success || !result.data) {
+      return { success: false, error: result.error || 'Falha ao gerar relatório de ciclo.' }
+    }
+
+    const cycleResult = result.data as CycleAIResult
+    const today = new Date().toISOString().slice(0, 10)
+    const markdown = renderCycleMarkdown(person.nome, periodoInicio, periodoFim, cycleResult)
+
+    const fileName = `${today}-${personSlug}-ciclo.md`
+    const filePath = join(settings.workspacePath, 'exports', fileName)
+    writeFileSync(filePath, markdown, 'utf-8')
+
+    return { success: true, path: filePath, markdown, result: cycleResult }
+  })
 
   // ── Shell ─────────────────────────────────────────────────
   ipcMain.handle('shell:open', (_event, filePath: string) => {

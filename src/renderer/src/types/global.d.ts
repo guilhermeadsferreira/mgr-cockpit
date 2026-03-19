@@ -1,4 +1,4 @@
-import type { AppSettings, PersonConfig, ArtifactMeta, PerfilData, QueueItem, CycleReportParams, DetectedPerson } from './ipc'
+import type { AppSettings, PersonConfig, ArtifactMeta, PerfilData, QueueItem, CycleReportParams, DetectedPerson, PautaMeta } from './ipc'
 
 declare global {
   interface Window {
@@ -14,15 +14,17 @@ declare global {
       }
 
       people: {
-        list:      () => Promise<PersonConfig[]>
-        get:       (slug: string) => Promise<PersonConfig | null>
-        save:      (data: PersonConfig) => Promise<void>
-        delete:    (slug: string) => Promise<void>
-        getPerfil: (slug: string) => Promise<PerfilData | null>
+        list:       () => Promise<PersonConfig[]>
+        get:        (slug: string) => Promise<PersonConfig | null>
+        save:       (data: PersonConfig) => Promise<void>
+        delete:     (slug: string) => Promise<void>
+        getPerfil:  (slug: string) => Promise<PerfilData | null>
+        listPautas: (slug: string) => Promise<PautaMeta[]>
       }
 
       artifacts: {
         list: (slug: string) => Promise<ArtifactMeta[]>
+        read: (path: string) => Promise<string>
       }
 
       ingestion: {

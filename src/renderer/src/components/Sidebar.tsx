@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Grid2X2, Inbox, FileText, Settings } from 'lucide-react'
 import { useRouter, type ViewName } from '../router'
 
@@ -9,20 +10,43 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard',    label: 'Time',               icon: <Grid2X2 size={15} /> },
-  { id: 'inbox',        label: 'Inbox',              icon: <Inbox size={15} /> },
+  { id: 'inbox',        label: 'Inbox',              icon: <Inbox size={14} /> },
+  { id: 'dashboard',    label: 'Time',               icon: <Grid2X2 size={14} /> },
 ]
 
 const NAV_REPORTS: NavItem[] = [
-  { id: 'cycle-report', label: 'Relatório de Ciclo', icon: <FileText size={15} /> },
+  { id: 'cycle-report', label: 'Relatório de Ciclo', icon: <FileText size={14} /> },
 ]
 
 const NAV_SYSTEM: NavItem[] = [
-  { id: 'settings',     label: 'Settings',           icon: <Settings size={15} /> },
+  { id: 'settings',     label: 'Settings',           icon: <Settings size={14} /> },
 ]
+
+function getInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return '?'
+  const first = words[0][0] ?? ''
+  const last = words.length > 1 ? words[words.length - 1][0] ?? '' : ''
+  return (first + last).toUpperCase() || '?'
+}
 
 export function Sidebar() {
   const { view, navigate } = useRouter()
+  const [profile, setProfile] = useState<{ name: string; role: string }>({ name: '', role: '' })
+
+  useEffect(() => {
+    function loadProfile() {
+      window.api.settings.load().then((s) => {
+        setProfile({ name: s.managerName ?? '', role: s.managerRole ?? '' })
+      })
+    }
+    loadProfile()
+    window.addEventListener('settings:saved', loadProfile)
+    return () => window.removeEventListener('settings:saved', loadProfile)
+  }, [])
+
+  const displayName = profile.name || 'Configurar perfil'
+  const initials = getInitials(profile.name)
 
   return (
     <nav style={{
@@ -37,23 +61,23 @@ export function Sidebar() {
       height: '100vh',
       zIndex: 100,
     }}>
-      {/* Traffic light spacer — macOS window controls live here */}
+      {/* macOS traffic light spacer */}
       <div className="drag-region" style={{ height: 44, flexShrink: 0 }} />
 
       {/* Logo */}
       <div style={{
-        padding: '0 20px 16px',
+        padding: '0 18px 16px',
         borderBottom: '1px solid var(--border-subtle)',
         display: 'flex',
         alignItems: 'center',
         gap: 8,
       }}>
         <span style={{
-          fontFamily: 'Inter, -apple-system, sans-serif',
-          fontSize: 15,
+          fontSize: 14,
           fontWeight: 700,
           color: 'var(--text-primary)',
           letterSpacing: '-0.02em',
+          lineHeight: 1,
         }}>
           MgrCockpit
         </span>
@@ -61,14 +85,21 @@ export function Sidebar() {
           width: 5, height: 5,
           borderRadius: '50%',
           background: 'var(--accent)',
-          boxShadow: '0 0 8px var(--accent)',
+          boxShadow: '0 0 6px var(--accent), 0 0 12px var(--accent-glow)',
           flexShrink: 0,
-          marginBottom: 2,
+          marginBottom: 1,
         }} />
       </div>
 
       {/* Nav */}
-      <div style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
+      <div style={{
+        flex: 1,
+        padding: '10px 8px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1,
+        overflowY: 'auto',
+      }}>
         {NAV_ITEMS.map((item) => (
           <NavBtn key={item.id} item={item} active={view === item.id} onClick={() => navigate(item.id)} />
         ))}
@@ -85,22 +116,38 @@ export function Sidebar() {
       </div>
 
       {/* Footer */}
-      <div style={{ padding: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+      <div style={{ padding: '8px', borderTop: '1px solid var(--border-subtle)' }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 9,
-          padding: '8px 10px', borderRadius: 6, cursor: 'default',
+          padding: '8px 10px',
+          borderRadius: 'var(--r)',
+          cursor: 'default',
         }}>
           <div style={{
-            width: 28, height: 28, borderRadius: '50%',
-            background: 'var(--surface-3)', border: '1px solid var(--border)',
+            width: 30, height: 30,
+            borderRadius: '50%',
+            background: 'var(--accent-dim)',
+            border: '1px solid rgba(192,135,58,0.25)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 10, fontWeight: 700, color: 'var(--accent)', flexShrink: 0,
+            fontSize: 10, fontWeight: 700,
+            color: 'var(--accent)',
+            letterSpacing: '0.02em',
+            flexShrink: 0,
           }}>
-            GA
+            {initials}
           </div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>Guilherme Augusto</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>Gerente de Engenharia</div>
+            <div style={{
+              fontSize: 12.5, fontWeight: 600, lineHeight: 1.3,
+              color: profile.name ? 'var(--text-primary)' : 'var(--text-muted)',
+            }}>
+              {displayName}
+            </div>
+            {profile.role && (
+              <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 1 }}>
+                {profile.role}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -113,31 +160,50 @@ function NavBtn({ item, active, onClick }: { item: NavItem; active: boolean; onC
     <button
       onClick={onClick}
       style={{
-        display: 'flex', alignItems: 'center', gap: 9,
-        padding: '7px 10px', borderRadius: 6,
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '7px 10px',
+        borderRadius: 'var(--r)',
         background: active ? 'var(--surface-3)' : 'transparent',
-        border: active ? '1px solid var(--border)' : '1px solid transparent',
+        border: 'none',
+        outline: 'none',
+        boxShadow: active ? 'inset 2px 0 0 var(--accent)' : 'inset 2px 0 0 transparent',
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-        fontSize: 13.5, fontWeight: active ? 500 : 400,
-        fontFamily: 'Inter, -apple-system, sans-serif',
-        cursor: 'pointer', width: '100%', textAlign: 'left',
-        transition: 'all 0.12s',
+        fontSize: 13, fontWeight: active ? 500 : 400,
+        cursor: 'pointer',
+        width: '100%', textAlign: 'left',
+        transition: 'background 0.12s, color 0.12s, box-shadow 0.12s',
       }}
-      onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-2)' }}
-      onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+      onMouseEnter={(e) => {
+        if (!active) {
+          e.currentTarget.style.background = 'var(--surface-2)'
+          e.currentTarget.style.color = 'var(--text-primary)'
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!active) {
+          e.currentTarget.style.background = 'transparent'
+          e.currentTarget.style.color = 'var(--text-secondary)'
+        }
+      }}
     >
-      <span style={{ opacity: active ? 1 : 0.65, display: 'flex', alignItems: 'center' }}>
+      <span style={{
+        opacity: active ? 1 : 0.5,
+        display: 'flex', alignItems: 'center',
+        transition: 'opacity 0.12s',
+        color: active ? 'var(--accent)' : 'currentColor',
+      }}>
         {item.icon}
       </span>
       {item.label}
       {item.badge !== undefined && (
         <span style={{
           marginLeft: 'auto',
-          background: 'rgba(184,64,64,0.12)',
+          background: 'var(--red-dim)',
           border: '1px solid rgba(184,64,64,0.25)',
           color: 'var(--red)',
-          fontFamily: 'JetBrains Mono, monospace',
-          fontSize: 10, padding: '1px 6px', borderRadius: 20,
+          fontFamily: 'var(--font-mono)',
+          fontSize: 9.5, padding: '1px 6px', borderRadius: 20,
+          fontWeight: 500,
         }}>
           {item.badge}
         </span>
@@ -149,10 +215,10 @@ function NavBtn({ item, active, onClick }: { item: NavItem; active: boolean; onC
 function SectionLabel({ children }: { children: string }) {
   return (
     <div style={{
-      fontSize: 10, fontWeight: 600,
-      letterSpacing: '0.1em', textTransform: 'uppercase',
+      fontSize: 9.5, fontWeight: 600,
+      letterSpacing: '0.12em', textTransform: 'uppercase',
       color: 'var(--text-muted)',
-      padding: '10px 10px 4px', marginTop: 4,
+      padding: '12px 12px 4px',
     }}>
       {children}
     </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FolderOpen, Cpu, Bell, CheckCircle2, XCircle } from 'lucide-react'
+import { FolderOpen, Cpu, Bell, CheckCircle2, XCircle, User } from 'lucide-react'
 import type { AppSettings } from '../types/ipc'
 
 export function SettingsView() {
@@ -26,6 +26,7 @@ export function SettingsView() {
     if (!form) return
     await window.api.settings.save(form)
     await window.api.settings.setupWorkspace(form.workspacePath)
+    window.dispatchEvent(new CustomEvent('settings:saved'))
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }
@@ -69,6 +70,30 @@ export function SettingsView() {
       {/* Form */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '28px 40px' }}>
         <div style={{ maxWidth: 580 }}>
+
+          {/* Perfil do gestor */}
+          <Section
+            icon={<User size={14} />}
+            title="Perfil do gestor"
+            desc="Seu nome e cargo exibidos na barra lateral"
+          >
+            <Field label="Nome">
+              <input
+                style={styles.input}
+                value={form.managerName ?? ''}
+                onChange={(e) => set('managerName', e.target.value)}
+                placeholder="Ex: Guilherme Augusto"
+              />
+            </Field>
+            <Field label="Cargo / Função">
+              <input
+                style={styles.input}
+                value={form.managerRole ?? ''}
+                onChange={(e) => set('managerRole', e.target.value)}
+                placeholder="Ex: Gerente de Engenharia"
+              />
+            </Field>
+          </Section>
 
           {/* Workspace */}
           <Section
@@ -205,28 +230,28 @@ const styles = {
     color: 'var(--text-muted)', marginBottom: 4,
   },
   pageTitle: {
-    fontFamily: 'Inter, -apple-system, sans-serif',
+    fontFamily: 'var(--font)',
     fontSize: 24, fontWeight: 700,
     color: 'var(--text-primary)', letterSpacing: '-0.025em', lineHeight: 1.1,
   } as React.CSSProperties,
   input: {
     background: 'var(--surface-2)', border: '1px solid var(--border)',
     borderRadius: 6, padding: '8px 12px',
-    fontFamily: 'JetBrains Mono, monospace', fontSize: 12,
+    fontFamily: 'var(--font-mono)', fontSize: 12,
     color: 'var(--text-primary)', outline: 'none', width: '100%',
   } as React.CSSProperties,
   btnPrimary: {
     display: 'inline-flex', alignItems: 'center', gap: 6,
     padding: '8px 14px', borderRadius: 6, border: 'none',
     background: 'var(--accent)', color: '#09090c',
-    fontSize: 13, fontFamily: 'Inter, -apple-system, sans-serif', fontWeight: 600, cursor: 'pointer',
+    fontSize: 13, fontFamily: 'var(--font)', fontWeight: 600, cursor: 'pointer',
   } as React.CSSProperties,
   btnSecondary: {
     display: 'inline-flex', alignItems: 'center', gap: 6,
     padding: '7px 12px', borderRadius: 6,
     background: 'var(--surface-2)', color: 'var(--text-primary)',
     border: '1px solid var(--border)',
-    fontSize: 12, fontFamily: 'Inter, -apple-system, sans-serif', fontWeight: 500, cursor: 'pointer',
+    fontSize: 12, fontFamily: 'var(--font)', fontWeight: 500, cursor: 'pointer',
     whiteSpace: 'nowrap' as const,
   } as React.CSSProperties,
 }

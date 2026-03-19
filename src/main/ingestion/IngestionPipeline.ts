@@ -69,7 +69,9 @@ export class IngestionPipeline {
    */
   syncPending(registeredSlug: string): number {
     const matching = this.queue.filter(
-      (i) => i.status === 'pending' && i.personSlug === registeredSlug
+      (i) =>
+        i.status === 'pending' &&
+        (i.personSlug === registeredSlug || i.naoCadastradas?.includes(registeredSlug))
     )
     if (matching.length === 0) return 0
 
@@ -94,7 +96,7 @@ export class IngestionPipeline {
     if (!item.cachedAiResult || !item.cachedText) return
 
     const writer = new ArtifactWriter(this.workspacePath)
-    const artifactFileName = writer.writeArtifact(slug, item.cachedAiResult.data_artefato, item.cachedText, item.cachedAiResult.tipo)
+    const artifactFileName = writer.writeArtifact(slug, item.cachedAiResult, item.cachedText)
     writer.updatePerfil(slug, item.cachedAiResult, artifactFileName)
 
     item.status         = 'done'

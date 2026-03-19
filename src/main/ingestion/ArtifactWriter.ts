@@ -22,14 +22,68 @@ export class ArtifactWriter {
   }
 
   /**
-   * Saves the artifact content to pessoas/{slug}/historico/{date}-{slug}.md
-   * and returns the relative path.
+   * Saves the artifact to pessoas/{slug}/historico/{date}-{slug}.md
+   * with a formatted template (AI analysis + original content) and returns the file name.
    */
-  writeArtifact(slug: string, date: string, content: string, tipo: string): string {
+  writeArtifact(slug: string, result: IngestionAIResult, rawContent: string): string {
+    const { tipo, data_artefato: date, resumo, acoes_comprometidas, pontos_de_atencao,
+            elogios_e_conquistas, temas_detectados, motivo_indicador, indicador_saude } = result
+
     const fileName = `${date}-${slug}.md`
     const dest = join(this.pessoasDir, slug, 'historico', fileName)
-    const header = `---\ntipo: ${tipo}\ndata: ${date}\npessoa: ${slug}\n---\n\n`
-    writeFileSync(dest, header + content, 'utf-8')
+
+    const lines: string[] = [
+      `---`,
+      `tipo: ${tipo}`,
+      `data: ${date}`,
+      `pessoa: ${slug}`,
+      `saude: ${indicador_saude}`,
+      `---`,
+      ``,
+      `# ${tipoLabel(tipo)} — ${slug} · ${date}`,
+      ``,
+      `## Resumo`,
+      resumo,
+      ``,
+    ]
+
+    if (acoes_comprometidas.length > 0) {
+      lines.push(`## Ações Comprometidas`)
+      acoes_comprometidas.forEach((a) => lines.push(`- [ ] ${a}`))
+      lines.push(``)
+    }
+
+    if (pontos_de_atencao.length > 0) {
+      lines.push(`## Pontos de Atenção`)
+      pontos_de_atencao.forEach((p) => lines.push(`- ${p}`))
+      lines.push(``)
+    }
+
+    if (elogios_e_conquistas.length > 0) {
+      lines.push(`## Elogios e Conquistas`)
+      elogios_e_conquistas.forEach((e) => lines.push(`- ${e}`))
+      lines.push(``)
+    }
+
+    if (temas_detectados.length > 0) {
+      lines.push(`## Temas`)
+      temas_detectados.forEach((t) => lines.push(`- ${t}`))
+      lines.push(``)
+    }
+
+    if (motivo_indicador) {
+      lines.push(`## Indicador de Saúde`)
+      lines.push(`**${indicador_saude}** — ${motivo_indicador}`)
+      lines.push(``)
+    }
+
+    lines.push(`---`)
+    lines.push(``)
+    lines.push(`## Conteúdo Original`)
+    lines.push(``)
+    lines.push(rawContent.trim())
+
+    writeFileSync(dest, lines.join('\n'), 'utf-8')
     return fileName
   }
 
@@ -227,4 +281,17 @@ ${SECTION.historico.close}
     const m = content.match(re)
     return m ? m[1] : ''
   }
+}
+
+function tipoLabel(tipo: string): string {
+  const map: Record<string, string> = {
+    '1on1':     '1:1',
+    'reuniao':  'Reunião',
+    'daily':    'Daily',
+    'planning': 'Planning',
+    'retro':    'Retro',
+    'feedback': 'Feedback',
+    'outro':    'Artefato',
+  }
+  return map[tipo] ?? tipo
 }

@@ -13,15 +13,17 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   people: {
-    list:      ()              => ipcRenderer.invoke('people:list'),
-    get:       (slug: string)  => ipcRenderer.invoke('people:get', slug),
-    save:      (data: unknown) => ipcRenderer.invoke('people:save', data),
-    delete:    (slug: string)  => ipcRenderer.invoke('people:delete', slug),
-    getPerfil: (slug: string)  => ipcRenderer.invoke('people:get-perfil', slug),
+    list:       ()              => ipcRenderer.invoke('people:list'),
+    get:        (slug: string)  => ipcRenderer.invoke('people:get', slug),
+    save:       (data: unknown) => ipcRenderer.invoke('people:save', data),
+    delete:     (slug: string)  => ipcRenderer.invoke('people:delete', slug),
+    getPerfil:  (slug: string)  => ipcRenderer.invoke('people:get-perfil', slug),
+    listPautas: (slug: string)  => ipcRenderer.invoke('people:list-pautas', slug),
   },
 
   artifacts: {
-    list: (slug: string) => ipcRenderer.invoke('artifacts:list', slug),
+    list:    (slug: string)  => ipcRenderer.invoke('artifacts:list', slug),
+    read:    (path: string)  => ipcRenderer.invoke('artifacts:read', path),
   },
 
   ai: {

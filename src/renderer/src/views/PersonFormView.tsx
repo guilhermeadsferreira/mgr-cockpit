@@ -4,8 +4,30 @@ import { useRouter } from '../router'
 import { toSlug } from '../lib/utils'
 import type { PersonConfig, PersonLevel, PersonRelacao } from '../types/ipc'
 
-const NIVEIS: PersonLevel[] = ['junior', 'pleno', 'senior', 'staff', 'principal', 'manager']
-const RELACOES: PersonRelacao[] = ['liderado', 'par', 'gestor', 'stakeholder']
+const NIVEIS: { value: PersonLevel; label: string }[] = [
+  { value: 'junior',    label: 'Junior' },
+  { value: 'pleno',     label: 'Pleno' },
+  { value: 'senior',    label: 'Sênior' },
+  { value: 'staff',     label: 'Staff' },
+  { value: 'principal', label: 'Principal' },
+  { value: 'manager',   label: 'Gerente' },
+]
+
+const RELACOES: { value: PersonRelacao; label: string }[] = [
+  { value: 'liderado',    label: 'Liderado' },
+  { value: 'par',         label: 'Par' },
+  { value: 'gestor',      label: 'Gestor' },
+  { value: 'stakeholder', label: 'Stakeholder' },
+]
+
+const CARGOS_SUGERIDOS = [
+  'Backend Sênior', 'Backend Pleno', 'Backend Junior',
+  'Frontend Sênior', 'Frontend Pleno', 'Frontend Junior',
+  'Fullstack Sênior', 'Fullstack Pleno', 'Fullstack Junior',
+  'Tech Lead', 'Staff Engineer', 'Principal Engineer',
+  'Product Manager', 'Engineering Manager', 'Data Engineer',
+  'QA Engineer', 'DevOps Engineer', 'SRE',
+]
 
 const EMPTY: Partial<PersonConfig> = {
   schema_version: 1,
@@ -168,21 +190,26 @@ export function PersonFormView() {
             <Field label="Cargo *">
               <input
                 style={styles.input}
+                list="cargos-list"
                 value={form.cargo ?? ''}
                 onChange={(e) => set('cargo', e.target.value)}
-                placeholder="ex: Engenheira de Software"
+                placeholder="Selecione ou digite…"
+                autoComplete="off"
               />
+              <datalist id="cargos-list">
+                {CARGOS_SUGERIDOS.map((c) => <option key={c} value={c} />)}
+              </datalist>
             </Field>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Field label="Nível">
                 <select style={styles.select} value={form.nivel ?? 'senior'} onChange={(e) => set('nivel', e.target.value)}>
-                  {NIVEIS.map((n) => <option key={n} value={n}>{n}</option>)}
+                  {NIVEIS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </Field>
               <Field label="Relação">
                 <select style={styles.select} value={form.relacao ?? 'liderado'} onChange={(e) => set('relacao', e.target.value)}>
-                  {RELACOES.map((r) => <option key={r} value={r}>{r}</option>)}
+                  {RELACOES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </Field>
             </div>
@@ -339,23 +366,23 @@ const styles = {
     display: 'inline-flex', alignItems: 'center', gap: 5,
     fontSize: 12, color: 'var(--text-secondary)',
     background: 'none', border: 'none', cursor: 'pointer',
-    marginBottom: 6, padding: '4px 0', fontFamily: 'Inter, -apple-system, sans-serif',
+    marginBottom: 6, padding: '4px 0', fontFamily: 'var(--font)',
   } as React.CSSProperties,
   pageTitle: {
-    fontFamily: 'Inter, -apple-system, sans-serif',
+    fontFamily: 'var(--font)',
     fontSize: 24, fontWeight: 700,
     color: 'var(--text-primary)', letterSpacing: '-0.025em', lineHeight: 1.1,
   } as React.CSSProperties,
   input: {
     background: 'var(--surface-2)', border: '1px solid var(--border)',
     borderRadius: 6, padding: '8px 12px',
-    fontFamily: 'Inter, -apple-system, sans-serif', fontSize: 13,
+    fontFamily: 'var(--font)', fontSize: 13,
     color: 'var(--text-primary)', outline: 'none', width: '100%',
   } as React.CSSProperties,
   select: {
     background: 'var(--surface-2)', border: '1px solid var(--border)',
     borderRadius: 6, padding: '8px 12px',
-    fontFamily: 'Inter, -apple-system, sans-serif', fontSize: 13,
+    fontFamily: 'var(--font)', fontSize: 13,
     color: 'var(--text-primary)', outline: 'none', width: '100%',
     cursor: 'pointer',
   } as React.CSSProperties,
@@ -363,7 +390,7 @@ const styles = {
     display: 'inline-flex', alignItems: 'center', gap: 6,
     padding: '8px 14px', borderRadius: 6, border: 'none',
     background: 'var(--accent)', color: '#09090c',
-    fontSize: 13, fontFamily: 'Inter, -apple-system, sans-serif', fontWeight: 600,
+    fontSize: 13, fontFamily: 'var(--font)', fontWeight: 600,
     cursor: 'pointer',
   } as React.CSSProperties,
   btnSecondary: {
@@ -371,7 +398,7 @@ const styles = {
     padding: '7px 12px', borderRadius: 6,
     background: 'var(--surface-2)', color: 'var(--text-primary)',
     border: '1px solid var(--border)',
-    fontSize: 13, fontFamily: 'Inter, -apple-system, sans-serif', fontWeight: 500,
+    fontSize: 13, fontFamily: 'var(--font)', fontWeight: 500,
     cursor: 'pointer',
   } as React.CSSProperties,
   btnDanger: {
@@ -379,7 +406,7 @@ const styles = {
     padding: '7px 12px', borderRadius: 6,
     background: 'rgba(184,64,64,0.12)', color: 'var(--red)',
     border: '1px solid rgba(184,64,64,0.3)',
-    fontSize: 13, fontFamily: 'Inter, -apple-system, sans-serif', fontWeight: 500,
+    fontSize: 13, fontFamily: 'var(--font)', fontWeight: 500,
     cursor: 'pointer',
   } as React.CSSProperties,
 }

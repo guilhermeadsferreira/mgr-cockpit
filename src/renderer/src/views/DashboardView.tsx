@@ -2,6 +2,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { UserPlus, Pencil, ChevronRight, X, UserCheck } from 'lucide-react'
 import { useRouter } from '../router'
 import type { PersonConfig, PerfilFrontmatter, DetectedPerson } from '../types/ipc'
+import { labelNivel, labelRelacao } from '../lib/utils'
+
+function fmtDate(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y}`
+}
 
 export function DashboardView() {
   const { navigate } = useRouter()
@@ -59,13 +66,25 @@ export function DashboardView() {
             {loading ? '…' : `${people.length} ${people.length === 1 ? 'pessoa' : 'pessoas'}`}
           </div>
         </div>
-        <button
-          onClick={() => navigate('person-form')}
-          style={styles.btnPrimary}
-        >
-          <UserPlus size={13} />
-          Adicionar pessoa
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
+          <button onClick={() => navigate('person-form')} style={styles.btnPrimary}>
+            <UserPlus size={13} />
+            Adicionar pessoa
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {([
+              { color: 'var(--green)',            label: 'Saudável' },
+              { color: 'var(--yellow, #d4a843)',  label: 'Atenção' },
+              { color: 'var(--red)',              label: 'Risco' },
+              { color: 'var(--surface-3)',        label: 'Sem dados' },
+            ] as const).map(({ color, label }) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Content */}
@@ -110,7 +129,7 @@ export function DashboardView() {
                   <span style={{
                     fontSize: 10, padding: '1px 6px', borderRadius: 20,
                     background: 'rgba(192,135,58,0.1)', border: '1px solid rgba(192,135,58,0.25)',
-                    color: 'var(--accent)', fontFamily: 'JetBrains Mono, monospace',
+                    color: 'var(--accent)', fontFamily: 'var(--font-mono)',
                   }}>
                     {detected.length}
                   </span>
@@ -120,7 +139,7 @@ export function DashboardView() {
                 </div>
                 <div style={{
                   background: 'var(--surface)', border: '1px solid var(--border)',
-                  borderRadius: 6, overflow: 'hidden',
+                  borderRadius: 'var(--r)', overflow: 'hidden',
                 }}>
                   {detected.map((p, i) => (
                     <DetectedRow
@@ -167,12 +186,12 @@ function PersonCard({
       style={{
         background: hovered ? 'var(--surface-2)' : 'var(--surface)',
         border: '1px solid var(--border)',
-        borderRadius: 6,
+        borderRadius: 'var(--r)',
         overflow: 'hidden',
         position: 'relative',
         transition: 'all 0.18s ease',
-        transform: hovered ? 'translateY(-1px)' : 'none',
-        boxShadow: hovered ? '0 6px 24px rgba(0,0,0,0.3)' : 'none',
+        transform: hovered ? 'translateY(-2px)' : 'none',
+        boxShadow: hovered ? '0 8px 28px rgba(0,0,0,0.4)' : 'none',
         cursor: 'default',
       }}
     >
@@ -196,7 +215,7 @@ function PersonCard({
             <LevelBadge nivel={person.nivel} />
             {person.squad && (
               <span style={{
-                fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
+                fontSize: 10, fontFamily: 'var(--font-mono)',
                 color: 'var(--text-muted)', padding: '2px 6px',
                 background: 'var(--surface-2)', border: '1px solid var(--border-subtle)',
                 borderRadius: 3,
@@ -216,7 +235,7 @@ function PersonCard({
           {perfil.acoes_pendentes_count != null && perfil.acoes_pendentes_count > 0 && (
             <Stat label="ações" value={String(perfil.acoes_pendentes_count)} alert />
           )}
-          {perfil.ultimo_1on1 && <Stat label="último 1:1" value={perfil.ultimo_1on1} mono />}
+          {perfil.ultimo_1on1 && <Stat label="último 1:1" value={fmtDate(perfil.ultimo_1on1)} mono />}
         </div>
       )}
 
@@ -243,7 +262,7 @@ function Stat({ label, value, mono, alert }: { label: string; value: string; mon
       <span style={{
         fontSize: mono ? 10 : 11.5, fontWeight: 600,
         color: alert ? 'var(--red)' : 'var(--text-primary)',
-        fontFamily: mono ? 'JetBrains Mono, monospace' : undefined,
+        fontFamily: mono ? 'var(--font-mono)' : undefined,
       }}>
         {value}
       </span>
@@ -262,7 +281,7 @@ function LevelBadge({ nivel }: { nivel: string }) {
       color: 'var(--blue)',
       border: '1px solid rgba(64,128,168,0.2)',
     }}>
-      {nivel}
+      {labelNivel(nivel)}
     </span>
   )
 }
@@ -274,7 +293,7 @@ function RelacaoBadge({ relacao }: { relacao: string }) {
       background: 'var(--surface-2)', color: 'var(--text-secondary)',
       border: '1px solid var(--border)', whiteSpace: 'nowrap',
     }}>
-      {relacao}
+      {labelRelacao(relacao)}
     </span>
   )
 }
@@ -299,7 +318,7 @@ function DetectedRow({
             {person.nome || person.slug}
           </span>
           <span style={{
-            fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 10, fontFamily: 'var(--font-mono)',
             color: 'var(--text-muted)', padding: '1px 5px',
             background: 'var(--surface-2)', borderRadius: 3,
           }}>
@@ -316,7 +335,7 @@ function DetectedRow({
         padding: '5px 10px', borderRadius: 5, border: 'none',
         background: 'rgba(192,135,58,0.12)', color: 'var(--accent)',
         fontSize: 11.5, fontWeight: 500, cursor: 'pointer',
-        fontFamily: 'Inter, -apple-system, sans-serif',
+        fontFamily: 'var(--font)',
       }}>
         <UserCheck size={11} /> Adicionar ao time
       </button>
@@ -336,7 +355,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <div style={{ textAlign: 'center', padding: '60px 40px' }}>
       <div style={{
-        fontFamily: 'Inter, -apple-system, sans-serif',
+        fontFamily: 'var(--font)',
         fontSize: 22, fontWeight: 600,
         color: 'var(--text-secondary)', marginBottom: 8, letterSpacing: '-0.02em',
       }}>
@@ -361,32 +380,32 @@ const styles = {
     color: 'var(--text-muted)', marginBottom: 4,
   },
   pageTitle: {
-    fontFamily: 'Inter, -apple-system, sans-serif',
+    fontFamily: 'var(--font)',
     fontSize: 24, fontWeight: 700,
     color: 'var(--text-primary)', letterSpacing: '-0.025em', lineHeight: 1.1,
   },
   pageSub: { fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 4 },
   btnPrimary: {
     display: 'inline-flex', alignItems: 'center', gap: 6,
-    padding: '8px 14px', borderRadius: 6, border: 'none',
+    padding: '8px 14px', borderRadius: 'var(--r)', border: 'none',
     background: 'var(--accent)', color: '#09090c',
-    fontSize: 13, fontFamily: 'Inter, -apple-system, sans-serif', fontWeight: 600,
+    fontSize: 13, fontFamily: 'var(--font)', fontWeight: 600,
     cursor: 'pointer',
   } as React.CSSProperties,
   btnSecondary: {
     display: 'inline-flex', alignItems: 'center', gap: 6,
-    padding: '6px 10px', borderRadius: 6,
+    padding: '6px 10px', borderRadius: 'var(--r-sm)',
     background: 'var(--surface-2)', color: 'var(--text-primary)',
     border: '1px solid var(--border)',
-    fontSize: 12, fontFamily: 'Inter, -apple-system, sans-serif', fontWeight: 500,
+    fontSize: 12, fontFamily: 'var(--font)', fontWeight: 500,
     cursor: 'pointer', justifyContent: 'center' as const,
   } as React.CSSProperties,
   btnGhost: {
     display: 'inline-flex', alignItems: 'center', gap: 5,
-    padding: '6px 10px', borderRadius: 6,
+    padding: '6px 10px', borderRadius: 'var(--r-sm)',
     background: 'transparent', color: 'var(--text-secondary)',
     border: '1px solid transparent',
-    fontSize: 12, fontFamily: 'Inter, -apple-system, sans-serif', fontWeight: 500,
+    fontSize: 12, fontFamily: 'var(--font)', fontWeight: 500,
     cursor: 'pointer', justifyContent: 'center' as const,
   } as React.CSSProperties,
 }
