@@ -26,15 +26,22 @@ function daysUntil(d: string): number {
   return Math.floor((new Date(d + 'T00:00:00').getTime() - todayMs) / 86_400_000)
 }
 
+function daysUntilEndOfWeek(): number {
+  const day = new Date().getDay() // 0=Dom, 1=Seg, ..., 6=Sáb
+  const daysSinceMonday = day === 0 ? 6 : day - 1
+  return 6 - daysSinceMonday // dias até domingo (fim da semana ISO)
+}
+
 function deadlineBadge(prazo: string): { label: string; color: string; bg: string; border: string } {
   const diff = daysUntil(prazo)
-  if (diff < 0)   return { label: 'Vencida',        color: 'var(--red)',            bg: 'rgba(184,64,64,0.12)',   border: 'rgba(184,64,64,0.3)' }
-  if (diff === 0) return { label: 'Hoje',            color: '#e8873a',               bg: 'rgba(232,135,58,0.12)',  border: 'rgba(232,135,58,0.35)' }
-  if (diff === 1) return { label: 'Amanhã',          color: 'var(--accent)',         bg: 'var(--accent-dim)',      border: 'rgba(192,135,58,0.3)' }
-  if (diff <= 6)  return { label: 'Esta semana',     color: 'var(--accent)',         bg: 'var(--accent-dim)',      border: 'rgba(192,135,58,0.25)' }
-  if (diff <= 13) return { label: 'Semana que vem',  color: '#9db87c',               bg: 'rgba(157,184,124,0.1)', border: 'rgba(157,184,124,0.3)' }
-  if (diff <= 30) return { label: 'Este mês',        color: 'var(--text-secondary)', bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.1)' }
-  return               { label: formatDate(prazo),   color: 'var(--text-muted)',     bg: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.08)' }
+  const endOfWeek = daysUntilEndOfWeek()
+  if (diff < 0)              return { label: 'Vencida',        color: 'var(--red)',            bg: 'rgba(184,64,64,0.12)',   border: 'rgba(184,64,64,0.3)' }
+  if (diff === 0)            return { label: 'Hoje',            color: '#e8873a',               bg: 'rgba(232,135,58,0.12)',  border: 'rgba(232,135,58,0.35)' }
+  if (diff === 1)            return { label: 'Amanhã',          color: 'var(--accent)',         bg: 'var(--accent-dim)',      border: 'rgba(192,135,58,0.3)' }
+  if (diff <= endOfWeek)     return { label: 'Esta semana',     color: 'var(--accent)',         bg: 'var(--accent-dim)',      border: 'rgba(192,135,58,0.25)' }
+  if (diff <= endOfWeek + 7) return { label: 'Semana que vem',  color: '#9db87c',               bg: 'rgba(157,184,124,0.1)', border: 'rgba(157,184,124,0.3)' }
+  if (diff <= 30)            return { label: 'Este mês',        color: 'var(--text-secondary)', bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.1)' }
+  return                            { label: formatDate(prazo),  color: 'var(--text-muted)',     bg: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.08)' }
 }
 
 export function MyDemandsView() {
