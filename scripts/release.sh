@@ -54,12 +54,12 @@ npm run package
 # ── 5. GitHub Release ─────────────────────────────────────────────────────────
 echo "Criando release v$NEW no GitHub..."
 
-ASSETS=$(find dist -maxdepth 1 \( -name "*.dmg" -o -name "*.blockmap" -o -name "latest-mac.yml" \) | tr '\n' ' ')
+mapfile -t ASSETS < <(find dist -maxdepth 1 \( -name "*.dmg" -o -name "*.blockmap" -o -name "latest-mac.yml" \))
 
 gh release create "v$NEW" \
   --title "v$NEW" \
   --notes "Release v$NEW" \
-  $ASSETS
+  "${ASSETS[@]}"
 
 # ── 6. Push ───────────────────────────────────────────────────────────────────
 git push && git push --tags
