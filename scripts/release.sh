@@ -54,7 +54,10 @@ npm run package
 # ── 5. GitHub Release ─────────────────────────────────────────────────────────
 echo "Criando release v$NEW no GitHub..."
 
-mapfile -t ASSETS < <(find dist -maxdepth 1 \( -name "*.dmg" -o -name "*.blockmap" -o -name "latest-mac.yml" \))
+ASSETS=()
+while IFS= read -r f; do
+  ASSETS+=("$f")
+done < <(find dist -maxdepth 1 \( -name "*.dmg" -o -name "*.blockmap" -o -name "latest-mac.yml" \))
 
 gh release create "v$NEW" \
   --title "v$NEW" \
