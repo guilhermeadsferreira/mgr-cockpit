@@ -47,20 +47,26 @@ git tag "v$NEW"
 
 echo "Commit e tag v$NEW criados."
 
-# ── 4. Build ──────────────────────────────────────────────────────────────────
+# ── 4. Limpar dist/ para não incluir artefatos de versões anteriores ──────────
+if [[ -d dist ]]; then
+  echo "Limpando dist/..."
+  rm -rf dist
+fi
+
+# ── 5. Build ──────────────────────────────────────────────────────────────────
 echo "Buildando..."
 npm run package
 
-# ── 5. Push (antes da release, para a tag existir no remote) ──────────────────
+# ── 6. Push (antes da release, para a tag existir no remote) ──────────────────
 git push && git push --tags
 
-# ── 6. GitHub Release ─────────────────────────────────────────────────────────
+# ── 7. GitHub Release ─────────────────────────────────────────────────────────
 echo "Criando release v$NEW no GitHub..."
 
 ASSETS=()
 while IFS= read -r f; do
   ASSETS+=("$f")
-done < <(find dist -maxdepth 1 \( -name "*.dmg" -o -name "*.blockmap" -o -name "latest-mac.yml" \))
+done < <(find dist -maxdepth 1 \( -name "*-${NEW}*.dmg" -o -name "*-${NEW}*.blockmap" -o -name "latest-mac.yml" \))
 
 gh release create "v$NEW" \
   --title "v$NEW" \
