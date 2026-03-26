@@ -126,3 +126,16 @@ These constraints apply to every plan in this roadmap:
 ---
 
 *Last updated: 2026-03-26*
+
+---
+
+## Backlog
+
+### Phase 999.1: Resumo de 1:1 no estilo Qulture Rocks (BACKLOG)
+
+**Goal:** Após a ingestão de um 1:1, gerar um resumo estruturado no estilo Qulture Rocks — com o que foi discutido, compromissos assumidos e próximos passos — em três versões: para o gestor, para o liderado e para RH.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
