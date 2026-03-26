@@ -139,3 +139,13 @@ These constraints apply to every plan in this roadmap:
 
 Plans:
 - [ ] TBD (promote with /gsd:review-backlog when ready)
+
+### Phase 999.2: Módulo Mentor AI (BACKLOG)
+
+**Goal:** IA de apoio ao gestor para tirar dúvidas sobre gestão, com contexto do projeto e dos liderados. Aproveitar prompt já existente (localização a confirmar).
+**Requirements:** TBD
+**Plans:** 0 plans
+**Note:** Prompt base já existe — recuperar e referenciar antes de planejar.
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
