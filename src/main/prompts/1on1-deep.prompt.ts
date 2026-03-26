@@ -1,0 +1,228 @@
+export interface OneOnOneDeepPromptParams {
+  artifactContent: string        // transcrição/anotação do 1:1
+  perfilMdRaw: string | null     // perfil.md atual da pessoa
+  configYaml: string             // config.yaml da pessoa (inclui PDI)
+  openActionsLiderado: string    // ações abertas do liderado serializadas
+  openActionsGestor: string      // ações abertas do gestor serializadas
+  sinaisTerceiros: string        // sinais de terceiros do perfil
+  historicoSaude: string         // últimas 5 entradas do histórico de saúde
+  today: string                  // YYYY-MM-DD
+  managerName?: string
+}
+
+export interface OneOnOneFollowup {
+  acao_original: string
+  acao_id: string
+  status: 'cumprida' | 'em_andamento' | 'nao_mencionada' | 'abandonada'
+  evidencia: string | null
+}
+
+export interface OneOnOneAcaoLiderado {
+  descricao: string
+  tipo: 'tarefa_explicita' | 'compromisso_informal' | 'mudanca_processo' | 'pdi'
+  prazo_iso: string | null
+  origem_pauta: 'liderado' | 'gestor' | 'terceiro'
+  terceiro_nome: string | null
+  contexto: string
+}
+
+export interface OneOnOneAcaoGestor {
+  descricao: string
+  prazo_iso: string | null
+}
+
+export interface OneOnOneInsight {
+  categoria: 'carreira' | 'pdi' | 'expectativas' | 'feedback_dado'
+    | 'feedback_recebido' | 'relacionamento' | 'pessoal' | 'processo'
+  conteudo: string
+  relevancia: 'alta' | 'media'
+  acao_implicita: string | null
+}
+
+export interface OneOnOneSugestao {
+  descricao: string
+  resposta_liderado: 'aceitou_explicito' | 'aceitou_tacito' | 'resistiu' | 'ficou_em_aberto'
+  gerar_acao: boolean
+}
+
+export interface OneOnOneCorrelacao {
+  sinal_original: string
+  fonte: string
+  confirmado_pelo_liderado: boolean
+  contexto_confirmacao: string | null
+}
+
+export interface OneOnOnePdiUpdate {
+  houve_mencao_pdi: boolean
+  objetivos_mencionados: string[]
+  novo_objetivo_sugerido: string | null
+  progresso_observado: string | null
+}
+
+export interface OneOnOneResult {
+  followup_acoes: OneOnOneFollowup[]
+  acoes_liderado: OneOnOneAcaoLiderado[]
+  acoes_gestor: OneOnOneAcaoGestor[]
+  insights_1on1: OneOnOneInsight[]
+  sugestoes_gestor: OneOnOneSugestao[]
+  correlacoes_terceiros: OneOnOneCorrelacao[]
+  tendencia_emocional: 'estavel' | 'melhorando' | 'deteriorando' | 'novo_sinal'
+  nota_tendencia: string
+  pdi_update: OneOnOnePdiUpdate
+  resumo_executivo_rh: string
+}
+
+export function build1on1DeepPrompt(params: OneOnOneDeepPromptParams): string {
+  const {
+    artifactContent, perfilMdRaw, configYaml,
+    openActionsLiderado, openActionsGestor,
+    sinaisTerceiros, historicoSaude, today, managerName,
+  } = params
+  const gestorLabel = managerName || 'Gestor'
+
+  return `Você é o assistente de um gestor de tecnologia. Sua tarefa é fazer uma análise PROFUNDA de um 1:1 já realizado, extraindo follow-ups, compromissos, insights qualitativos e correlações — informações que uma análise genérica de reunião não captura.
+
+IMPORTANTE: Este pass complementa uma análise genérica já realizada. Foque no que é ESPECÍFICO de um 1:1: follow-up de ações, compromissos tácitos, insights de carreira/PDI, correlação com sinais de terceiros, tendência emocional.
+
+Data atual: ${today}
+Nome do gestor (usuário do sistema): ${gestorLabel}
+
+## Configuração da pessoa (config.yaml)
+<config>
+${configYaml}
+</config>
+
+## Perfil atual da pessoa (perfil.md)
+${perfilMdRaw
+  ? `<perfil_atual>\n${perfilMdRaw}\n</perfil_atual>`
+  : 'Nenhum perfil ainda.'}
+
+## Ações abertas do liderado
+${openActionsLiderado || 'Nenhuma ação aberta.'}
+
+## Ações abertas do gestor (prometidas ao liderado)
+${openActionsGestor || 'Nenhuma ação aberta.'}
+
+## Sinais de terceiros (de cerimônias e outros artefatos)
+${sinaisTerceiros || 'Nenhum sinal de terceiro registrado.'}
+
+## Histórico de saúde recente
+${historicoSaude || 'Sem histórico.'}
+
+## Transcrição / anotação do 1:1
+<artefato>
+${artifactContent}
+</artefato>
+
+## Sua tarefa
+
+Analise o 1:1 e retorne APENAS um JSON válido (sem texto antes ou depois) com a estrutura abaixo.
+
+QUALIDADE TEXTUAL — Regra absoluta:
+O artefato pode ser transcrição automática com imperfeições. Ao preencher TODOS os campos:
+1. Escreva em português brasileiro correto e profissional
+2. Nunca copie texto garbled, caracteres estranhos ou frases incompletas
+3. Cada campo deve ser compreensível de forma autônoma — sem precisar ler a transcrição
+
+### REGRAS POR CAMPO:
+
+**"followup_acoes"** — Follow-up obrigatório de ações anteriores:
+Para CADA ação listada em "Ações abertas do liderado" e "Ações abertas do gestor", determine o status com base no que foi dito no 1:1.
+- "acao_original": copie o texto da ação como fornecido acima
+- "acao_id": copie o ID da ação como fornecido acima
+- "status":
+  - "cumprida": liderado/gestor confirma que fez, há evidência concreta
+  - "em_andamento": mencionou que está fazendo, progresso parcial
+  - "nao_mencionada": não apareceu no 1:1 (atenção: isso é um sinal)
+  - "abandonada": contexto mudou, ação não faz mais sentido, ou declarado explicitamente
+- "evidencia": transcreva a evidência concreta se houver, null se "nao_mencionada"
+- NÃO invente evidência. Se não foi mencionada, marque "nao_mencionada".
+
+**"acoes_liderado"** — Novas ações do liderado:
+- "descricao": acionável, autônoma, compreensível por quem não leu a transcrição. Padrão: O QUÊ + SOBRE O QUÊ + PARA QUÊ.
+- "tipo":
+  - "tarefa_explicita": ação pontual e verificável ("entregar proposta até sexta")
+  - "compromisso_informal": algo aceito tacitamente ou em tom informal
+  - "mudanca_processo": envolve mudança de hábito/processo observável ao longo do tempo (ex: "rever processo de code review")
+  - "pdi": relacionada ao Plano de Desenvolvimento Individual
+- "prazo_iso": YYYY-MM-DD se mencionado, null se não
+- "origem_pauta": quem trouxe o tema — "liderado" se partiu dele, "gestor" se foi sugestão do gestor, "terceiro" se veio de feedback/sinal de outra pessoa
+- "terceiro_nome": nome de quem originou, se origem_pauta = "terceiro"
+- "contexto": 1 frase dizendo onde na conversa surgiu (para o gestor validar)
+
+**"acoes_gestor"** — Ações que o gestor se comprometeu a fazer:
+- "descricao": o que o gestor prometeu fazer, acionável e autônoma
+- "prazo_iso": YYYY-MM-DD se mencionado, null se não
+
+**"sugestoes_gestor"** — Sugestões do gestor e reação do liderado:
+Quando o gestor faz sugestão e o liderado responde:
+- Afirmativamente ("total", "aham", "é", "faz sentido", "pode ser") sem rejeitar → "aceitou_tacito", gerar_acao: true
+- Com aceitação explícita ("vou fazer", "combinado") → "aceitou_explicito", gerar_acao: true
+- Com resistência ("não sei", "acho difícil", "não concordo") → "resistiu", gerar_acao: false
+- Sem conclusão clara → "ficou_em_aberto", gerar_acao: false
+Quando gerar_acao = true, gere a ação correspondente em "acoes_liderado" com origem_pauta: "gestor".
+
+**"insights_1on1"** — Insights qualitativos:
+Capture momentos de alinhamento que NÃO são ações: carreira, expectativas, feedback informal, preocupações pessoais, mudanças de processo.
+- "categoria": carreira | pdi | expectativas | feedback_dado | feedback_recebido | relacionamento | pessoal | processo
+- "conteudo": legível por alguém que não leu a transcrição, daqui a 3 meses. Auto-contido.
+- "relevancia": "alta" para decisões, alinhamentos críticos, mudanças de direção. "media" para contexto útil.
+- "acao_implicita": se o insight sugere uma ação futura não capturada explicitamente, descreva-a. null se não.
+
+**"correlacoes_terceiros"** — Correlação com sinais de terceiros:
+Compare o conteúdo do 1:1 com os sinais de terceiros fornecidos acima.
+- Se o liderado confirmar, endossar ou contradizer qualquer sinal, registre.
+- Convergência de fontes é o sinal mais forte para o gestor.
+- Array vazio se não há sinais de terceiros ou nenhuma correlação detectada.
+
+**"tendencia_emocional"** — Compare sentimento e engajamento deste 1:1 com o histórico de saúde:
+- "estavel": sem mudança significativa
+- "melhorando": sinais positivos comparados ao histórico recente
+- "deteriorando": padrão de piora em 2+ registros consecutivos
+- "novo_sinal": sinal emocional sem precedente no histórico
+"nota_tendencia": 1-2 frases explicando a avaliação.
+
+**"pdi_update"** — Menção ao PDI:
+- "houve_mencao_pdi": true se PDI, carreira ou desenvolvimento foram mencionados
+- "objetivos_mencionados": objetivos do PDI (do config.yaml) que foram citados
+- "novo_objetivo_sugerido": se um novo objetivo de PDI foi sugerido, descreva. null se não
+- "progresso_observado": evidência concreta de progresso em algum objetivo. null se nenhuma
+
+**"resumo_executivo_rh"** — Resumo para Qulture Rocks:
+Formato pronto para colar numa ferramenta de RH. Estrutura:
+- Parágrafo de abertura (2-3 frases): o que foi tratado, contexto geral
+- Ações combinadas (bullets com •): compromissos do liderado e do gestor, com responsável explícito
+- Próximos passos (bullets com •): o que será acompanhado até o próximo 1:1
+Tom: profissional e objetivo. Sem jargão interno do app. NÃO inclua indicadores de saúde, sentimento, tendência emocional, ou insights sensíveis de carreira/pessoal — apenas o que é apropriado para registro formal de RH.
+
+JSON esperado:
+{
+  "followup_acoes": [
+    {"acao_original": "string", "acao_id": "string", "status": "cumprida|em_andamento|nao_mencionada|abandonada", "evidencia": "string ou null"}
+  ],
+  "acoes_liderado": [
+    {"descricao": "string", "tipo": "tarefa_explicita|compromisso_informal|mudanca_processo|pdi", "prazo_iso": "YYYY-MM-DD ou null", "origem_pauta": "liderado|gestor|terceiro", "terceiro_nome": "string ou null", "contexto": "string"}
+  ],
+  "acoes_gestor": [
+    {"descricao": "string", "prazo_iso": "YYYY-MM-DD ou null"}
+  ],
+  "insights_1on1": [
+    {"categoria": "carreira|pdi|expectativas|feedback_dado|feedback_recebido|relacionamento|pessoal|processo", "conteudo": "string", "relevancia": "alta|media", "acao_implicita": "string ou null"}
+  ],
+  "sugestoes_gestor": [
+    {"descricao": "string", "resposta_liderado": "aceitou_explicito|aceitou_tacito|resistiu|ficou_em_aberto", "gerar_acao": true}
+  ],
+  "correlacoes_terceiros": [
+    {"sinal_original": "string", "fonte": "string", "confirmado_pelo_liderado": true, "contexto_confirmacao": "string ou null"}
+  ],
+  "tendencia_emocional": "estavel|melhorando|deteriorando|novo_sinal",
+  "nota_tendencia": "string",
+  "pdi_update": {
+    "houve_mencao_pdi": true,
+    "objetivos_mencionados": ["string"],
+    "novo_objetivo_sugerido": "string ou null",
+    "progresso_observado": "string ou null"
+  },
+  "resumo_executivo_rh": "string"
+}`
+}

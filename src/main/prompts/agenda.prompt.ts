@@ -1,25 +1,68 @@
+export interface AgendaOpenAction {
+  texto: string
+  descricao?: string
+  criadoEm: string
+  owner?: string
+  tipo?: string
+  contexto?: string
+  ciclos_sem_mencao?: number
+}
+
 export interface AgendaPromptParams {
   configYaml:        string
   perfilMd:          string
   today:             string
   dadosStale?:       boolean
   pautasAnteriores?: Array<{ date: string; content: string }>
-  openActions?:      Array<{ texto: string; criadoEm: string }>
+  openActions?:      AgendaOpenAction[]
+  insightsRecentes?: string
+  sinaisTerceiros?:  string
+  pdiEstruturado?:   string
 }
 
 export function buildAgendaPrompt(params: AgendaPromptParams): string {
-  const { configYaml, perfilMd, today, dadosStale = false, pautasAnteriores = [], openActions = [] } = params
+  const { configYaml, perfilMd, today, dadosStale = false, pautasAnteriores = [], openActions = [], insightsRecentes = '', sinaisTerceiros = '', pdiEstruturado = '' } = params
 
   const pautasSection = pautasAnteriores.length > 0
     ? `\n## Histórico de pautas anteriores\n${pautasAnteriores.map(p => `### Pauta de ${p.date}\n${p.content}`).join('\n\n')}\n`
     : ''
 
   const today_date = new Date(today)
-  const acoesSection = openActions.length > 0
-    ? `\n## Ações em aberto (Action Loop)\n${openActions.map(a => {
-        const daysOpen = Math.floor((today_date.getTime() - new Date(a.criadoEm).getTime()) / 86_400_000)
-        return `- [${daysOpen}d em aberto] ${a.texto}`
-      }).join('\n')}\n`
+
+  // Separate actions by risk level
+  const riscoAbandono = openActions.filter(a => (a.ciclos_sem_mencao ?? 0) >= 2)
+  const acoesGestor = openActions.filter(a => a.owner === 'gestor')
+  const acoesNormais = openActions.filter(a => (a.ciclos_sem_mencao ?? 0) < 2 && a.owner !== 'gestor')
+
+  const formatAction = (a: AgendaOpenAction): string => {
+    const daysOpen = Math.floor((today_date.getTime() - new Date(a.criadoEm).getTime()) / 86_400_000)
+    const desc = a.descricao || a.texto
+    const ctx = a.contexto ? ` — contexto: ${a.contexto}` : ''
+    const tipo = a.tipo ? ` [${a.tipo}]` : ''
+    return `- [${daysOpen}d em aberto]${tipo} ${desc}${ctx}`
+  }
+
+  let acoesSection = ''
+  if (riscoAbandono.length > 0) {
+    acoesSection += `\n## ⚠️ Ações com risco de abandono (2+ ciclos sem menção)\n${riscoAbandono.map(formatAction).join('\n')}\n`
+  }
+  if (acoesGestor.length > 0) {
+    acoesSection += `\n## Prestar contas — ações do gestor pendentes\n${acoesGestor.map(formatAction).join('\n')}\n`
+  }
+  if (acoesNormais.length > 0) {
+    acoesSection += `\n## Ações em aberto (Action Loop)\n${acoesNormais.map(formatAction).join('\n')}\n`
+  }
+
+  const insightsSection = insightsRecentes
+    ? `\n## Insights recentes de 1:1\n${insightsRecentes}\n`
+    : ''
+
+  const sinaisSection = sinaisTerceiros
+    ? `\n## Sinais de terceiros não explorados\n${sinaisTerceiros}\n`
+    : ''
+
+  const pdiSection = pdiEstruturado
+    ? `\n## PDI atual\n${pdiEstruturado}\n`
     : ''
 
   const staleWarning = dadosStale
@@ -38,10 +81,10 @@ ${configYaml}
 
 ## Perfil vivo atual
 ${perfilMd}
-${pautasSection}${acoesSection}
+${pautasSection}${acoesSection}${insightsSection}${sinaisSection}${pdiSection}
 ## Sua tarefa
 
-Com base no perfil acumulado${pautasAnteriores.length > 0 ? ', no histórico de pautas anteriores' : ''}${openActions.length > 0 ? ', nas ações em aberto do Action Loop' : ''} e nas boas práticas de gestão, gere uma pauta completa e estruturada para o próximo 1:1. Retorne APENAS um JSON válido (sem texto antes ou depois):
+Com base no perfil acumulado, nas ações em aberto, nos insights de 1:1, sinais de terceiros e PDI, gere uma pauta completa e estruturada para o próximo 1:1. Retorne APENAS um JSON válido (sem texto antes ou depois):
 
 {
   "follow_ups": ["string"],
@@ -52,10 +95,10 @@ Com base no perfil acumulado${pautasAnteriores.length > 0 ? ', no histórico de 
 }
 
 Regras:
-- "follow_ups": ações em aberto e acordos das pautas anteriores que precisam de acompanhamento. Priorize as ações do Action Loop mais antigas (mais dias em aberto). Seja específico e mencione o contexto.
-- "temas": assuntos recorrentes, pontos de atenção ou evolução de carreira que merecem discussão aprofundada. Priorize pelo impacto.
-- "perguntas_sugeridas": 4 a 6 perguntas abertas, específicas e contextualizadas para esta pessoa. Inclua perguntas sobre bem-estar, desafios técnicos, relacionamentos com o time e desenvolvimento profissional. NUNCA use perguntas genéricas — baseie-se no perfil real.
-- "alertas": pontos críticos que o gestor DEVE abordar (bloqueios, conflitos, risco de desengajamento, deadlines críticos). Array vazio se não houver urgências.
+- "follow_ups": use DESCRIÇÃO COMPLETA e CONTEXTO das ações, não só texto resumido. Ações com risco de abandono (2+ ciclos sem menção) são PRIORIDADE MÁXIMA — devem ser os primeiros itens. Ações do gestor pendentes vão em seção separada como "prestar contas". Priorize as mais antigas.
+- "temas": assuntos recorrentes, pontos de atenção ou evolução de carreira que merecem discussão aprofundada. Conecte insights de 1:1 sobre carreira/PDI com perguntas sugeridas quando aplicável. Priorize pelo impacto.
+- "perguntas_sugeridas": 4 a 6 perguntas abertas, específicas e contextualizadas para esta pessoa. Sinais de terceiros não explorados devem gerar perguntas de validação (ex: "O Antonio mencionou X — como você vê isso?"). Insights de PDI conectam com perguntas de desenvolvimento. NUNCA use perguntas genéricas — baseie-se no perfil real.
+- "alertas": pontos críticos que o gestor DEVE abordar (bloqueios, conflitos, risco de desengajamento, deadlines críticos, ações com risco de abandono). Array vazio se não houver urgências.
 - "reconhecimentos": conquistas e elogios recentes que merecem ser reconhecidos explicitamente na conversa. Reconhecimento público fortalece o vínculo. Array vazio se não houver.`
 }
 

@@ -6,8 +6,10 @@
  *   1 → 2: removed acoes_pendentes_count (now computed from ActionRegistry)
  *   2 → 3: unique open marker for conquistas block (was identical to atencao, breaking appendToBlock)
  *   3 → 4: unique close markers per block (all blocks shared '<!-- FIM DO BLOCO GERENCIADO -->')
+ *   4 → 5: new frontmatter (tendencia_emocional, nota_tendencia, ultimo_followup_acoes)
+ *           + new sections "Insights de 1:1" and "Sinais de Terceiros"
  */
-export const CURRENT_SCHEMA_VERSION = 4
+export const CURRENT_SCHEMA_VERSION = 5
 
 export function migrateProfileContent(content: string): string {
   const fmMatch = content.match(/^---\n([\s\S]*?)\n---/)
@@ -41,6 +43,32 @@ export function migrateProfileContent(content: string): string {
   // find the open, replace the FIRST shared close after it with the unique close for that block.
   if (version < 4) {
     body = migrateToUniqueCloseMarkers(body)
+  }
+
+  // v4 → v5: add new frontmatter fields + new sections for 1:1 deep pass
+  if (version < 5) {
+    // Add new frontmatter fields with safe defaults
+    if (!/tendencia_emocional:/.test(fm)) {
+      fm += '\ntendencia_emocional: null'
+    }
+    if (!/nota_tendencia:/.test(fm)) {
+      fm += '\nnota_tendencia: null'
+    }
+    if (!/ultimo_followup_acoes:/.test(fm)) {
+      fm += '\nultimo_followup_acoes: null'
+    }
+
+    // Add "Insights de 1:1" section before "Sinais de Terceiros" — both after "Histórico de Saúde"
+    const insightsSection = `\n## Insights de 1:1\n<!-- BLOCO GERENCIADO PELA IA — append apenas (insights 1on1) -->\n<!-- FIM BLOCO INSIGHTS_1ON1 -->`
+    const sinaisSection = `\n## Sinais de Terceiros\n<!-- BLOCO GERENCIADO PELA IA — append apenas (sinais terceiros) -->\n<!-- FIM BLOCO SINAIS_TERCEIROS -->`
+
+    // Insert after Histórico de Saúde block if it exists, otherwise append at end
+    if (body.includes('<!-- FIM BLOCO SAUDE -->')) {
+      const saudeEndIdx = body.indexOf('<!-- FIM BLOCO SAUDE -->') + '<!-- FIM BLOCO SAUDE -->'.length
+      body = body.slice(0, saudeEndIdx) + '\n' + insightsSection + '\n' + sinaisSection + body.slice(saudeEndIdx)
+    } else {
+      body = body.trimEnd() + '\n' + insightsSection + '\n' + sinaisSection + '\n'
+    }
   }
 
   fm = fm.replace(/schema_version:\s*\d+/, `schema_version: ${CURRENT_SCHEMA_VERSION}`)

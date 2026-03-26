@@ -3,7 +3,7 @@
 > Documento de referência para revisões de produto e técnica com apoio de IA.
 > Cobre: ideia, problema, objetivos, módulos, regras de negócio, retroalimentações e roadmap.
 >
-> **Última atualização:** 2026-03-24
+> **Última atualização:** 2026-03-26 (V2 Fases 1–5)
 
 ---
 
@@ -118,10 +118,17 @@ FileWatcher monitora inbox/ com chokidar
             → ArtifactWriter.writeArtifact() → historico/{slug}.md
             → ArtifactWriter.updatePerfil() → atualiza perfil.md
             → ActionRegistry.createFromArtifact() → actions.yaml
+            → [V2] Se tipo === '1on1' → Pass de 1:1 (fire-and-forget, 180s):
+                build1on1DeepPrompt() com ações abertas, sinais, PDI, saúde
+                  → SchemaValidator valida OneOnOneResult
+                  → ArtifactWriter.update1on1Results() → insights, sinais, tendência, resumo QR
+                  → ActionRegistry.updateFromFollowup() → status de ações anteriores
+                  → ActionRegistry.createFrom1on1Result() → novas ações com tipo e contexto
+                  → DemandaRegistry → ações do gestor ao módulo Eu
         → Se sem pessoa_principal → syncItemToCollective() → _coletivo/
             → Ações roteadas ao ActionRegistry de cada responsável registrado
             → [fire-and-forget] Para cada participante cadastrado:
-                Pass Cerimônia (novo, 60s): buildCerimoniaSinalPrompt() focado nessa pessoa
+                Pass Cerimônia (60s): buildCerimoniaSinalPrompt() focado nessa pessoa
                   → SchemaValidator valida CerimoniaSinalResult
                   → ArtifactWriter.updatePerfilDeCerimonia() → atualiza perfil sem criar entrada no histórico
         → Se pessoa detectada mas não cadastrada → status = 'pending'
@@ -226,6 +233,16 @@ Sinais de cerimônia coletiva NÃO criam entradas aqui (o artefato coletivo exis
 ## Histórico de Saúde
 Série histórica de indicadores: `YYYY-MM-DD | verde | motivo`. Ingestões diretas e sinais de
 cerimônia appendam entradas (as de cerimônia têm o tipo entre parênteses: `(daily)`, `(retro)`).
+
+## Insights de 1:1
+<!-- V2 — Populada pelo Pass de 1:1. Cada entrada auto-contida. -->
+Exemplo: **2026-03-26:** [carreira] Expressou interesse em arquitetura. Gestor alinhou
+que depende de ownership técnico no projeto atual. *(alta)*
+
+## Sinais de Terceiros
+<!-- V2 — Populada pelo Pass de Cerimônia e correlações do Pass de 1:1 -->
+Exemplo: **2026-03-21 (daily) — Antonio (TL):** PRs com erros críticos chegando para revisão.
+  → **Confirmado pelo liderado em 1:1 de 2026-03-26**
 ```
 
 **Frontmatter — indicadores persistidos:**
@@ -355,13 +372,23 @@ View transversal de todos os artefatos processados, independente de pessoa. Filt
 
 ---
 
-### 5.9 Módulo "Eu" (em desenvolvimento)
+### 5.9 Módulo "Eu"
 
-Cockpit sobre a própria jornada do gestor — não seus liderados, mas ele mesmo. Inclui:
-- Feedbacks recebidos do próprio gestor
-- Demandas e ações que foram delegadas ao usuário (extraídas de qualquer artefato)
-- Ciclo de autoavaliação
-- Histórico da própria evolução
+Cockpit sobre a própria jornada do gestor — não seus liderados, mas ele mesmo. Organizado em duas abas dentro de `EuView`:
+
+**Aba Demandas (`MyDemandsView`):**
+- Demandas e ações delegadas ao gestor, extraídas automaticamente de qualquer artefato ingerido
+- CRUD via `DemandaRegistry` (`gestor/demandas.yaml`)
+- Filtros por status (`open | in_progress | done | cancelled`) e prioridade
+
+**Aba Ciclo (`MyCycleView`):**
+- Autoavaliação do próprio gestor gerada via `gestor-ciclo.prompt.ts` e `autoavaliacao.prompt.ts`
+- Usa `CicloRegistry` para persistir entradas de ciclo do gestor (`gestor/ciclo/`)
+- Estrutura análoga ao Relatório de Ciclo dos liderados, com foco no próprio desenvolvimento e evidências para o gestor defender sua evolução
+
+**View de Refinamentos (`RefinamentosView`):**
+- Gestão de documentos de refinamento armazenados em `gestor/refinamentos/`
+- Drop zone para ingestão direta; exibe lista com preview markdown
 
 ---
 
@@ -565,13 +592,13 @@ Tudo é texto puro. O gestor pode abrir qualquer arquivo no Obsidian, Notion, VS
 Main Process (Node.js)
 ├── index.ts — BrowserWindow + todos os IPC handlers
 ├── ingestion/ — FileWatcher, Pipeline, ClaudeRunner, ArtifactWriter, SchemaValidator
-├── registry/ — PersonRegistry, ActionRegistry, DetectedRegistry, SettingsManager
+├── registry/ — PersonRegistry, ActionRegistry, DetectedRegistry, SettingsManager, DemandaRegistry, CicloRegistry
 ├── migration/ — ProfileMigration (schema versioning)
-├── prompts/ — ingestion, cerimonia-sinal, agenda, agenda-gestor, cycle, compression, autoavaliacao
+├── prompts/ — ingestion, cerimonia-sinal, agenda, agenda-gestor, cycle, gestor-ciclo, compression, autoavaliacao
 └── workspace/ — WorkspaceSetup (cria estrutura de pastas)
 
 Renderer Process (React)
-└── views/ — Dashboard, Inbox, Person, PersonForm, MeetingsFeed, Settings, Setup, [Eu]
+└── views/ — Dashboard, Inbox, Person, PersonForm, MeetingsFeed, Settings, Setup, Eu (EuView + MyDemandsView + MyCycleView), CycleReport, Refinamentos
 
 IPC Bridge (preload/index.ts)
 └── contextBridge → window.api (people, artifacts, detected, ingestion, ai, actions, settings)
@@ -626,19 +653,23 @@ atualizado_em: "2026-03-18T10:00:00Z"
 
 ```yaml
 slug: "maria-silva"
-schema_version: 3
-ultima_atualizacao: "2026-03-21T10:00:00Z"
-ultima_ingestao: "2026-03-21"
+schema_version: 5
+ultima_atualizacao: "2026-03-26T10:00:00Z"
+ultima_ingestao: "2026-03-26"
 total_artefatos: 12
-ultimo_1on1: "2026-03-15"
+ultimo_1on1: "2026-03-26"
 alertas_ativos: []
 saude: "verde"
+ultima_confianca: "alta"
 necessita_1on1: false
 motivo_1on1: null
 alerta_estagnacao: false
 motivo_estagnacao: null
 sinal_evolucao: true
 evidencia_evolucao: "Liderou refatoração sozinha e recebeu elogio do time"
+tendencia_emocional: "estavel"          # V2
+nota_tendencia: "Sem mudanças"          # V2
+ultimo_followup_acoes: "2026-03-26"     # V2
 ```
 
 **Campos calculados em runtime (não persistidos):**
@@ -665,9 +696,14 @@ actions:
     criadoEm: "2026-03-15"
     concluidoEm: null
     fonteArtefato: "2026-03-15-maria-silva.md"
+    # V2 fields (optional, backward compat)
+    tipo: "tarefa_explicita"       # tarefa_explicita|compromisso_informal|mudanca_processo|pdi
+    origem_pauta: "gestor"         # liderado|gestor|terceiro
+    contexto: "Gestor sugeriu rever processo de dev com IA"
+    ciclos_sem_mencao: 0           # incrementado pelo follow-up do Pass de 1:1
 ```
 
-**Backward compat:** ações antigas sem o campo `descricao` continuam exibindo `texto` na UI.
+**Backward compat:** ações antigas sem os campos `descricao`, `tipo`, `origem_pauta`, `contexto`, `ciclos_sem_mencao` continuam funcionando — todos são opcionais.
 
 ---
 
@@ -697,9 +733,34 @@ actions:
 | Campo `descricao` separado em ações (UI mostra título limpo + responsável como metadata) | ✅ |
 | Nome real do gestor nas ações via `managerName` nas settings | ✅ |
 
-### V2 — Cockpit completo de gestão (planejado)
+### V2 — Qualidade de ingestão + inteligência de 1:1 (implementado 2026-03-26)
 
-**Princípio:** V1 valida o núcleo `pessoas → reuniões → calibração`. V2 expande para o cockpit do **dia a dia operacional**, com dois novos primitivos:
+| Feature | Status |
+|---------|--------|
+| Prompt genérico refinado (ações, resumo, pontos de atenção — qualidade) | ✅ |
+| Pass de Cerimônia refinado (skills com evidência, cruzamento com perfil, feedback com impacto) | ✅ |
+| Pass de 1:1 profundo (follow-ups, compromissos tácitos, insights, correlações, resumo QR) | ✅ |
+| Schema migration v4→v5 (tendência emocional, insights de 1:1, sinais de terceiros) | ✅ |
+| ActionRegistry: follow-up batch, criação via 1on1, campos estendidos (tipo, origem, contexto, ciclos_sem_mencao) | ✅ |
+| Conexão acoes_gestor → DemandaRegistry (módulo Eu) | ✅ |
+| Reingestão em batch (IPC handlers: list-processados, reset-data, batch-reingest) | ✅ |
+| Pauta enriquecida (insights, sinais de terceiros, PDI, ações por risco) | ✅ |
+| Relatório de ciclo enriquecido (insights, correlações, follow-up histórico, tendência, PDI) | ✅ |
+| TeamRiskPanel: novos gatilhos (abandono, tendência deteriorando, promessa gestor 14d+) | ✅ |
+
+**TODOs pendentes (V2.1):**
+| Item | Arquivo | Descrição |
+|------|---------|-----------|
+| Pauta roll-up enriquecida | `index.ts:233` | Enriquecer pauta com gestor com tendências, correlações, riscos compostos |
+| Autoavaliação com dados V2 | `autoavaliacao.prompt.ts` | Consumir insights de feedback_dado, tendências emocionais, accountability |
+| UI: Insights de 1:1 no perfil | `PersonView.tsx` | Exibir seção de insights na tela de perfil |
+| UI: Sinais de Terceiros no perfil | `PersonView.tsx` | Exibir seção de sinais na tela de perfil |
+| UI: Botão "Copiar para QR" | `PersonView.tsx` | Botão de cópia do resumo executivo no artefato de 1:1 |
+| UI: Reingestão na Settings | `SettingsView.tsx` | Botão com confirmação modal e progress bar |
+
+### V3 — Cockpit completo de gestão (planejado)
+
+**Princípio:** V1 valida o núcleo, V2 melhora qualidade. V3 expande para o cockpit do **dia a dia operacional**, com dois novos primitivos:
 
 #### Entidade Projeto
 
@@ -712,7 +773,7 @@ projetos/{slug}/
   historico/     ← artefatos que tocaram este projeto
 ```
 
-Na ingestão V2, o pipeline identifica **pessoas E projetos** mencionados. O `actions.yaml` ganha o campo `projeto_slug` — retrocompatível com V1.
+Na ingestão V3, o pipeline identifica **pessoas E projetos** mencionados. O `actions.yaml` ganha o campo `projeto_slug` — retrocompatível com V1.
 
 #### View Hoje / Esta Semana
 
@@ -737,7 +798,7 @@ Viável sem mudança no backend — os dados já existem no `LideradoSnapshot` e
 - Insights cruzados do time (padrões que aparecem em múltiplas pessoas)
 - Caso de promoção gerado pela IA com base em perfil + projetos + artefatos
 
-### V3 — Proatividade e integrações externas
+### V4 — Proatividade e integrações externas
 
 - Briefing pré-reunião proativo (integração com Google Calendar)
 - Pergunta livre em linguagem natural sobre o time

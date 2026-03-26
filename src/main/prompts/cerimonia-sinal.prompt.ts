@@ -79,41 +79,48 @@ REGRAS OBRIGATÓRIAS:
 - Nunca copie fragmentos garbled, caracteres estranhos ou frases incompletas da transcrição
 - Escreva em português brasileiro correto e profissional — corrija ortografia, gramática e pontuação em todos os campos de texto
 
+**Cruzamento com perfil (obrigatório se perfil disponível):**
+${perfilMdRaw ? `A pessoa tem pontos de atenção e temas recorrentes no perfil. Se você observar evidência de MELHORIA ou PIORA em algum ponto de atenção ativo, registre explicitamente nos campos relevantes (feedbacks_positivos para melhoria, pontos_de_desenvolvimento para piora). Conecte observações aos temas recorrentes quando aplicável.` : 'Sem perfil anterior — analise apenas com base nesta cerimônia.'}
+
 **Por categoria:**
 
-"soft_skills_observadas": padrões comportamentais observáveis nesta cerimônia.
-  - INCLUIR: comunicação (clareza, objetividade, escuta), colaboração, autonomia, gestão de bloqueios, proatividade, resiliência, adaptabilidade
-  - Apenas quando houver evidência clara e específica do comportamento
-  Exemplos:
+"soft_skills_observadas": descreva O QUE A PESSOA FEZ, não uma label genérica.
+  - NUNCA retorne labels como "boa comunicação", "proatividade", "trabalho em equipe"
+  - SEMPRE descreva o comportamento observado com contexto
+  - Se participação insuficiente para gerar skill concreta, retorne array vazio
+  Ruim: "boa comunicação" / "proatividade" / "trabalho em equipe"
+  Bom:
   - "Comunicou bloqueio de infraestrutura com clareza durante a daily: descreveu o problema, impacto esperado e o que tentou antes de escalar"
   - "Demonstrou escuta ativa ao incorporar sugestão do colega e ajustar a proposta de arquitetura em tempo real"
   - "Trouxe dois pontos de melhoria concretos na retro com proposta de ação imediata, sem esperar o time perguntar"
 
-"hard_skills_observadas": evidências técnicas concretas observadas nesta cerimônia.
-  - INCLUIR: liderou decisão técnica, identificou problema técnico, demonstrou domínio de ferramenta/sistema, estimou corretamente
-  - Apenas quando houver evidência objetiva e verificável
-  Exemplos:
+"hard_skills_observadas": evidências técnicas concretas e verificáveis, não labels.
+  Ruim: "bom conhecimento técnico" / "domínio de ferramentas"
+  Bom:
   - "Liderou decisão técnica sobre migração do serviço de auth baseando-se em análise de trade-offs entre custo e segurança"
   - "Identificou gargalo de performance no pipeline de CI que impactava todo o time — propôs solução de caching"
   - "Quebrou epic complexo em tasks independentes e estimou esforço corretamente (confirmado no sprint seguinte)"
 
 "pontos_de_desenvolvimento": áreas que precisam crescer, observadas nesta cerimônia.
-  - INCLUIR: dificuldades evidentes, lacunas técnicas observadas, comportamentos que limitam a efetividade
   - Seja específico: o que foi observado, qual o impacto potencial
+  - Se um ponto de atenção do perfil piorou, mencione explicitamente
   Exemplos:
   - "Participou minimamente da daily — respondeu apenas às perguntas diretas sem contextualizar o status da tarefa, dificultando a visibilidade do time"
   - "Apresentou dificuldade em dimensionar esforço — estimativa 3x acima do realizado no sprint, padrão já observado em ciclos anteriores"
   - "Não participou da discussão de arquitetura onde teria contexto relevante — pode indicar falta de confiança para contribuir em público"
 
-"feedbacks_positivos": reconhecimentos positivos concretos observados nesta cerimônia.
-  Exemplos:
-  - "Entregou feature complexa antes do prazo e com cobertura de testes completa — mencionado pelo time na retro"
+"feedbacks_positivos": padrão obrigatório: [QUEM] + [FEZ O QUÊ] + [IMPACTO].
+  Ruim: "Bom trabalho" / "Mandou bem"
+  Bom:
+  - "Entregou feature complexa de pagamentos antes do prazo e com cobertura de testes completa — reduzindo risco de regressão no release"
   - "Desbloqueou o time ao resolver incidente de produção em menos de 1 hora durante o horário da daily"
+  - "Identificou edge case no fluxo de pagamento durante planning que evitaria bug em produção"
 
-"feedbacks_negativos": observações negativas concretas que merecem atenção.
-  Exemplos:
-  - "Comprometeu investigação de bug crítico na sprint passada sem atualização — mencionado como item sem follow-up na retro"
-  - "Interrompeu colega duas vezes durante explicação técnica na reunião de arquitetura"
+"feedbacks_negativos": padrão obrigatório: [QUEM] + [FEZ O QUÊ] + [IMPACTO].
+  Ruim: "Precisa melhorar" / "Não foi bem"
+  Bom:
+  - "Comprometeu investigação de bug crítico na sprint passada sem atualização — citado como item sem follow-up na retro, gerou retrabalho"
+  - "Interrompeu colega duas vezes durante explicação técnica na reunião de arquitetura — prejudicou a dinâmica da discussão"
 
 "temas_detectados": temas recorrentes identificados (ex: "comunicação assertiva", "liderança técnica", "gestão de tempo").
   Use esses para enriquecer os Temas Recorrentes do perfil.

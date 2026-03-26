@@ -1,5 +1,6 @@
 import type { IngestionAIResult } from '../prompts/ingestion.prompt'
 import type { CerimoniaSinalResult } from '../prompts/cerimonia-sinal.prompt'
+import type { OneOnOneResult } from '../prompts/1on1-deep.prompt'
 
 const REQUIRED_FIELDS: (keyof IngestionAIResult)[] = [
   'tipo',
@@ -158,6 +159,108 @@ export function validateCerimoniaSinalResult(data: unknown): ValidationResult {
   for (const arr of ['soft_skills_observadas', 'hard_skills_observadas', 'pontos_de_desenvolvimento', 'feedbacks_positivos', 'feedbacks_negativos', 'temas_detectados']) {
     if (obj[arr] !== undefined && !Array.isArray(obj[arr])) {
       typeErrors.push(`${arr} deve ser array`)
+    }
+  }
+
+  return {
+    valid: missingFields.length === 0 && typeErrors.length === 0,
+    missingFields,
+    typeErrors,
+  }
+}
+
+// --- OneOnOneResult validation ---
+
+const ONE_ON_ONE_REQUIRED_FIELDS: (keyof OneOnOneResult)[] = [
+  'followup_acoes',
+  'acoes_liderado',
+  'acoes_gestor',
+  'insights_1on1',
+  'sugestoes_gestor',
+  'correlacoes_terceiros',
+  'tendencia_emocional',
+  'nota_tendencia',
+  'pdi_update',
+  'resumo_executivo_rh',
+]
+
+export function validateOneOnOneResult(data: unknown): ValidationResult {
+  const missingFields: string[] = []
+  const typeErrors: string[] = []
+
+  if (!data || typeof data !== 'object') {
+    return { valid: false, missingFields: ['(all — not an object)'], typeErrors: [] }
+  }
+
+  const obj = data as Record<string, unknown>
+
+  for (const field of ONE_ON_ONE_REQUIRED_FIELDS) {
+    if (obj[field] === undefined || obj[field] === null) {
+      missingFields.push(field)
+    }
+  }
+
+  // Array fields
+  for (const arr of ['followup_acoes', 'acoes_liderado', 'acoes_gestor', 'insights_1on1', 'sugestoes_gestor', 'correlacoes_terceiros']) {
+    if (obj[arr] !== undefined && !Array.isArray(obj[arr])) {
+      typeErrors.push(`${arr} deve ser array`)
+    }
+  }
+
+  // Enum: tendencia_emocional
+  if (obj.tendencia_emocional && !['estavel', 'melhorando', 'deteriorando', 'novo_sinal'].includes(obj.tendencia_emocional as string)) {
+    typeErrors.push(`tendencia_emocional inválido: "${obj.tendencia_emocional}"`)
+  }
+
+  // pdi_update must be object
+  if (obj.pdi_update !== undefined && (typeof obj.pdi_update !== 'object' || obj.pdi_update === null)) {
+    typeErrors.push('pdi_update deve ser objeto')
+  }
+
+  // resumo_executivo_rh must be string
+  if (obj.resumo_executivo_rh !== undefined && typeof obj.resumo_executivo_rh !== 'string') {
+    typeErrors.push('resumo_executivo_rh deve ser string')
+  }
+
+  // Validate followup_acoes items
+  if (Array.isArray(obj.followup_acoes)) {
+    for (let i = 0; i < (obj.followup_acoes as unknown[]).length; i++) {
+      const f = (obj.followup_acoes as Record<string, unknown>[])[i]
+      if (!f || typeof f !== 'object') {
+        typeErrors.push(`followup_acoes[${i}]: não é objeto`)
+      } else if (!f.status || !['cumprida', 'em_andamento', 'nao_mencionada', 'abandonada'].includes(f.status as string)) {
+        typeErrors.push(`followup_acoes[${i}].status inválido: "${f.status}"`)
+      }
+    }
+  }
+
+  // Validate acoes_liderado items
+  if (Array.isArray(obj.acoes_liderado)) {
+    for (let i = 0; i < (obj.acoes_liderado as unknown[]).length; i++) {
+      const a = (obj.acoes_liderado as Record<string, unknown>[])[i]
+      if (!a || typeof a !== 'object') {
+        typeErrors.push(`acoes_liderado[${i}]: não é objeto`)
+      } else {
+        if (!a.descricao || typeof a.descricao !== 'string' || (a.descricao as string).trim() === '') {
+          typeErrors.push(`acoes_liderado[${i}]: descricao vazia ou inválida`)
+        }
+        if (a.tipo && !['tarefa_explicita', 'compromisso_informal', 'mudanca_processo', 'pdi'].includes(a.tipo as string)) {
+          typeErrors.push(`acoes_liderado[${i}].tipo inválido: "${a.tipo}"`)
+        }
+      }
+    }
+  }
+
+  // Validate insights_1on1 items
+  if (Array.isArray(obj.insights_1on1)) {
+    const validCategorias = ['carreira', 'pdi', 'expectativas', 'feedback_dado', 'feedback_recebido', 'relacionamento', 'pessoal', 'processo']
+    for (let i = 0; i < (obj.insights_1on1 as unknown[]).length; i++) {
+      const ins = (obj.insights_1on1 as Record<string, unknown>[])[i]
+      if (!ins || typeof ins !== 'object') {
+        typeErrors.push(`insights_1on1[${i}]: não é objeto`)
+      } else if (ins.categoria && !validCategorias.includes(ins.categoria as string)) {
+        typeErrors.push(`insights_1on1[${i}].categoria inválido: "${ins.categoria}"`)
+      }
     }
   }
 

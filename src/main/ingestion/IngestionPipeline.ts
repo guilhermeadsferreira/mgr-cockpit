@@ -5,7 +5,8 @@ import { ArtifactWriter } from './ArtifactWriter'
 import { runClaudePrompt } from './ClaudeRunner'
 import { buildIngestionPrompt, type IngestionAIResult } from '../prompts/ingestion.prompt'
 import { buildCerimoniaSinalPrompt } from '../prompts/cerimonia-sinal.prompt'
-import { validateIngestionResult, validateCerimoniaSinalResult } from './SchemaValidator'
+import { build1on1DeepPrompt, type OneOnOneResult } from '../prompts/1on1-deep.prompt'
+import { validateIngestionResult, validateCerimoniaSinalResult, validateOneOnOneResult } from './SchemaValidator'
 import { PersonRegistry } from '../registry/PersonRegistry'
 import { ActionRegistry } from '../registry/ActionRegistry'
 import { DetectedRegistry } from '../registry/DetectedRegistry'
@@ -434,6 +435,153 @@ export class IngestionPipeline {
     console.log(`[IngestionPipeline] sinal cerimônia gestor gravado: ${fileName}`)
   }
 
+  /**
+   * Pass de 1:1 profundo: extrai follow-ups, compromissos, insights, correlações.
+   * Roda após Pass 1/2 quando tipo === '1on1'. Fire-and-forget.
+   * Aplica side effects: atualiza perfil (insights, sinais, tendência, resumo QR),
+   * atualiza status de ações via follow-up, cria novas ações, roteia ações do gestor para Demandas.
+   */
+  private async run1on1DeepPass(
+    slug: string,
+    aiResult: IngestionAIResult,
+    artifactText: string,
+    claudeBinPath: string,
+  ): Promise<OneOnOneResult | null> {
+    const registry = new PersonRegistry(this.workspacePath)
+    const actionReg = new ActionRegistry(this.workspacePath)
+    const pessoa = registry.get(slug)
+    if (!pessoa) return null
+
+    const configYaml = registry.getConfigRaw(slug)
+    const perfilData = registry.getPerfil(slug)
+    const perfilMdRaw = perfilData?.raw ?? null
+    const settings = SettingsManager.load()
+
+    // Serialize open actions by owner
+    const openLiderado = actionReg.getOpenByOwner(slug, 'liderado')
+    const openGestor = actionReg.getOpenByOwner(slug, 'gestor')
+
+    const serializeActions = (actions: import('../../renderer/src/types/ipc').Action[]): string => {
+      if (actions.length === 0) return ''
+      return actions.map((a) =>
+        `- [${a.id}] "${a.descricao || a.texto}" (criada em ${a.criadoEm}${a.prazo ? `, prazo: ${a.prazo}` : ''})`
+      ).join('\n')
+    }
+
+    // Extract sinais de terceiros from profile (Pontos de Atenção with source attribution)
+    const sinaisTerceiros = this.extractProfileSection(perfilMdRaw, 'Sinais de Terceiros')
+      || this.extractProfileSection(perfilMdRaw, 'Pontos de Atenção Ativos')
+      || ''
+
+    // Extract recent health history (last 5 entries)
+    const historicoSaudeRaw = this.extractProfileSection(perfilMdRaw, 'Histórico de Saúde') || ''
+    const historicoSaude = historicoSaudeRaw
+      .split('\n')
+      .filter((l) => l.trim().length > 0)
+      .slice(-5)
+      .join('\n')
+
+    const prompt = build1on1DeepPrompt({
+      artifactContent: artifactText,
+      perfilMdRaw,
+      configYaml,
+      openActionsLiderado: serializeActions(openLiderado),
+      openActionsGestor: serializeActions(openGestor),
+      sinaisTerceiros,
+      historicoSaude,
+      today: new Date().toISOString().slice(0, 10),
+      managerName: settings.managerName ?? undefined,
+    })
+
+    console.log(`[IngestionPipeline] pass 1on1 para "${slug}"`)
+    const result = await runClaudePrompt(claudeBinPath, prompt, 180_000)
+
+    if (!result.success || !result.data) {
+      console.warn(`[IngestionPipeline] pass 1on1 falhou para "${slug}": ${result.error ?? 'sem dados'}`)
+      return null
+    }
+
+    const validation = validateOneOnOneResult(result.data)
+    if (!validation.valid) {
+      const details = [
+        ...validation.missingFields.map((f) => `campo ausente: ${f}`),
+        ...validation.typeErrors,
+      ].join('; ')
+      console.warn(`[IngestionPipeline] schema inválido no pass 1on1 para "${slug}": ${details}`)
+      return null
+    }
+
+    const oneOnOneResult = result.data as OneOnOneResult
+    const date = aiResult.data_artefato
+    const artifactFileName = `${date}-${slug}.md`
+
+    console.log(
+      `[IngestionPipeline] pass 1on1 concluído para "${slug}": ` +
+      `${oneOnOneResult.followup_acoes.length} followups, ` +
+      `${oneOnOneResult.acoes_liderado.length} ações liderado, ` +
+      `${oneOnOneResult.insights_1on1.length} insights`
+    )
+
+    // Apply side effects: update perfil, actions, demandas
+    const release = await this.acquirePersonLock(slug)
+    try {
+      // 1. Update perfil with 1on1 results (insights, sinais, tendencia, resumo QR)
+      const writer = new ArtifactWriter(this.workspacePath)
+      writer.update1on1Results(slug, oneOnOneResult, artifactFileName)
+
+      // 2. Update action statuses from follow-up analysis
+      if (oneOnOneResult.followup_acoes.length > 0) {
+        actionReg.updateFromFollowup(slug, oneOnOneResult.followup_acoes)
+      }
+
+      // 3. Create new actions from 1on1 results
+      if (oneOnOneResult.acoes_liderado.length > 0 || oneOnOneResult.sugestoes_gestor.some((s) => s.gerar_acao)) {
+        actionReg.createFrom1on1Result(slug, oneOnOneResult, date, artifactFileName)
+      }
+
+      // 4. Route acoes_gestor to DemandaRegistry (módulo Eu)
+      if (oneOnOneResult.acoes_gestor.length > 0) {
+        const demandaReg = new DemandaRegistry(this.workspacePath)
+        for (const acao of oneOnOneResult.acoes_gestor) {
+          demandaReg.save({
+            id:           `${date}-1on1-gestor-${Math.random().toString(36).slice(2, 7)}`,
+            descricao:    acao.descricao,
+            origem:       'Liderado',
+            prazo:        acao.prazo_iso ?? null,
+            criadoEm:     date,
+            atualizadoEm: date,
+            status:       'open',
+          })
+        }
+        console.log(`[IngestionPipeline] ${oneOnOneResult.acoes_gestor.length} ação(ões) do gestor → Demandas`)
+      }
+    } finally {
+      release()
+    }
+
+    // Notify renderer about 1on1 deep pass completion
+    this.notifyRenderer('ingestion:1on1-deep-completed', {
+      personSlug: slug,
+      followups: oneOnOneResult.followup_acoes.length,
+      newActions: oneOnOneResult.acoes_liderado.length + oneOnOneResult.acoes_gestor.length,
+      insights: oneOnOneResult.insights_1on1.length,
+      tendencia: oneOnOneResult.tendencia_emocional,
+    })
+
+    return oneOnOneResult
+  }
+
+  /**
+   * Extracts a named section from perfil.md raw content.
+   * Returns the content between ## SectionName and the next ## or end of file.
+   */
+  private extractProfileSection(perfilMdRaw: string | null, sectionName: string): string {
+    if (!perfilMdRaw) return ''
+    const regex = new RegExp(`## ${sectionName}\\n([\\s\\S]*?)(?=\\n## |$)`)
+    const match = perfilMdRaw.match(regex)
+    return match ? match[1].trim() : ''
+  }
+
   private async syncItemToPerson(item: QueueItem, slug: string): Promise<void> {
     if (!item.cachedAiResult || !item.cachedText) return
 
@@ -480,6 +628,133 @@ export class IngestionPipeline {
       filePath: item.filePath, personSlug: slug,
       tipo: item.tipo, summary: item.summary, novas: [],
     })
+  }
+
+  /**
+   * Batch re-ingestion: processes a list of files in chronological order.
+   * Used for full workspace re-processing after prompt improvements.
+   *
+   * Flow:
+   * 1. Caller provides sorted file paths (chronological order matters for resumo_evolutivo)
+   * 2. Each file is enqueued and processed sequentially (respects per-person lock)
+   * 3. Progress is reported via renderer events
+   *
+   * Does NOT clean data — caller must handle backup/reset before calling this.
+   */
+  async batchReingest(
+    filePaths: string[],
+    onProgress?: (current: number, total: number, fileName: string) => void,
+  ): Promise<{ processed: number; errors: string[] }> {
+    const errors: string[] = []
+    let processed = 0
+
+    console.log(`[IngestionPipeline] batch reingest: ${filePaths.length} arquivo(s)`)
+
+    for (let i = 0; i < filePaths.length; i++) {
+      const filePath = filePaths[i]
+      const fileName = basename(filePath)
+      onProgress?.(i + 1, filePaths.length, fileName)
+
+      this.notifyRenderer('ingestion:batch-progress', {
+        current: i + 1,
+        total: filePaths.length,
+        fileName,
+      })
+
+      // Create a queue item and process it directly (bypass drainQueue)
+      const item: QueueItem = {
+        id:       `batch-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        filePath,
+        fileName,
+        status:   'queued',
+      }
+
+      try {
+        await this.processItem(item)
+        if (item.status === 'done' || item.status === 'pending') {
+          processed++
+        } else if (item.status === 'error') {
+          errors.push(`${fileName}: ${item.error}`)
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        errors.push(`${fileName}: ${msg}`)
+      }
+
+      // Small delay between items to avoid overwhelming the Claude CLI
+      if (i < filePaths.length - 1) {
+        await new Promise((r) => setTimeout(r, 500))
+      }
+    }
+
+    console.log(`[IngestionPipeline] batch reingest concluído: ${processed}/${filePaths.length} processados, ${errors.length} erro(s)`)
+
+    this.notifyRenderer('ingestion:batch-completed', {
+      processed,
+      total: filePaths.length,
+      errors,
+    })
+
+    return { processed, errors }
+  }
+
+  /**
+   * Resets generated data for all people (perfil.md, actions.yaml, historico/).
+   * Preserves config.yaml. Used before batch re-ingestion.
+   * Returns list of people whose data was reset.
+   */
+  static resetGeneratedData(workspacePath: string): string[] {
+    const pessoasDir = join(workspacePath, 'pessoas')
+    if (!existsSync(pessoasDir)) return []
+
+    const { readdirSync, rmSync } = require('fs') as typeof import('fs')
+    const people = readdirSync(pessoasDir, { withFileTypes: true })
+      .filter((d: { isDirectory: () => boolean }) => d.isDirectory())
+      .map((d: { name: string }) => d.name)
+
+    const resetList: string[] = []
+
+    for (const slug of people) {
+      const personDir = join(pessoasDir, slug)
+
+      // Remove perfil.md (will be regenerated)
+      const perfilPath = join(personDir, 'perfil.md')
+      if (existsSync(perfilPath)) {
+        rmSync(perfilPath)
+      }
+      // Remove perfil.md.bak
+      const bakPath = perfilPath + '.bak'
+      if (existsSync(bakPath)) rmSync(bakPath)
+
+      // Remove actions.yaml (will be regenerated)
+      const actionsPath = join(personDir, 'actions.yaml')
+      if (existsSync(actionsPath)) {
+        rmSync(actionsPath)
+      }
+
+      // Remove historico/ directory (will be regenerated)
+      const historicoDir = join(personDir, 'historico')
+      if (existsSync(historicoDir)) {
+        rmSync(historicoDir, { recursive: true })
+        mkdirSync(historicoDir, { recursive: true })
+      }
+
+      // Remove pautas/ directory (will be regenerated)
+      const pautasDir = join(personDir, 'pautas')
+      if (existsSync(pautasDir)) {
+        rmSync(pautasDir, { recursive: true })
+        mkdirSync(pautasDir, { recursive: true })
+      }
+
+      resetList.push(slug)
+    }
+
+    // Clear pending queue
+    const pendingPath = join(workspacePath, 'inbox', 'pending-queue.json')
+    if (existsSync(pendingPath)) rmSync(pendingPath)
+
+    console.log(`[IngestionPipeline] reset data for ${resetList.length} people: ${resetList.join(', ')}`)
+    return resetList
   }
 
   private async drainQueue(): Promise<void> {
@@ -691,8 +966,18 @@ export class IngestionPipeline {
 
       // If pessoa_principal is registered → sync immediately
       if (principal && registry.get(principal)) {
+        // Capture before sync (sync clears cached data)
+        const capturedAiResult = aiResult
+        const capturedText = text
+
         await this.syncItemToPerson(item, principal)
         console.log(`[IngestionPipeline] done: ${item.fileName} → ${principal}`)
+
+        // Pass 1on1: deep analysis for 1:1 artifacts (fire-and-forget)
+        if (capturedAiResult.tipo === '1on1' && settings.claudeBinPath) {
+          this.run1on1DeepPass(principal, capturedAiResult, capturedText, settings.claudeBinPath)
+            .catch((err) => console.warn('[IngestionPipeline] pass 1on1 falhou:', err))
+        }
       } else if (!principal) {
         // Reunião coletiva: sem pessoa_principal → salva em _coletivo + sinais por pessoa (async)
         this.syncItemToCollective(item, settings.claudeBinPath)

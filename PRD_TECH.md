@@ -3,8 +3,8 @@
 > Documento vivo — atualizar a cada mudança de stack, arquitetura, schema ou convenção técnica relevante.
 
 **Criado em:** 2026-03-18
-**Status:** V1 concluída · Auditoria técnica implementada (3 fases) · Estável
-**Última atualização:** 2026-03-23
+**Status:** V1 concluída · V2 Fase 1–5 implementadas · Schema v5
+**Última atualização:** 2026-03-26
 
 ---
 
@@ -107,16 +107,23 @@ pulse-cockpit/
 │   │   │   └── SchemaValidator.ts   # valida JSON do Claude antes de usar
 │   │   ├── registry/
 │   │   │   ├── PersonRegistry.ts
-│   │   │   ├── ActionRegistry.ts    # ações estruturadas (actions.yaml por pessoa)
+│   │   │   ├── ActionRegistry.ts    # ações estruturadas + follow-up + criação via 1on1
+│   │   │   ├── DemandaRegistry.ts   # demandas do gestor (módulo Eu)
+│   │   │   ├── CicloRegistry.ts     # entradas de ciclo do gestor
 │   │   │   ├── DetectedRegistry.ts
 │   │   │   └── SettingsManager.ts
 │   │   ├── migration/
-│   │   │   └── ProfileMigration.ts  # migração automática de perfil.md entre versões
+│   │   │   └── ProfileMigration.ts  # migração automática v1→v5
 │   │   ├── prompts/
 │   │   │   ├── ingestion.prompt.ts
-│   │   │   ├── agenda.prompt.ts
+│   │   │   ├── 1on1-deep.prompt.ts  # V2: Pass de 1:1 profundo
+│   │   │   ├── cerimonia-sinal.prompt.ts
+│   │   │   ├── agenda.prompt.ts     # V2: enriquecida com insights, sinais, PDI
 │   │   │   ├── agenda-gestor.prompt.ts
-│   │   │   └── cycle.prompt.ts
+│   │   │   ├── cycle.prompt.ts      # V2: enriquecido com insights, correlações
+│   │   │   ├── gestor-ciclo.prompt.ts
+│   │   │   ├── autoavaliacao.prompt.ts
+│   │   │   └── compression.prompt.ts
 │   │   └── workspace/
 │   │       └── WorkspaceSetup.ts    # cria dirs + templates de artefato
 │   │
@@ -201,27 +208,42 @@ criado_em: "2026-03-18T10:00:00Z"
 atualizado_em: "2026-03-18T10:00:00Z"
 ```
 
-### perfil.md — frontmatter (schema_version: 2)
+### perfil.md — frontmatter (schema_version: 5)
 
 ```yaml
 slug: "maria-silva"
-schema_version: 2            # v1→v2: removeu acoes_pendentes_count
-ultima_atualizacao: "2026-03-19T14:30:00Z"
-ultima_ingestao: "2026-03-19" # atualizado a cada ingestão bem-sucedida
+schema_version: 5
+ultima_atualizacao: "2026-03-26T14:30:00Z"
+ultima_ingestao: "2026-03-26"
 total_artefatos: 7
-ultimo_1on1: "2026-03-15"    # atualizado em tipo=1on1 OU necessita_1on1=false
+ultimo_1on1: "2026-03-26"
 alertas_ativos: []
 saude: "verde"
+ultima_confianca: "alta"
 necessita_1on1: false
 motivo_1on1: null
 alerta_estagnacao: false
 motivo_estagnacao: null
 sinal_evolucao: true
 evidencia_evolucao: "Liderou refatoração do serviço de auth"
+tendencia_emocional: "estavel"     # V2: estavel|melhorando|deteriorando|novo_sinal
+nota_tendencia: "Sem mudanças"     # V2: explicação da tendência
+ultimo_followup_acoes: "2026-03-26" # V2: data do último follow-up via Pass de 1:1
 ```
 
-> `acoes_pendentes_count` foi removido do frontmatter. Calculado em runtime pelo `ActionRegistry`.
+> `acoes_pendentes_count` foi removido do frontmatter (v2). Calculado em runtime pelo `ActionRegistry`.
 > `dados_stale: boolean` é injetado pelo IPC handler (não persistido no arquivo).
+
+**Seções do perfil.md (body):**
+- Resumo Evolutivo (reescrito a cada ingestão)
+- Ações Pendentes (append)
+- Pontos de Atenção Ativos (append, com strikethrough para resolvidos)
+- Conquistas e Elogios (append)
+- Temas Recorrentes (substituído — lista deduplicada)
+- Histórico de Artefatos (append, nunca reescrito)
+- Histórico de Saúde (append)
+- **Insights de 1:1** (V2, append — populado pelo Pass de 1:1)
+- **Sinais de Terceiros** (V2, append — populado pelo Pass de 1:1 + Cerimônia)
 
 ### actions.yaml (por pessoa)
 
@@ -239,6 +261,11 @@ actions:
     criadoEm: "2026-03-15"
     concluidoEm: null
     fonteArtefato: "2026-03-15-maria-silva.md"
+    # V2 fields (optional, backward compat)
+    tipo: "tarefa_explicita"       # tarefa_explicita|compromisso_informal|mudanca_processo|pdi
+    origem_pauta: "gestor"         # liderado|gestor|terceiro
+    contexto: "Gestor sugeriu rever processo de dev com IA"
+    ciclos_sem_mencao: 0           # incrementado pelo follow-up do Pass de 1:1
 ```
 
 ### Schema migration
@@ -248,6 +275,9 @@ O módulo `ProfileMigration.ts` migra `perfil.md` automaticamente na leitura:
 | De | Para | Mudança |
 |----|------|---------|
 | v1 | v2 | remove `acoes_pendentes_count` do frontmatter |
+| v2 | v3 | marker único para bloco conquistas (fix bug de append) |
+| v3 | v4 | markers de fechamento únicos por bloco (todos compartilhavam um) |
+| v4 | v5 | novos campos frontmatter (tendencia_emocional, nota_tendencia, ultimo_followup_acoes) + seções "Insights de 1:1" e "Sinais de Terceiros" |
 
 A migração é transparente — aplicada em `PersonRegistry.getPerfil()` e persistida no disco se o conteúdo mudou.
 
@@ -291,9 +321,15 @@ A migração é transparente — aplicada em `PersonRegistry.getPerfil()` e pers
 | `ai:generate-agenda` | renderer → main | Gera pauta de 1:1 |
 | `ai:cycle-report` | renderer → main | Relatório de ciclo/avaliação |
 | `shell:open` | renderer → main | Abre arquivo no editor externo |
+| `ingestion:batch-reingest` | renderer → main | V2: reingestão em batch (lista de paths) |
+| `ingestion:reset-data` | renderer → main | V2: limpa dados gerados preservando config |
+| `ingestion:list-processados` | renderer → main | V2: lista arquivos em inbox/processados/ |
 | `ingestion:started` | main → renderer | Arquivo entrou na fila |
 | `ingestion:completed` | main → renderer | Ingestão concluída |
 | `ingestion:failed` | main → renderer | Erro no processamento |
+| `ingestion:1on1-deep-completed` | main → renderer | V2: Pass de 1:1 concluído |
+| `ingestion:batch-progress` | main → renderer | V2: progresso da reingestão |
+| `ingestion:batch-completed` | main → renderer | V2: reingestão batch concluída |
 
 ---
 
@@ -314,8 +350,12 @@ spawn(claudeBin, ['-p', prompt], {
 5. Se ainda falhar: conta como erro para retry
 
 **Parâmetros:**
-- Timeout ingestão: 90s por pass (pass 1 + pass 2 = até 180s para pessoas com perfil)
+- Timeout Pass 1: 90s
+- Timeout Pass 2: 180s (perfil no contexto)
+- Timeout Pass de 1:1 (V2): 180s
+- Timeout Pass de Cerimônia: 60s
 - Timeout relatório de ciclo: 120s
+- Pior caso 1:1 com Pass 2 + Pass 1on1: ~450s (~7.5 min)
 - Max retries: 2 (backoff linear: `attempt * 2000ms`)
 
 **Detecção do binário:**
@@ -334,16 +374,48 @@ spawn(claudeBin, ['-p', prompt], {
 
 **Pass 2:** se `pessoa_principal` é cadastrada e tem perfil → re-executa com `perfilMdRaw` para gerar `resumo_evolutivo` e `temas_atualizados` com histórico real.
 
+**V2 — Instruções refinadas:**
+- Ações: regra crítica de responsável (quem executa, não quem pediu), padrão O QUÊ + SOBRE O QUÊ + PARA QUÊ
+- Resumo: 3 perguntas obrigatórias (por que aconteceu, o que decidiu, o que muda)
+- Pontos de atenção: padrão O QUÊ + EVIDÊNCIA + IMPACTO
+
 **Schema retornado:**
-`tipo`, `data_artefato`, `titulo`, `participantes_nomes`, `pessoas_identificadas`, `novas_pessoas_detectadas`, `pessoa_principal`, `resumo`, `acoes_comprometidas` (objeto: `{responsavel, descricao, prazo_iso}`), `pontos_de_atencao`, `pontos_resolvidos`, `elogios_e_conquistas`, `temas_detectados`, `resumo_evolutivo`, `temas_atualizados`, `indicador_saude`, `motivo_indicador`, `sentimento_detectado`, `nivel_engajamento`, `necessita_1on1`, `motivo_1on1`, `alerta_estagnacao`, `motivo_estagnacao`, `sinal_evolucao`, `evidencia_evolucao`
+`tipo`, `data_artefato`, `titulo`, `participantes_nomes`, `pessoas_identificadas`, `novas_pessoas_detectadas`, `pessoa_principal`, `resumo`, `acoes_comprometidas` (objeto: `{responsavel, descricao, prazo_iso}`), `pontos_de_atencao`, `pontos_resolvidos`, `elogios_e_conquistas`, `temas_detectados`, `resumo_evolutivo`, `temas_atualizados`, `indicador_saude`, `motivo_indicador`, `sentimento_detectado`, `nivel_engajamento`, `necessita_1on1`, `motivo_1on1`, `alerta_estagnacao`, `motivo_estagnacao`, `sinal_evolucao`, `evidencia_evolucao`, `confianca`
 
 **Validação:** `SchemaValidator.ts` valida campos obrigatórios + tipos. Falha no pass 1 → erro. Falha no pass 2 → usa pass 1 com aviso.
 
-### agenda.prompt.ts
+### 1on1-deep.prompt.ts — V2: Pass de 1:1
 
-Contexto: `config.yaml` + `perfil.md` + pautas anteriores + ações abertas.
+**Roda após Pass 1/2 quando `tipo === '1on1'`.** Fire-and-forget (180s timeout).
 
-Retorna JSON com: follow-ups, temas, perguntas sugeridas, alertas, reconhecimentos.
+**Contexto injetado:**
+- `artifactContent` (transcrição), `perfilMdRaw`, `configYaml` (inclui PDI)
+- Ações abertas do liderado e do gestor (serializadas com ID, descrição, prazo)
+- Sinais de terceiros (do perfil), Histórico de saúde recente (últimas 5 entradas)
+
+**Schema retornado (`OneOnOneResult`):**
+- `followup_acoes[]` — status de cada ação aberta (cumprida/em_andamento/nao_mencionada/abandonada)
+- `acoes_liderado[]` — novas ações com tipo, origem_pauta, contexto
+- `acoes_gestor[]` — ações do gestor (→ DemandaRegistry)
+- `insights_1on1[]` — categoria, conteúdo, relevância
+- `sugestoes_gestor[]` — reação do liderado (aceitou_tacito/explicito/resistiu/aberto)
+- `correlacoes_terceiros[]` — confirmação de sinais de terceiros
+- `tendencia_emocional` — estavel/melhorando/deteriorando/novo_sinal
+- `pdi_update` — menções ao PDI, progresso observado
+- `resumo_executivo_rh` — formato pronto para Qulture Rocks
+
+### cerimonia-sinal.prompt.ts — V2: refinamentos
+
+**V2 — Instruções refinadas:**
+- Skills: "descreva O QUE A PESSOA FEZ, não uma label" (nunca "boa comunicação")
+- Cruzamento com perfil: cross-referencia pontos de atenção e temas recorrentes
+- Feedback: padrão [QUEM] + [FEZ O QUÊ] + [IMPACTO]
+
+### agenda.prompt.ts — V2: enriquecida
+
+**Contexto V2:** `config.yaml` + `perfil.md` + pautas anteriores + ações abertas (com `descricao`, `owner`, `tipo`, `contexto`, `ciclos_sem_mencao`) + insights recentes + sinais de terceiros + PDI estruturado.
+
+Ações separadas por risco: abandono (2+ ciclos) como prioridade, gestor pendentes em "prestar contas".
 
 ### agenda-gestor.prompt.ts
 
@@ -351,11 +423,13 @@ Contexto: igual ao agenda.prompt + `LideradoSnapshot[]` (roll-up do time).
 
 Usa `dados_stale` para suprimir alertas de liderados sem ingestão recente (30+ dias).
 
-### cycle.prompt.ts
+### cycle.prompt.ts — V2: enriquecido
 
-Contexto: `config.yaml` + `perfil.md` + artefatos do período.
+**Contexto V2:** `config.yaml` + `perfil.md` + artefatos do período + insights de 1:1 + correlações de terceiros + histórico de follow-up (cumpridas/abandonadas/abertas) + tendência emocional + evolução do PDI.
 
 Retorna JSON com: `linha_do_tempo`, `entregas_e_conquistas`, `padroes_de_comportamento`, `evolucao_frente_ao_cargo`, `pontos_de_desenvolvimento`, `conclusao_para_calibracao`, `flag_promovibilidade`, **`evidencias_promovibilidade`** (3–5 bullets citáveis no fórum).
+
+**Instruções V2:** evidências cruzadas (múltiplas fontes), accountability com proporção cumpridas/abandonadas, promovibilidade cruzando conquistas + terceiros + PDI + tendência.
 
 ---
 
@@ -366,21 +440,31 @@ FileWatcher detects file
   → IngestionPipeline.enqueue()
     → drainQueue() — até 3 paralelos
       → processItem()
-        → Pass 1: buildIngestionPrompt(perfilMdRaw: null)
+        → Pass 1 (90s): buildIngestionPrompt(perfilMdRaw: null)
         → SchemaValidator.validate()
         → se pessoa registrada com perfil:
-            Pass 2: buildIngestionPrompt(perfilMdRaw: perfil.raw)
+            Pass 2 (180s): buildIngestionPrompt(perfilMdRaw: perfil.raw)
             SchemaValidator.validate()
         → se pessoa registrada: acquirePersonLock() → syncItemToPerson()
           → ArtifactWriter.writeArtifact()
           → ArtifactWriter.updatePerfil()
-          → ActionRegistry.createFromArtifact() [com prazo, owner, responsavel_slug]
+          → ActionRegistry.createFromArtifact()
+          → [V2] se tipo === '1on1': run1on1DeepPass() (fire-and-forget, 180s)
+            → build1on1DeepPrompt() com ações abertas, sinais, PDI, histórico saúde
+            → SchemaValidator.validateOneOnOneResult()
+            → ArtifactWriter.update1on1Results() (insights, sinais, tendência, resumo QR)
+            → ActionRegistry.updateFromFollowup() (status de ações)
+            → ActionRegistry.createFrom1on1Result() (novas ações com tipo, contexto)
+            → DemandaRegistry.save() (ações do gestor → módulo Eu)
         → se sem pessoa_principal: syncItemToCollective()
           → cria ações no ActionRegistry de cada responsável registrado
+          → [fire-and-forget] Pass Cerimônia por pessoa (60s)
         → se pessoa não cadastrada: status = 'pending'
 ```
 
 **Per-person lock:** `acquirePersonLock(slug)` serializa writes de `perfil.md` via promise chain, sem bloquear itens de pessoas diferentes.
+
+**Reingestão batch (V2):** `batchReingest(filePaths)` processa sequencialmente, respeita locks, reporta progresso. `resetGeneratedData()` limpa perfil/actions/historico preservando config.yaml.
 
 ---
 

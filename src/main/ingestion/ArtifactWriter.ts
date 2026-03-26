@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync, renameSync, copyFileSync } fro
 import { join } from 'path'
 import type { IngestionAIResult } from '../prompts/ingestion.prompt'
 import type { CerimoniaSinalResult } from '../prompts/cerimonia-sinal.prompt'
+import type { OneOnOneResult } from '../prompts/1on1-deep.prompt'
 import { ActionRegistry } from '../registry/ActionRegistry'
 import { CURRENT_SCHEMA_VERSION } from '../migration/ProfileMigration'
 
@@ -12,7 +13,9 @@ const SECTION = {
   conquistas:      { open: '<!-- BLOCO GERENCIADO PELA IA — append apenas (conquistas) -->',                   close: '<!-- FIM BLOCO CONQUISTAS -->' },
   temas:           { open: '<!-- BLOCO GERENCIADO PELA IA — lista deduplicada, substituída a cada ingestão -->', close: '<!-- FIM BLOCO TEMAS -->' },
   historico:       { open: '<!-- BLOCO GERENCIADO PELA IA — append apenas, nunca reescrito -->',               close: '<!-- FIM BLOCO HISTORICO -->' },
-  saude_historico: { open: '<!-- BLOCO GERENCIADO PELA IA — append apenas (histórico de saúde) -->',           close: '<!-- FIM BLOCO SAUDE -->' },
+  saude_historico:   { open: '<!-- BLOCO GERENCIADO PELA IA — append apenas (histórico de saúde) -->',           close: '<!-- FIM BLOCO SAUDE -->' },
+  insights_1on1:    { open: '<!-- BLOCO GERENCIADO PELA IA — append apenas (insights 1on1) -->',              close: '<!-- FIM BLOCO INSIGHTS_1ON1 -->' },
+  sinais_terceiros: { open: '<!-- BLOCO GERENCIADO PELA IA — append apenas (sinais terceiros) -->',           close: '<!-- FIM BLOCO SINAIS_TERCEIROS -->' },
 }
 
 /**
@@ -180,6 +183,9 @@ alerta_estagnacao: ${result.alerta_estagnacao ?? false}
 motivo_estagnacao: ${result.motivo_estagnacao ? `"${result.motivo_estagnacao}"` : 'null'}
 sinal_evolucao: ${result.sinal_evolucao ?? false}
 evidencia_evolucao: ${result.evidencia_evolucao ? `"${result.evidencia_evolucao}"` : 'null'}
+tendencia_emocional: null
+nota_tendencia: null
+ultimo_followup_acoes: null
 ---
 
 # Perfil Vivo — ${slug}
@@ -218,6 +224,14 @@ ${SECTION.historico.close}
 ${SECTION.saude_historico.open}
 - ${result.data_artefato} | ${result.indicador_saude} | ${result.motivo_indicador}
 ${SECTION.saude_historico.close}
+
+## Insights de 1:1
+${SECTION.insights_1on1.open}
+${SECTION.insights_1on1.close}
+
+## Sinais de Terceiros
+${SECTION.sinais_terceiros.open}
+${SECTION.sinais_terceiros.close}
 `
   }
 
@@ -405,6 +419,92 @@ ${SECTION.saude_historico.close}
   }
 
   /**
+   * Applies 1:1 deep pass results to an existing perfil.md.
+   * Updates: frontmatter (tendencia, followup date), "Insights de 1:1", "Sinais de Terceiros".
+   * Also appends resumo_executivo_rh to the artifact file in historico/.
+   * Atomic write: .tmp → rename.
+   */
+  update1on1Results(slug: string, result: OneOnOneResult, artifactFileName: string): void {
+    const perfilPath = join(this.pessoasDir, slug, 'perfil.md')
+    if (!existsSync(perfilPath)) return
+
+    const bakPath = perfilPath + '.bak'
+    const tmpPath = perfilPath + '.tmp'
+    copyFileSync(perfilPath, bakPath)
+
+    let updated = readFileSync(perfilPath, 'utf-8')
+    const now = new Date().toISOString()
+    const today = now.slice(0, 10)
+
+    // 1. Update frontmatter: tendencia_emocional, nota_tendencia, ultimo_followup_acoes
+    const fmMatch = updated.match(/^---\n([\s\S]*?)\n---/)
+    if (fmMatch) {
+      let fm = fmMatch[1]
+      fm = fm.replace(/ultima_atualizacao:.*/, `ultima_atualizacao: "${now}"`)
+
+      const tendencia = result.tendencia_emocional
+      const notaTendencia = result.nota_tendencia ? `"${result.nota_tendencia.replace(/"/g, '\\"')}"` : 'null'
+      if (/tendencia_emocional:/.test(fm)) {
+        fm = fm.replace(/tendencia_emocional:.*/, `tendencia_emocional: "${tendencia}"`)
+        fm = fm.replace(/nota_tendencia:.*/, `nota_tendencia: ${notaTendencia}`)
+      } else {
+        fm += `\ntendencia_emocional: "${tendencia}"\nnota_tendencia: ${notaTendencia}`
+      }
+
+      if (/ultimo_followup_acoes:/.test(fm)) {
+        fm = fm.replace(/ultimo_followup_acoes:.*/, `ultimo_followup_acoes: "${today}"`)
+      } else {
+        fm += `\nultimo_followup_acoes: "${today}"`
+      }
+
+      updated = updated.replace(/^---\n[\s\S]*?\n---/, `---\n${fm}\n---`)
+    }
+
+    // 2. Append insights de 1:1
+    if (result.insights_1on1.length > 0) {
+      const insightLines = result.insights_1on1.map((i) => {
+        return `**${today}:** [${i.categoria}] ${i.conteudo} *(${i.relevancia})*`
+      }).join('\n')
+      if (updated.includes(SECTION.insights_1on1.open)) {
+        updated = this.appendToBlock(updated, 'insights_1on1', insightLines)
+      } else {
+        updated = updated.trimEnd() + `\n\n## Insights de 1:1\n${SECTION.insights_1on1.open}\n${insightLines}\n${SECTION.insights_1on1.close}\n`
+      }
+    }
+
+    // 3. Append sinais de terceiros (correlações confirmadas)
+    if (result.correlacoes_terceiros.length > 0) {
+      const sinaisLines = result.correlacoes_terceiros.map((c) => {
+        const confirmacao = c.confirmado_pelo_liderado
+          ? `→ **Confirmado pelo liderado em 1:1 de ${today}**`
+          : `→ Não confirmado em 1:1 de ${today}`
+        const contexto = c.contexto_confirmacao ? ` (${c.contexto_confirmacao})` : ''
+        return `**${today} (${c.fonte}):** ${c.sinal_original}\n  ${confirmacao}${contexto}`
+      }).join('\n')
+      if (updated.includes(SECTION.sinais_terceiros.open)) {
+        updated = this.appendToBlock(updated, 'sinais_terceiros', sinaisLines)
+      } else {
+        updated = updated.trimEnd() + `\n\n## Sinais de Terceiros\n${SECTION.sinais_terceiros.open}\n${sinaisLines}\n${SECTION.sinais_terceiros.close}\n`
+      }
+    }
+
+    writeFileSync(tmpPath, updated, 'utf-8')
+    renameSync(tmpPath, perfilPath)
+
+    // 4. Append resumo_executivo_rh to the artifact file
+    if (result.resumo_executivo_rh) {
+      const artifactPath = join(this.pessoasDir, slug, 'historico', artifactFileName)
+      if (existsSync(artifactPath)) {
+        let artifactContent = readFileSync(artifactPath, 'utf-8')
+        if (!artifactContent.includes('## Resumo Executivo (Qulture Rocks)')) {
+          artifactContent += `\n\n---\n\n## Resumo Executivo (Qulture Rocks)\n\n${result.resumo_executivo_rh}\n`
+          writeFileSync(artifactPath, artifactContent, 'utf-8')
+        }
+      }
+    }
+  }
+
+  /**
    * Applies per-person ceremony signals to an existing perfil.md.
    * Unlike updatePerfil(), this method:
    *   - Does NOT rewrite Resumo Evolutivo (no full narrative context for group ceremonies)
@@ -514,6 +614,9 @@ alerta_estagnacao: false
 motivo_estagnacao: null
 sinal_evolucao: ${sinal.confianca !== 'baixa' && sinal.sinal_evolucao ? 'true' : 'false'}
 evidencia_evolucao: ${sinal.confianca !== 'baixa' && sinal.evidencia_evolucao ? `"${sinal.evidencia_evolucao}"` : 'null'}
+tendencia_emocional: null
+nota_tendencia: null
+ultimo_followup_acoes: null
 ---
 
 # Perfil Vivo — ${slug}
@@ -546,6 +649,14 @@ ${SECTION.historico.close}
 ## Histórico de Saúde
 ${SECTION.saude_historico.open}
 ${SECTION.saude_historico.close}
+
+## Insights de 1:1
+${SECTION.insights_1on1.open}
+${SECTION.insights_1on1.close}
+
+## Sinais de Terceiros
+${SECTION.sinais_terceiros.open}
+${SECTION.sinais_terceiros.close}
 `
   }
 

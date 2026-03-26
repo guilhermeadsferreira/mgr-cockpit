@@ -567,6 +567,25 @@ function TeamRiskPanel({
 
       if (fm.alerta_estagnacao) motivos.push('estagnação detectada')
 
+      // V2 risk triggers
+      // Ações com risco de abandono (2+ ciclos sem menção)
+      const abandonoRisk = actions.filter((a) => a.status === 'open' && ((a as Record<string, unknown>).ciclos_sem_mencao as number ?? 0) >= 2)
+      if (abandonoRisk.length > 0) motivos.push(`${abandonoRisk.length} ação${abandonoRisk.length > 1 ? 'ões' : ''} risco abandono`)
+
+      // Tendência emocional deteriorando
+      if ((fm as Record<string, unknown>).tendencia_emocional === 'deteriorando') motivos.push('tendência deteriorando')
+
+      // Promessa do gestor pendente há 14+ dias
+      const gestorPendentes = actions.filter((a) => a.owner === 'gestor' && a.status === 'open' && a.criadoEm)
+      const gestorVencidas = gestorPendentes.filter((a) => {
+        const dias = Math.floor((Date.now() - new Date(a.criadoEm).getTime()) / 86_400_000)
+        return dias >= 14
+      })
+      if (gestorVencidas.length > 0) motivos.push(`${gestorVencidas.length} promessa${gestorVencidas.length > 1 ? 's' : ''} do gestor 14d+`)
+
+      // Risco composto: 3+ sinais negativos simultâneos (já acima)
+      // Este é implícito — se motivos.length >= 3, o badge count já sinaliza
+
       return { slug: p.slug, nome: p.nome, cargo: p.cargo, motivos }
     })
     .filter((r) => r.motivos.length > 0)

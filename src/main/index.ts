@@ -170,6 +170,27 @@ function registerIpcHandlers(): void {
     if (fileWatcher) fileWatcher.enqueue(filePath)
   })
 
+  ipcMain.handle('ingestion:batch-reingest', async (_event, filePaths: string[]) => {
+    if (!fileWatcher) return { processed: 0, errors: ['FileWatcher não inicializado'] }
+    return fileWatcher.batchReingest(filePaths)
+  })
+
+  ipcMain.handle('ingestion:reset-data', () => {
+    const { workspacePath } = SettingsManager.load()
+    return FileWatcher.resetGeneratedData(workspacePath)
+  })
+
+  ipcMain.handle('ingestion:list-processados', () => {
+    const { workspacePath } = SettingsManager.load()
+    const processadosDir = require('path').join(workspacePath, 'inbox', 'processados')
+    const { existsSync, readdirSync } = require('fs')
+    if (!existsSync(processadosDir)) return []
+    return readdirSync(processadosDir)
+      .filter((f: string) => /\.(md|txt|pdf)$/i.test(f))
+      .sort() // alphabetical = chronological when filenames start with date
+      .map((f: string) => require('path').join(processadosDir, f))
+  })
+
   // ── AI ────────────────────────────────────────────────────
   ipcMain.handle('ai:test', async () => {
     console.log('[ai:test] handler chamado')
@@ -209,6 +230,7 @@ function registerIpcHandlers(): void {
     if (person.relacao === 'gestor') {
       // Pauta com o meu gestor — inclui roll-up do time
       const liderados = registry.getTeamRollup()
+      // TODO Fase 5: enrich gestor agenda with tendencias, correlações, riscos compostos
       const prompt = buildGestorAgendaPrompt({
         configYaml: configRaw,
         perfilMd: perfilData.raw,
@@ -231,7 +253,34 @@ function registerIpcHandlers(): void {
       const dadosStale = ultimaIngestao
         ? (Date.now() - new Date(ultimaIngestao).getTime()) > 30 * 24 * 60 * 60 * 1000
         : false
-      const prompt = buildAgendaPrompt({ configYaml: configRaw, perfilMd: perfilData.raw, today, dadosStale, pautasAnteriores, openActions })
+      // Enrich context: insights, sinais, PDI
+      const actionReg = new ActionRegistry(settings.workspacePath)
+      const enrichedActions = actionReg.list(slug)
+        .filter((a) => a.status === 'open')
+        .map((a) => ({
+          texto: a.texto,
+          descricao: (a as Record<string, unknown>).descricao as string | undefined,
+          criadoEm: a.criadoEm,
+          owner: a.owner,
+          tipo: (a as Record<string, unknown>).tipo as string | undefined,
+          contexto: (a as Record<string, unknown>).contexto as string | undefined,
+          ciclos_sem_mencao: (a as Record<string, unknown>).ciclos_sem_mencao as number | undefined,
+        }))
+
+      // Extract insights from perfil
+      const insightsMatch = perfilData.raw.match(/## Insights de 1:1\n[\s\S]*?<!--[^>]*-->\n([\s\S]*?)<!--/)
+      const insightsRecentes = insightsMatch?.[1]?.trim()
+        ?.split('\n').filter(Boolean).slice(-5).join('\n') || ''
+
+      // Extract sinais de terceiros
+      const sinaisMatch = perfilData.raw.match(/## Sinais de Terceiros\n[\s\S]*?<!--[^>]*-->\n([\s\S]*?)<!--/)
+      const sinaisTerceiros = sinaisMatch?.[1]?.trim() || ''
+
+      // Serialize PDI from config
+      const pdiMatch = configRaw.match(/pdi:\n([\s\S]*?)(?=\n\w|\n$|$)/)
+      const pdiEstruturado = pdiMatch?.[1]?.trim() || ''
+
+      const prompt = buildAgendaPrompt({ configYaml: configRaw, perfilMd: perfilData.raw, today, dadosStale, pautasAnteriores, openActions: enrichedActions, insightsRecentes, sinaisTerceiros, pdiEstruturado })
       const result = await runClaudePrompt(settings.claudeBinPath, prompt, 90_000)
       if (!result.success || !result.data) {
         return { success: false, error: result.error || 'Falha ao gerar pauta.' }
@@ -262,8 +311,36 @@ function registerIpcHandlers(): void {
     }
 
     const artifacts = registry.listArtifactsWithContent(personSlug, periodoInicio, periodoFim)
+
+    // V2 enrichments for cycle report
+    const insightsMatch = perfilData.raw.match(/## Insights de 1:1\n[\s\S]*?<!--[^>]*-->\n([\s\S]*?)<!--/)
+    const insights1on1 = insightsMatch?.[1]?.trim() || ''
+
+    const sinaisMatch = perfilData.raw.match(/## Sinais de Terceiros\n[\s\S]*?<!--[^>]*-->\n([\s\S]*?)<!--/)
+    const correlacoes = sinaisMatch?.[1]?.trim() || ''
+
+    // Follow-up history: count cumpridas vs abandonadas
+    const actionReg = new ActionRegistry(settings.workspacePath)
+    const allActions = actionReg.list(personSlug)
+    const cumpridas = allActions.filter(a => a.status === 'done').length
+    const abandonadas = allActions.filter(a => a.status === 'cancelled').length
+    const abertas = allActions.filter(a => a.status === 'open').length
+    const followupHistorico = allActions.length > 0
+      ? `Ações no período: ${cumpridas} cumpridas, ${abandonadas} abandonadas, ${abertas} em aberto (total: ${allActions.length})`
+      : ''
+
+    // Tendencia emocional from frontmatter
+    const tendencia = perfilData.frontmatter.tendencia_emocional as string || ''
+    const notaTendencia = perfilData.frontmatter.nota_tendencia as string || ''
+    const tendenciaEmocional = tendencia ? `${tendencia}${notaTendencia ? ` — ${notaTendencia}` : ''}` : ''
+
+    // PDI evolution
+    const pdiMatch = configRaw.match(/pdi:\n([\s\S]*?)(?=\n\w|\n$|$)/)
+    const pdiEvolucao = pdiMatch?.[1]?.trim() || ''
+
     const { prompt, truncatedArtifacts, totalArtifacts } = buildCyclePrompt({
       configYaml: configRaw, perfilMd: perfilData.raw, artifacts, periodoInicio, periodoFim,
+      insights1on1, correlacoes, followupHistorico, tendenciaEmocional, pdiEvolucao,
     })
 
     if (truncatedArtifacts > 0) {

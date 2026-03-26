@@ -3,6 +3,7 @@ import { join } from 'path'
 import yaml from 'js-yaml'
 import type { Action, ActionStatus } from '../../renderer/src/types/ipc'
 import type { AcaoComprometida } from '../prompts/ingestion.prompt'
+import type { OneOnOneResult, OneOnOneFollowup, OneOnOneAcaoLiderado } from '../prompts/1on1-deep.prompt'
 
 export class ActionRegistry {
   private pessoasDir: string
@@ -43,6 +44,16 @@ export class ActionRegistry {
     this.write(slug, actions)
   }
 
+  /**
+   * Returns open actions for a person, optionally filtered by owner.
+   * Used by Pass de 1:1 to serialize context for follow-up analysis.
+   */
+  getOpenByOwner(slug: string, owner?: 'gestor' | 'liderado' | 'terceiro'): Action[] {
+    const actions = this.list(slug).filter((a) => a.status === 'open')
+    if (!owner) return actions
+    return actions.filter((a) => a.owner === owner)
+  }
+
   createFromArtifact(
     slug: string,
     acoes: AcaoComprometida[],
@@ -80,6 +91,90 @@ export class ActionRegistry {
 
     if (toAdd.length > 0) {
       this.write(slug, [...toAdd, ...existing])
+    }
+  }
+
+  /**
+   * Batch-updates action statuses based on 1:1 follow-up results.
+   * Increments ciclos_sem_mencao for actions not mentioned.
+   */
+  updateFromFollowup(slug: string, followups: OneOnOneFollowup[]): void {
+    const actions = this.list(slug)
+    let changed = false
+
+    for (const fu of followups) {
+      const action = actions.find((a) => a.id === fu.acao_id)
+      if (!action) continue
+
+      if (fu.status === 'cumprida') {
+        action.status = 'done'
+        action.concluidoEm = new Date().toISOString().slice(0, 10)
+        changed = true
+      } else if (fu.status === 'em_andamento' && action.status === 'open') {
+        action.status = 'in_progress'
+        changed = true
+      } else if (fu.status === 'abandonada') {
+        action.status = 'cancelled'
+        action.concluidoEm = new Date().toISOString().slice(0, 10)
+        changed = true
+      } else if (fu.status === 'nao_mencionada') {
+        // Increment ciclos_sem_mencao (backward compat — field may not exist)
+        const current = (action as Record<string, unknown>).ciclos_sem_mencao as number ?? 0
+        ;(action as Record<string, unknown>).ciclos_sem_mencao = current + 1
+        changed = true
+      }
+    }
+
+    if (changed) this.write(slug, actions)
+  }
+
+  /**
+   * Creates new actions from 1:1 deep pass results.
+   * Handles acoes_liderado + sugestoes_gestor that generated actions.
+   * Also returns acoes_gestor for DemandaRegistry routing.
+   */
+  createFrom1on1Result(
+    slug: string,
+    result: OneOnOneResult,
+    date: string,
+    artifactFileName: string,
+  ): void {
+    const existing = this.list(slug)
+    const existingTextos = new Set(existing.map((a) => a.texto.trim().toLowerCase()))
+
+    const newActions: Action[] = []
+
+    // Actions from acoes_liderado
+    for (let i = 0; i < result.acoes_liderado.length; i++) {
+      const acao = result.acoes_liderado[i]
+      const texto = `${slug}: ${acao.descricao}${acao.prazo_iso ? ` até ${acao.prazo_iso}` : ''}`
+      if (existingTextos.has(texto.trim().toLowerCase())) continue
+
+      newActions.push({
+        id:               `${date}-1on1-${slug}-${i}`,
+        personSlug:       slug,
+        texto,
+        descricao:        acao.descricao,
+        responsavel:      slug,
+        responsavel_slug: slug,
+        prazo:            acao.prazo_iso ?? null,
+        owner:            'liderado',
+        prioridade:       'media',
+        status:           'open' as ActionStatus,
+        criadoEm:         date,
+        fonteArtefato:    artifactFileName,
+        // Extended v2 fields (backward compat — optional)
+        ...({
+          tipo:          acao.tipo,
+          origem_pauta:  acao.origem_pauta,
+          contexto:      acao.contexto,
+          ciclos_sem_mencao: 0,
+        } as Record<string, unknown>),
+      } as Action)
+    }
+
+    if (newActions.length > 0) {
+      this.write(slug, [...newActions, ...existing])
     }
   }
 

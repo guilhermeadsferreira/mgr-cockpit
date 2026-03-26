@@ -66,6 +66,16 @@ export class FileWatcher {
     this.pipeline.restorePending()
   }
 
+  // Batch re-ingestion: process files in chronological order
+  batchReingest(filePaths: string[]): Promise<{ processed: number; errors: string[] }> {
+    return this.pipeline.batchReingest(filePaths)
+  }
+
+  // Reset generated data (perfil, actions, historico) preserving config.yaml
+  static resetGeneratedData(workspacePath: string): string[] {
+    return IngestionPipeline.resetGeneratedData(workspacePath)
+  }
+
   private handleFile(filePath: string): void {
     const lower = filePath.toLowerCase()
     if (!SUPPORTED_EXTENSIONS.some((ext) => lower.endsWith(ext))) return
