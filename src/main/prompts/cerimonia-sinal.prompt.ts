@@ -26,6 +26,7 @@ export interface CerimoniaSinalResult {
   necessita_1on1: boolean
   motivo_1on1: string | null
   confianca: 'alta' | 'media' | 'baixa'
+  resumo_evolutivo: string | null
 }
 
 export function buildCerimoniaSinalPrompt(params: CerimoniaSinalPromptParams): string {
@@ -57,6 +58,7 @@ A relação desta pessoa com o gestor é: **${pessoaRelacao}**.
 - "gestor": foque em alinhamento ascendente, suporte recebido e expectativas comunicadas. Nunca use framing de desenvolvimento como se fosse um liderado — não escreva "está evoluindo" ou "precisa desenvolver".
 - "par": foque em colaboração horizontal, dependências e alinhamento de trabalho conjunto.
 - "stakeholder": foque em gestão de expectativas, alinhamento de entregas e riscos de desalinhamento.
+- "eu" (o próprio gestor analisando sua participação): foque em como o gestor se comportou nesta cerimônia — como facilitou discussões, que decisões tomou, que sinais deu ao time. Tom neutro e observacional: "facilitou", "comunicou", "decidiu", "demonstrou". Não use framing de desenvolvimento de liderado.
 
 ## Sua tarefa
 
@@ -133,6 +135,8 @@ REGRAS OBRIGATÓRIAS:
   - "media": participação razoável, algumas evidências
   - "baixa": participação mínima, poucas evidências ou cerimônia muito curta
 
+${perfilMdRaw === null ? `"resumo_evolutivo": escreva 3–5 frases narrativas em português profissional sobre a participação e perfil observado de ${pessoaNome} nesta cerimônia. Inclua: comportamento observado, pontos fortes, o que merece atenção futura. Calibre pelo papel (${pessoaRelacao}). Este campo é obrigatório pois não existe perfil anterior desta pessoa.` : '"resumo_evolutivo": null — já existe perfil anterior, não gere narrativa.'}
+
 JSON esperado:
 {
   "sentimento_detectado": "positivo|neutro|ansioso|frustrado|desengajado",
@@ -149,6 +153,7 @@ JSON esperado:
   "evidencia_evolucao": "string ou null",
   "necessita_1on1": false,
   "motivo_1on1": "string ou null",
-  "confianca": "alta|media|baixa"
+  "confianca": "alta|media|baixa",
+  "resumo_evolutivo": null
 }`
 }

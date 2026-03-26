@@ -150,8 +150,10 @@ function registerIpcHandlers(): void {
 
   // ── Detected people ───────────────────────────────────────
   ipcMain.handle('detected:list', () => {
-    const { workspacePath } = SettingsManager.load()
-    return new DetectedRegistry(workspacePath).list()
+    const settings = SettingsManager.load()
+    const managerSlug = (settings.managerName ?? '').trim().toLowerCase().replace(/\s+/g, '-')
+    const all = new DetectedRegistry(settings.workspacePath).list()
+    return managerSlug ? all.filter((p) => p.slug !== managerSlug) : all
   })
 
   ipcMain.handle('detected:dismiss', (_event, slug: string) => {

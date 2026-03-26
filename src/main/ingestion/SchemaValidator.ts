@@ -117,6 +117,7 @@ const CERIMONIA_SINAL_REQUIRED_FIELDS: (keyof CerimoniaSinalResult)[] = [
 const CERIMONIA_SINAL_NULLABLE_FIELDS = new Set<keyof CerimoniaSinalResult>([
   'evidencia_evolucao',
   'motivo_1on1',
+  'resumo_evolutivo',
 ])
 
 export function validateCerimoniaSinalResult(data: unknown): ValidationResult {

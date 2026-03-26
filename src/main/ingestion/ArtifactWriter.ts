@@ -353,9 +353,9 @@ ${SECTION.saude_historico.close}
       close: close.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
     }
 
-    const re = new RegExp(`(${escaped.open}\n)[\\s\\S]*?(\n${escaped.close})`)
+    const re = new RegExp(`(${escaped.open}\n)[\\s\\S]*?(${escaped.close})`)
     if (re.test(content)) {
-      return content.replace(re, `$1${newBody}$2`)
+      return content.replace(re, `$1${newBody}\n$2`)
     }
     return content
   }
@@ -365,9 +365,9 @@ ${SECTION.saude_historico.close}
     const escapedOpen  = open.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const escapedClose = close.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     // Anchor to the specific block using its unique open marker, then find the first close after it
-    const re = new RegExp(`(${escapedOpen}\n[\\s\\S]*?)(\n${escapedClose})`)
+    const re = new RegExp(`(${escapedOpen}\n)([\\s\\S]*?)(${escapedClose})`)
     if (re.test(content)) {
-      return content.replace(re, `$1\n${newLines}$2`)
+      return content.replace(re, `$1$2${newLines}\n$3`)
     }
     return content
   }
@@ -520,7 +520,7 @@ evidencia_evolucao: ${sinal.confianca !== 'baixa' && sinal.evidencia_evolucao ? 
 
 ## Resumo Evolutivo
 ${SECTION.resumo.open}
-Perfil criado a partir de sinais de cerimônia coletiva (${today}). Aguardando primeira ingestão individual para narrativa completa.
+${sinal.resumo_evolutivo ?? `Perfil criado a partir de sinais de cerimônia coletiva (${today}). Aguardando primeira ingestão individual para narrativa completa.`}
 ${SECTION.resumo.close}
 
 ## Ações Pendentes

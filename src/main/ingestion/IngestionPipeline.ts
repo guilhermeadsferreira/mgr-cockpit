@@ -235,12 +235,34 @@ export class IngestionPipeline {
 
     // Per-person ceremony signal extraction (fire-and-forget — does not block collective completion)
     if (claudeBinPath) {
-      const registeredParticipants = (aiResult.pessoas_identificadas ?? [])
+      // Primary: slugs Claude returned in pessoas_identificadas that are registered
+      const fromIdentificadas = (aiResult.pessoas_identificadas ?? [])
         .filter((slug) => !!registry.get(slug))
+
+      // Fallback: registered people whose name appears in participantes_nomes
+      // (catches cases where Claude missed them in pessoas_identificadas)
+      const allPeople = registry.list()
+      const fromNomes = (aiResult.participantes_nomes ?? []).flatMap((nome) => {
+        const candidate = nome.trim().toLowerCase().replace(/\s+/g, '-')
+        if (registry.get(candidate)) return [candidate]
+        // Try first-name unambiguous match
+        const firstName = nome.trim().split(' ')[0].toLowerCase()
+        const matches = allPeople.filter((p) => p.slug.split('-')[0] === firstName)
+        return matches.length === 1 ? [matches[0].slug] : []
+      })
+
+      const registeredParticipants = [...new Set([...fromIdentificadas, ...fromNomes])]
       if (registeredParticipants.length > 0) {
         this.runCerimoniaSignalsForPeople(
           registeredParticipants, aiResult, text, uniqueFileName, claudeBinPath, registry
         ).catch((err) => console.warn('[IngestionPipeline] sinais cerimônia falhou:', err))
+      }
+
+      // Gestor ceremony signal: capture manager's own participation → Meu Ciclo
+      const settings2 = SettingsManager.load()
+      if (settings2.managerName) {
+        this.runCerimoniaSinalForGestor(aiResult, text, claudeBinPath, settings2)
+          .catch((err) => console.warn('[IngestionPipeline] sinal cerimônia gestor falhou:', err))
       }
     }
   }
@@ -334,6 +356,84 @@ export class IngestionPipeline {
    * Writes artifact + updates perfil for a given item using its cached AI result.
    * No Claude call — pure file I/O.
    */
+
+  /**
+   * Runs ceremony signal analysis for the manager themselves and writes the result
+   * as a .md artifact to gestor/ciclo/ so it surfaces in Meu Ciclo.
+   * Fire-and-forget — does not block collective completion.
+   */
+  private async runCerimoniaSinalForGestor(
+    aiResult: IngestionAIResult,
+    ceremonyContent: string,
+    claudeBinPath: string,
+    settings: import('../registry/SettingsManager').AppSettings,
+  ): Promise<void> {
+    const { buildCerimoniaSinalPrompt } = await import('../prompts/cerimonia-sinal.prompt')
+    const { validateCerimoniaSinalResult } = await import('./SchemaValidator')
+    const today = new Date().toISOString().slice(0, 10)
+
+    const prompt = buildCerimoniaSinalPrompt({
+      teamRegistry: new (await import('../registry/PersonRegistry')).PersonRegistry(this.workspacePath).serializeForPrompt(),
+      pessoaNome: settings.managerName!,
+      pessoaCargo: settings.managerRole ?? 'Gestor',
+      pessoaRelacao: 'eu',
+      perfilMdRaw: null,
+      ceremonyContent,
+      ceremonyTipo: aiResult.tipo,
+      ceremonyData: aiResult.data_artefato,
+      today,
+    })
+
+    const result = await runClaudePrompt(claudeBinPath, prompt, 60_000)
+    if (!result.success || !result.data) {
+      console.warn('[IngestionPipeline] sinal cerimônia gestor: sem dados')
+      return
+    }
+    const validation = validateCerimoniaSinalResult(result.data)
+    if (!validation.valid) return
+
+    const sinal = result.data as import('../prompts/cerimonia-sinal.prompt').CerimoniaSinalResult
+    const { mkdirSync: mkdir2, writeFileSync: write2 } = await import('fs')
+    const { join: join2 } = await import('path')
+
+    const gestorCicloDir = join2(this.workspacePath, 'gestor', 'ciclo')
+    mkdir2(gestorCicloDir, { recursive: true })
+
+    const fileName = `${aiResult.data_artefato}-${aiResult.tipo}-gestor-${Math.random().toString(36).slice(2, 6)}.md`
+    const filePath = join2(gestorCicloDir, fileName)
+
+    const tipoLabel = { '1on1': '1:1', reuniao: 'Reunião', daily: 'Daily', planning: 'Planning', retro: 'Retro', feedback: 'Feedback', outro: 'Evento' }[aiResult.tipo] ?? 'Evento'
+    const titulo = `${tipoLabel} — Minha Participação`
+
+    const atencaoLines = sinal.pontos_de_desenvolvimento.map((p) => `- ${p}`).join('\n')
+    const conquistaLines = [...sinal.hard_skills_observadas, ...sinal.feedbacks_positivos].map((e) => `- ${e}`).join('\n')
+    const softLines = sinal.soft_skills_observadas.map((s) => `- ${s}`).join('\n')
+
+    const narrative = sinal.resumo_evolutivo ?? ''
+
+    const content = [
+      `---`,
+      `tipo: ${aiResult.tipo}`,
+      `data: ${aiResult.data_artefato}`,
+      `titulo: ${titulo}`,
+      `saude: ${sinal.indicador_saude}`,
+      `---`,
+      ``,
+      `# ${titulo}`,
+      ``,
+      `## Minhas Contribuições`,
+      narrative,
+      softLines ? `\n**Comportamentos observados:**\n${softLines}` : '',
+      conquistaLines ? `\n**Conquistas e hard skills:**\n${conquistaLines}` : '',
+      atencaoLines ? `\n**Pontos de atenção:**\n${atencaoLines}` : '',
+      ``,
+      `*Saúde: ${sinal.indicador_saude} — ${sinal.motivo_indicador}*`,
+    ].filter((l) => l !== '').join('\n')
+
+    write2(filePath, content, 'utf-8')
+    console.log(`[IngestionPipeline] sinal cerimônia gestor gravado: ${fileName}`)
+  }
+
   private async syncItemToPerson(item: QueueItem, slug: string): Promise<void> {
     if (!item.cachedAiResult || !item.cachedText) return
 
@@ -558,16 +658,19 @@ export class IngestionPipeline {
 
       // Store newly detected (unregistered) people so the user can promote them
       const novas = aiResult.novas_pessoas_detectadas ?? []
+      // Manager slug: never stored as a detected person (they live in "Eu" module)
+      const managerSlug = (settings.managerName ?? '').trim().toLowerCase().replace(/\s+/g, '-')
       // Build a slug→nome map from novas for name lookups
       const novasNomeMap: Record<string, string> = {}
       for (const p of novas) {
         novasNomeMap[p.slug] = p.nome
-        if (!registry.get(p.slug)) {
+        if (!registry.get(p.slug) && p.slug !== managerSlug) {
           detectedRegistry.upsert(p.slug, p.nome, item.fileName)
         }
       }
       // Also store naoCadastradas that the AI matched from pessoas_identificadas
       for (const slug of naoCadastradas) {
+        if (slug === managerSlug) continue  // manager belongs to "Eu", not to the team registry
         // Use the real name from novas if available, otherwise keep the slug
         const nome = novasNomeMap[slug] || slug
         detectedRegistry.upsert(slug, nome, item.fileName)
