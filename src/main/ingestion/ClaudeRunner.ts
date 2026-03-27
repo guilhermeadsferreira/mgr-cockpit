@@ -127,7 +127,7 @@ export async function runOpenRouterPrompt(
   apiKey: string,
   model: string,
   prompt: string,
-  timeoutMs = 60_000,
+  timeoutMs = 15_000,
   systemPrompt?: string,
 ): Promise<ClaudeRunnerResult> {
   const controller = new AbortController()

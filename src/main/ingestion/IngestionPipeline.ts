@@ -121,7 +121,7 @@ export class IngestionPipeline {
 
     this.queue.unshift(item)
     this.notifyRenderer('ingestion:started', { filePath, fileName })
-    console.log(`[IngestionPipeline] enqueued: ${fileName}`)
+    console.log(`[IngestionPipeline] ${new Date().toTimeString().slice(0, 8)} GMT enqueued: ${fileName}`)
 
     this.drainQueue()
   }
@@ -318,7 +318,7 @@ export class IngestionPipeline {
             let result: import('./ClaudeRunner').ClaudeRunnerResult
 
             if (hybridActive) {
-              result = await runOpenRouterPrompt(settings.openRouterApiKey!, openRouterModel, prompt, 60_000)
+              result = await runOpenRouterPrompt(settings.openRouterApiKey!, openRouterModel, prompt, 15_000)
               if (!result.success) {
                 console.warn(`[IngestionPipeline] OpenRouter fallback para "${slug}": ${result.error}`)
                 result = await runClaudePrompt(claudeBinPath, prompt, 60_000)
@@ -407,7 +407,7 @@ export class IngestionPipeline {
 
     let result: import('./ClaudeRunner').ClaudeRunnerResult
     if (hybridActive) {
-      result = await runOpenRouterPrompt(settings.openRouterApiKey!, openRouterModel, prompt, 60_000)
+      result = await runOpenRouterPrompt(settings.openRouterApiKey!, openRouterModel, prompt, 15_000)
       if (!result.success) {
         console.warn(`[IngestionPipeline] OpenRouter fallback gestor: ${result.error}`)
         result = await runClaudePrompt(claudeBinPath, prompt, 60_000)
@@ -516,7 +516,7 @@ export class IngestionPipeline {
 
     const artifactForDeep = artifactText
 
-    console.log(`[IngestionPipeline] 1on1 prompt breakdown para "${slug}":`,
+    console.log(`[IngestionPipeline] ${new Date().toTimeString().slice(0, 8)} GMT 1on1 prompt breakdown para "${slug}":`,
       `artifact=${artifactText.length}chars`,
       `perfil=${(perfilMdRaw ?? '').length}chars`,
       `config=${configYaml.length}chars`,
@@ -538,7 +538,7 @@ export class IngestionPipeline {
     })
 
     const release1on1 = await this.acquire1on1Slot()
-    console.log(`[IngestionPipeline] pass 1on1 para "${slug}" (slot ${this.active1on1}/${MAX_CONCURRENT_1ON1})`)
+    console.log(`[IngestionPipeline] ${new Date().toTimeString().slice(0, 8)} GMT pass 1on1 para "${slug}" (slot ${this.active1on1}/${MAX_CONCURRENT_1ON1})`)
     let result: Awaited<ReturnType<typeof runClaudePrompt>>
     try {
       result = await runClaudePrompt(claudeBinPath, prompt, 300_000, 1, settings.ingestionModel ?? 'haiku')
@@ -566,7 +566,7 @@ export class IngestionPipeline {
     const artifactFileName = `${date}-${slug}.md`
 
     console.log(
-      `[IngestionPipeline] pass 1on1 concluído para "${slug}": ` +
+      `[IngestionPipeline] ${new Date().toTimeString().slice(0, 8)} GMT pass 1on1 concluído para "${slug}": ` +
       `${oneOnOneResult.followup_acoes.length} followups, ` +
       `${oneOnOneResult.acoes_liderado.length} ações liderado, ` +
       `${oneOnOneResult.insights_1on1.length} insights`
@@ -922,7 +922,7 @@ export class IngestionPipeline {
   private async processItem(item: QueueItem): Promise<void> {
     item.status    = 'processing'
     item.startedAt = Date.now()
-    console.log(`[IngestionPipeline] processing: ${item.fileName}`)
+    console.log(`[IngestionPipeline] ${new Date().toTimeString().slice(0, 8)} GMT processing: ${item.fileName}`)
 
     try {
       const settings         = SettingsManager.load()
@@ -963,7 +963,7 @@ export class IngestionPipeline {
           settings.openRouterApiKey!,
           openRouterModel,
           promptPass1,
-          60_000,
+          15_000,
           PASS1_SYSTEM_PROMPT,
         )
         if (resultPass1.success && resultPass1.data) {
@@ -1078,7 +1078,7 @@ export class IngestionPipeline {
         const capturedText = text
 
         await this.syncItemToPerson(item, principal)
-        console.log(`[IngestionPipeline] done: ${item.fileName} → ${principal}`)
+        console.log(`[IngestionPipeline] ${new Date().toTimeString().slice(0, 8)} GMT done: ${item.fileName} → ${principal}`)
 
         // Pass 1on1: deep analysis for 1:1 artifacts (fire-and-forget)
         if (capturedAiResult.tipo === '1on1' && settings.claudeBinPath) {
