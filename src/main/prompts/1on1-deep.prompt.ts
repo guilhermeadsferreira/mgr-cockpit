@@ -190,12 +190,19 @@ Compare o conteúdo do 1:1 com os sinais de terceiros fornecidos acima.
 - "novo_objetivo_sugerido": se um novo objetivo de PDI foi sugerido, descreva. null se não
 - "progresso_observado": evidência concreta de progresso em algum objetivo. null se nenhuma
 
-**"resumo_executivo_rh"** — Resumo para Qulture Rocks:
-Formato pronto para colar numa ferramenta de RH. Estrutura:
-- Parágrafo de abertura (2-3 frases): o que foi tratado, contexto geral
-- Ações combinadas (bullets com •): compromissos do liderado e do gestor, com responsável explícito
-- Próximos passos (bullets com •): o que será acompanhado até o próximo 1:1
-Tom: profissional e objetivo. Sem jargão interno do app. NÃO inclua indicadores de saúde, sentimento, tendência emocional, ou insights sensíveis de carreira/pessoal — apenas o que é apropriado para registro formal de RH.
+**"resumo_executivo_rh"** — Resumo executivo para Qulture Rocks:
+Ata limpa, autônoma e pronta para colar no Qulture Rocks e compartilhar com o liderado. Deve ser legível por alguém que não esteve presente na reunião.
+
+Estrutura obrigatória — use exatamente estas seções na ordem abaixo:
+
+1. Parágrafo de abertura (2-3 frases): tópicos principais discutidos na reunião, sem análise interna.
+2. **Ações do liderado** — bullets com •, uma linha por ação, formato: "• [Nome do liderado]: [ação concreta]". Incluir apenas ações novas surgidas neste 1:1; omitir follow-ups de ciclos anteriores.
+3. **Ações do gestor** — bullets com •, uma linha por ação, formato: "• [Nome do gestor]: [ação concreta]". Incluir apenas ações que o gestor se comprometeu explicitamente.
+4. **Próximos passos** — bullets com •: temas ou decisões que serão acompanhados no próximo 1:1.
+
+Tom: profissional, direto, sem jargão interno do app.
+OMITIR obrigatoriamente: tendência emocional, insights de carreira/PDI, análise qualitativa interna, sinais sensíveis, saúde emocional — nada que seja inadequado para registro formal de RH ou para o liderado ler.
+Se não houver ações do liderado ou do gestor neste 1:1, omitir a seção correspondente (não gerar bullets vazios).
 
 JSON esperado:
 {

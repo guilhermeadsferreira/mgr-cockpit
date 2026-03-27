@@ -421,10 +421,16 @@ function ArtifactsTab({ artifacts }: { artifacts: ArtifactMeta[] }) {
   )
 }
 
+function extractQRSummary(content: string): string | null {
+  const match = content.match(/##\s*Resumo Executivo \(Qulture Rocks\)([\s\S]*?)(?=\n##\s|\s*$)/)
+  return match ? match[1].trim() : null
+}
+
 function ArtifactCard({ artifact: a }: { artifact: ArtifactMeta }) {
   const [expanded, setExpanded] = useState(false)
   const [content,  setContent]  = useState<string | null>(null)
   const [loading,  setLoading]  = useState(false)
+  const [copied,   setCopied]   = useState(false)
 
   async function toggle() {
     if (!expanded && content === null) {
@@ -436,6 +442,16 @@ function ArtifactCard({ artifact: a }: { artifact: ArtifactMeta }) {
     }
     setExpanded((v) => !v)
   }
+
+  async function copyQR(text: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    await navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const is1on1 = a.tipo === '1on1'
+  const qrSummary = is1on1 && content ? extractQRSummary(content) : null
 
   return (
     <div style={{
@@ -491,6 +507,49 @@ function ArtifactCard({ artifact: a }: { artifact: ArtifactMeta }) {
           padding: '16px 18px',
           borderTop: '1px solid var(--border-subtle)',
         }}>
+          {qrSummary && (
+            <div style={{
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+              padding: '12px 14px',
+              marginBottom: 14,
+            }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                marginBottom: 8,
+              }}>
+                <span style={{
+                  fontSize: 10, fontWeight: 600, letterSpacing: '0.06em',
+                  textTransform: 'uppercase' as const,
+                  color: 'var(--text-muted)',
+                }}>
+                  Resumo Executivo (Qulture Rocks)
+                </span>
+                <button
+                  onClick={(e) => copyQR(qrSummary, e)}
+                  style={{
+                    ...styles.btnIcon,
+                    fontSize: 11, padding: '3px 8px', width: 'auto', height: 'auto',
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    color: copied ? 'var(--accent)' : 'var(--text-muted)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 4, background: 'var(--surface-3)',
+                  }}
+                  title="Copiar resumo para o Qulture Rocks"
+                >
+                  {copied ? 'Copiado!' : 'Copiar para QR'}
+                </button>
+              </div>
+              <pre style={{
+                margin: 0, whiteSpace: 'pre-wrap', fontSize: 12,
+                lineHeight: 1.6, color: 'var(--text-secondary)',
+                fontFamily: 'var(--font)',
+              }}>
+                {qrSummary}
+              </pre>
+            </div>
+          )}
           <MarkdownPreview content={content} maxHeight={480} />
         </div>
       )}
