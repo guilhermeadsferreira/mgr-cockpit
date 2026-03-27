@@ -404,6 +404,11 @@ spawn(claudeBin, ['-p', prompt], {
 - `pdi_update` — menções ao PDI, progresso observado
 - `resumo_executivo_rh` — formato pronto para Qulture Rocks
 
+**Regras de extração refinadas (2026-03-26):**
+- `origem_pauta`: baseado em quem originou o *sinal*, não quem falou. Se o liderado confessa um problema e nomeia um colega como impactado ("ficou na conta do Antônio"), usar `terceiro` com `terceiro_nome`.
+- `sugestoes_gestor` — "já anotei" NÃO suprime `gerar_acao`: reação prévia genérica do liderado não cancela a geração de ação quando o gestor depois apresenta uma sugestão concreta.
+- `sugestoes_gestor` — sugestões em lista: múltiplas sugestões em sequência geram entradas separadas (não consolidar num único registro vago).
+
 ### cerimonia-sinal.prompt.ts — V2: refinamentos
 
 **V2 — Instruções refinadas:**

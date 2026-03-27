@@ -8,6 +8,8 @@ export interface AppSettings {
   claudeBinPath: string
   managerName?: string
   managerRole?: string
+  /** Modelo Claude para passes de ingestão. Padrão: 'sonnet'. Aceita: 'haiku', 'sonnet', 'opus' */
+  ingestionModel?: string
 }
 
 const SETTINGS_DIR  = join(homedir(), '.pulsecockpit')

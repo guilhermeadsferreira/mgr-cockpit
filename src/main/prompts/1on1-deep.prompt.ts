@@ -146,8 +146,8 @@ Para CADA ação listada em "Ações abertas do liderado" e "Ações abertas do 
   - "mudanca_processo": envolve mudança de hábito/processo observável ao longo do tempo (ex: "rever processo de code review")
   - "pdi": relacionada ao Plano de Desenvolvimento Individual
 - "prazo_iso": YYYY-MM-DD se mencionado, null se não
-- "origem_pauta": quem trouxe o tema — "liderado" se partiu dele, "gestor" se foi sugestão do gestor, "terceiro" se veio de feedback/sinal de outra pessoa
-- "terceiro_nome": nome de quem originou, se origem_pauta = "terceiro"
+- "origem_pauta": quem originou o sinal que tornou o tema relevante — "liderado" se foi iniciativa ou percepção própria dele, "gestor" se foi sugestão ou observação do gestor, "terceiro" se veio de feedback ou impacto explicitamente atribuído a outra pessoa. Atenção: se o liderado confessou um problema mas atribuiu as consequências ou o impacto a um colega nomeado (ex: "ficou na conta do Antônio", "o Antônio reclamou"), use "terceiro" — o sinal de origem é a experiência do colega, não a confissão em si.
+- "terceiro_nome": nome de quem originou o sinal, se origem_pauta = "terceiro"
 - "contexto": 1 frase dizendo onde na conversa surgiu (para o gestor validar)
 
 **"acoes_gestor"** — Ações que o gestor se comprometeu a fazer:
@@ -161,6 +161,8 @@ Quando o gestor faz sugestão e o liderado responde:
 - Com resistência ("não sei", "acho difícil", "não concordo") → "resistiu", gerar_acao: false
 - Sem conclusão clara → "ficou_em_aberto", gerar_acao: false
 Quando gerar_acao = true, gere a ação correspondente em "acoes_liderado" com origem_pauta: "gestor".
+Atenção — "já anotei" NÃO cancela gerar_acao: O liderado pode dizer "já tô tentando", "já anotei" ou expressão similar ANTES de o gestor detalhar o COMO. Isso não significa que a ação já existe como compromisso estruturado. Se o gestor, mesmo após essa fala, apresentou uma sugestão concreta (método, ferramenta, processo), registre normalmente a sugestão e gere a ação — a resposta do liderado à sugestão específica do gestor é o que determina gerar_acao, não a reação prévia genérica.
+Atenção — sugestões em lista: Se o gestor apresentou múltiplas sugestões em sequência (ex: "você pode revisar o processo, criar guardias e gerar uma persona de revisão"), trate cada uma como uma sugestão separada em "sugestoes_gestor" e, quando gerar_acao = true, gere uma ação distinta por item em "acoes_liderado". Não consolide num único registro vago. Se o liderado aceitou o bloco inteiro com uma resposta afirmativa, aplique a mesma resposta_liderado a cada sugestão individual.
 
 **"insights_1on1"** — Insights qualitativos:
 Capture momentos de alinhamento que NÃO são ações: carreira, expectativas, feedback informal, preocupações pessoais, mudanças de processo.

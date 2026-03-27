@@ -83,7 +83,10 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.removeAllListeners('ingestion:completed')
       ipcRenderer.removeAllListeners('ingestion:failed')
     },
-    getQueue: ()                  => ipcRenderer.invoke('ingestion:queue'),
-    enqueue:  (filePath: string)  => ipcRenderer.invoke('ingestion:enqueue', filePath),
+    getQueue:         ()                    => ipcRenderer.invoke('ingestion:queue'),
+    enqueue:          (filePath: string)    => ipcRenderer.invoke('ingestion:enqueue', filePath),
+    listProcessados:  ()                    => ipcRenderer.invoke('ingestion:list-processados'),
+    resetData:        ()                    => ipcRenderer.invoke('ingestion:reset-data'),
+    batchReingest:    (files: string[])     => ipcRenderer.invoke('ingestion:batch-reingest', files),
   },
 })

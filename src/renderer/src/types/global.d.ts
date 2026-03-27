@@ -35,6 +35,9 @@ declare global {
         removeListeners: () => void
         getQueue:        () => Promise<QueueItem[]>
         enqueue:         (filePath: string) => Promise<void>
+        listProcessados: () => Promise<string[]>
+        resetData:       () => Promise<void>
+        batchReingest:   (files: string[]) => Promise<{ processed: number; errors: string[] }>
       }
 
       ai: {

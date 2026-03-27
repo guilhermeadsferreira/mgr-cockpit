@@ -40,12 +40,16 @@ export interface QueueItem {
 
 const MAX_CONCURRENT = 3
 const MAX_QUEUE_SIZE  = 100
+const MAX_CONCURRENT_1ON1 = 2
 
 export class IngestionPipeline {
   private queue: QueueItem[] = []
   private processing = false
   // Per-person locks prevent concurrent writes to the same perfil.md
   private personLocks = new Map<string, Promise<void>>()
+  // Semaphore for 1on1 deep passes — limits concurrent Claude spawns under heavy load
+  private active1on1 = 0
+  private pending1on1: Array<() => void> = []
 
   constructor(private workspacePath: string) {}
 
@@ -481,20 +485,40 @@ export class IngestionPipeline {
       .slice(-5)
       .join('\n')
 
+    const openActionsLideradoStr = serializeActions(openLiderado)
+    const openActionsGestorStr = serializeActions(openGestor)
+
+    const artifactForDeep = artifactText
+
+    console.log(`[IngestionPipeline] 1on1 prompt breakdown para "${slug}":`,
+      `artifact=${artifactText.length}chars`,
+      `perfil=${(perfilMdRaw ?? '').length}chars`,
+      `config=${configYaml.length}chars`,
+      `acoes=${openActionsLideradoStr.length + openActionsGestorStr.length}chars`,
+      `sinais=${sinaisTerceiros.length}chars`,
+      `historico=${historicoSaude.length}chars`,
+    )
+
     const prompt = build1on1DeepPrompt({
-      artifactContent: artifactText,
+      artifactContent: artifactForDeep,
       perfilMdRaw,
       configYaml,
-      openActionsLiderado: serializeActions(openLiderado),
-      openActionsGestor: serializeActions(openGestor),
+      openActionsLiderado: openActionsLideradoStr,
+      openActionsGestor: openActionsGestorStr,
       sinaisTerceiros,
       historicoSaude,
       today: new Date().toISOString().slice(0, 10),
       managerName: settings.managerName ?? undefined,
     })
 
-    console.log(`[IngestionPipeline] pass 1on1 para "${slug}"`)
-    const result = await runClaudePrompt(claudeBinPath, prompt, 180_000)
+    const release1on1 = await this.acquire1on1Slot()
+    console.log(`[IngestionPipeline] pass 1on1 para "${slug}" (slot ${this.active1on1}/${MAX_CONCURRENT_1ON1})`)
+    let result: Awaited<ReturnType<typeof runClaudePrompt>>
+    try {
+      result = await runClaudePrompt(claudeBinPath, prompt, 300_000, 1, settings.ingestionModel ?? 'haiku')
+    } finally {
+      release1on1()
+    }
 
     if (!result.success || !result.data) {
       console.warn(`[IngestionPipeline] pass 1on1 falhou para "${slug}": ${result.error ?? 'sem dados'}`)
@@ -771,6 +795,31 @@ export class IngestionPipeline {
     } finally {
       this.processing = false
     }
+  }
+
+  /**
+   * Semaphore for 1on1 deep passes. Allows up to MAX_CONCURRENT_1ON1 simultaneous
+   * passes; excess callers wait until a slot is released.
+   */
+  private acquire1on1Slot(): Promise<() => void> {
+    if (this.active1on1 < MAX_CONCURRENT_1ON1) {
+      this.active1on1++
+      return Promise.resolve(() => {
+        this.active1on1--
+        const next = this.pending1on1.shift()
+        if (next) next()
+      })
+    }
+    return new Promise((resolve) => {
+      this.pending1on1.push(() => {
+        this.active1on1++
+        resolve(() => {
+          this.active1on1--
+          const next = this.pending1on1.shift()
+          if (next) next()
+        })
+      })
+    })
   }
 
   /**
