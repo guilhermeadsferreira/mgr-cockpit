@@ -1,4 +1,4 @@
-import type { AppSettings, PersonConfig, ArtifactMeta, ArtifactFeedItem, PerfilData, QueueItem, CycleReportParams, DetectedPerson, PautaMeta, Action, ActionStatus, DocItem, LogLevel, LogEntry } from './ipc'
+import type { AppSettings, PersonConfig, ArtifactMeta, ArtifactFeedItem, PerfilData, QueueItem, CycleReportParams, DetectedPerson, PautaMeta, Action, ActionStatus, DocItem, LogLevel, LogEntry, ExternalHistoricoEntry } from './ipc'
 
 declare global {
   interface Window {
@@ -105,6 +105,7 @@ declare global {
         refreshMonthly: (yearMonth?: string) => Promise<string>
         refreshPerson:  (slug: string) => Promise<void>
         getData:        (slug: string) => Promise<string | null>
+        getHistorico:   (slug: string) => Promise<Record<string, ExternalHistoricoEntry> | null>
         listReports:    () => Promise<Array<{ name: string; date: string; size: number }>>
         getReport:      (path: string) => Promise<string>
       }

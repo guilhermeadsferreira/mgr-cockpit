@@ -20,9 +20,12 @@ import { buildAutoavaliacaoPrompt, renderAutoavaliacaoMarkdown, type Autoavaliac
 import type { CycleReportParams, AutoavaliacaoParams, DemandaStatus } from '../renderer/src/types/ipc'
 import { Logger, type LogLevel } from './logging'
 import { Scheduler } from './external/Scheduler'
+import { ExternalDataPass } from './external/ExternalDataPass'
 import { WeeklyReportGenerator } from './external/WeeklyReportGenerator'
 import { MonthlyReportGenerator } from './external/MonthlyReportGenerator'
 import { GitHubClient } from './external/GitHubClient'
+import { SystemAuditor } from './audit/SystemAuditor'
+import yaml from 'js-yaml'
 
 const APP_ICON = app.isPackaged
   ? join(process.resourcesPath, 'Logo.png')
@@ -148,6 +151,30 @@ function registerIpcHandlers(): void {
       return readFileSync(filePath, 'utf-8')
     } catch {
       return ''
+    }
+  })
+
+  // ── Resumo Executivo RH (último disponível nos artefatos 1:1) ──
+  ipcMain.handle('people:last-resumo-rh', (_event, slug: string) => {
+    const { workspacePath } = SettingsManager.load()
+    const historicoDir = join(workspacePath, 'pessoas', slug, 'historico')
+    if (!existsSync(historicoDir)) return null
+    try {
+      const files = readdirSync(historicoDir)
+        .filter((f) => f.endsWith('.md'))
+        .sort()
+        .reverse()
+      for (const file of files) {
+        const content = readFileSync(join(historicoDir, file), 'utf-8')
+        const match = content.match(/## Resumo Executivo \(Qulture Rocks\)\n\n([\s\S]+?)(?:\n---|\n##|$)/)
+        if (match) {
+          const dateMatch = file.match(/^(\d{4}-\d{2}-\d{2})/)
+          return { resumo: match[1].trim(), date: dateMatch?.[1] ?? null, artifact: file }
+        }
+      }
+      return null
+    } catch {
+      return null
     }
   })
 
@@ -330,10 +357,9 @@ function registerIpcHandlers(): void {
           ciclos_sem_mencao: (a as Record<string, unknown>).ciclos_sem_mencao as number | undefined,
         }))
 
-      // Extract insights from perfil
+      // Extract insights from perfil (all insights — longitudinal patterns matter for agenda quality)
       const insightsMatch = perfilData.raw.match(/## Insights de 1:1\n[\s\S]*?<!--[^>]*-->\n([\s\S]*?)<!--/)
-      const insightsRecentes = insightsMatch?.[1]?.trim()
-        ?.split('\n').filter(Boolean).slice(-5).join('\n') || ''
+      const insightsRecentes = insightsMatch?.[1]?.trim() || ''
 
       // Extract sinais de terceiros
       const sinaisMatch = perfilData.raw.match(/## Sinais de Terceiros\n[\s\S]*?<!--[^>]*-->\n([\s\S]*?)<!--/)
@@ -468,6 +494,11 @@ function registerIpcHandlers(): void {
   ipcMain.handle('demandas:list', () => {
     const { workspacePath } = SettingsManager.load()
     return new DemandaRegistry(workspacePath).list()
+  })
+
+  ipcMain.handle('demandas:list-by-person', (_event, personSlug: string) => {
+    const { workspacePath } = SettingsManager.load()
+    return new DemandaRegistry(workspacePath).list().filter((d) => d.pessoaSlug === personSlug && d.status === 'open')
   })
 
   ipcMain.handle('demandas:save', (_event, demanda) => {
@@ -690,10 +721,21 @@ function registerIpcHandlers(): void {
     const yamlPath = join(workspacePath, 'pessoas', slug, 'external_data.yaml')
     if (!existsSync(yamlPath)) return null
     try {
-      return readFileSync(yamlPath, 'utf-8')
+      const raw = readFileSync(yamlPath, 'utf-8')
+      const parsed = yaml.load(raw)
+      if (!parsed || typeof parsed !== 'object') return null
+      // Return the 'atual' snapshot (typed) or top-level if flat structure
+      const doc = parsed as Record<string, unknown>
+      return (doc.atual ?? doc) as unknown
     } catch {
       return null
     }
+  })
+
+  ipcMain.handle('external:get-historico', async (_event, slug: string) => {
+    const { workspacePath } = SettingsManager.load()
+    const pass = new ExternalDataPass(workspacePath)
+    return pass.loadHistorico(slug) ?? null
   })
 
   ipcMain.handle('external:list-reports', () => {
@@ -758,6 +800,17 @@ function registerIpcHandlers(): void {
         errorMsg = ghErr.message
       }
       return { success: false, error: errorMsg }
+    }
+  })
+
+  // ── System Audit ─────────────────────────────────────────────
+  ipcMain.handle('audit:run', async () => {
+    const { workspacePath } = SettingsManager.load()
+    try {
+      const auditor = new SystemAuditor(workspacePath)
+      return await auditor.run()
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
     }
   })
 }

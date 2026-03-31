@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ArrowLeft, FileText, CalendarDays, Pencil, ExternalLink, RefreshCw, Loader2, CheckSquare, Square, X, Plus, ArrowUpRight, Trash2 } from 'lucide-react'
 import { useRouter } from '../router'
-import type { PersonConfig, PerfilData, ArtifactMeta, PautaMeta, AgendaResult, Action, ActionOwner, Demanda } from '../types/ipc'
+import type { PersonConfig, PerfilData, ArtifactMeta, PautaMeta, AgendaResult, Action, ActionOwner, Demanda, PDIItem } from '../types/ipc'
 import { MarkdownPreview } from '../components/MarkdownPreview'
 import { labelNivel, labelRelacao, labelSaude, labelTipo, fmtDate as fmtDateUtil } from '../lib/utils'
 import { CycleTab } from './CycleReportView'
@@ -61,8 +61,10 @@ export function PersonView() {
   const [perfil,        setPerfil]        = useState<PerfilData | null>(null)
   const [artifacts,     setArtifacts]     = useState<ArtifactMeta[]>([])
   const [pautas,        setPautas]        = useState<PautaMeta[]>([])
-  const [activeTab,     setActiveTab]     = useState<'perfil' | 'artefatos' | 'pautas' | 'acoes' | 'ciclo'>('perfil')
+  const [activeTab,     setActiveTab]     = useState<'perfil' | 'artefatos' | 'pautas' | 'acoes' | 'ciclo' | 'dados-ext'>('perfil')
   const [actions,       setActions]       = useState<Action[]>([])
+  const [gestorDemandas, setGestorDemandas] = useState<Demanda[]>([])
+  const [resumoRH,      setResumoRH]      = useState<{ resumo: string; date: string | null } | null>(null)
   const [generatingAgenda, setGeneratingAgenda] = useState(false)
   const [agendaError,   setAgendaError]   = useState<string | null>(null)
   const [resetting,     setResetting]     = useState(false)
@@ -99,12 +101,32 @@ export function PersonView() {
     setActions(a)
   }, [])
 
+  const loadGestorDemandas = useCallback(async (slug: string) => {
+    try {
+      const d = await window.api.eu.listDemandasByPerson(slug)
+      setGestorDemandas(d ?? [])
+    } catch {
+      // graceful: feature may not exist yet in older builds
+    }
+  }, [])
+
+  const loadResumoRH = useCallback(async (slug: string) => {
+    try {
+      const r = await window.api.people.lastResumoRH(slug)
+      setResumoRH(r)
+    } catch {
+      // graceful
+    }
+  }, [])
+
   useEffect(() => {
     window.api.people.get(params.slug).then(setPerson)
     loadPerfil(params.slug)
     loadPautas(params.slug)
     loadActions(params.slug)
-  }, [params.slug, loadPerfil, loadPautas, loadActions])
+    loadGestorDemandas(params.slug)
+    loadResumoRH(params.slug)
+  }, [params.slug, loadPerfil, loadPautas, loadActions, loadGestorDemandas, loadResumoRH])
 
   // Refresh on ingestion completed
   useEffect(() => {
@@ -243,6 +265,35 @@ export function PersonView() {
                   />
                   <InfoRow label="Ações pendentes" value={String(fm.acoes_pendentes_count ?? 0)} />
                   <InfoRow label="Total artefatos" value={String(fm.total_artefatos ?? 0)} />
+                  {fm.tendencia_emocional && (
+                    <InfoRow
+                      label="Tendência"
+                      value={({
+                        estavel: '→ Estável',
+                        melhorando: '↑ Melhorando',
+                        deteriorando: '↓ Deteriorando',
+                        novo_sinal: '⚡ Novo sinal',
+                      } as Record<string, string>)[fm.tendencia_emocional] ?? fm.tendencia_emocional}
+                      suffix={fm.nota_tendencia ? (
+                        <span title={fm.nota_tendencia} style={{
+                          fontSize: 9.5, fontWeight: 600, letterSpacing: '0.04em',
+                          padding: '1px 5px', borderRadius: 3,
+                          background: fm.tendencia_emocional === 'deteriorando'
+                            ? 'rgba(184,64,64,0.12)' : fm.tendencia_emocional === 'melhorando'
+                            ? 'rgba(100,180,100,0.12)' : 'rgba(255,255,255,0.06)',
+                          border: `1px solid ${fm.tendencia_emocional === 'deteriorando'
+                            ? 'rgba(184,64,64,0.35)' : fm.tendencia_emocional === 'melhorando'
+                            ? 'rgba(100,180,100,0.35)' : 'rgba(255,255,255,0.12)'}`,
+                          color: fm.tendencia_emocional === 'deteriorando'
+                            ? 'var(--red)' : fm.tendencia_emocional === 'melhorando'
+                            ? 'var(--green)' : 'var(--text-secondary)',
+                          whiteSpace: 'nowrap', cursor: 'help', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>
+                          {fm.nota_tendencia}
+                        </span>
+                      ) : undefined}
+                    />
+                  )}
                 </InfoCard>
               )}
 
@@ -254,9 +305,32 @@ export function PersonView() {
                 </InfoCard>
               )}
 
-              {(person.jiraEmail || person.githubUsername) && (
-                <ExternalDataCard slug={person.slug} />
+              {gestorDemandas.length > 0 && (
+                <InfoCard title={`Minhas promessas (${gestorDemandas.length})`}>
+                  <div style={{ padding: '6px 12px 10px' }}>
+                    {gestorDemandas.map((d) => {
+                      const diasAberto = Math.floor((Date.now() - new Date(d.criadoEm).getTime()) / 86_400_000)
+                      const vencida = d.prazo && d.prazo < new Date().toISOString().slice(0, 10)
+                      return (
+                        <div key={d.id} style={{
+                          fontSize: 11.5, lineHeight: 1.5, padding: '4px 0',
+                          borderBottom: '1px solid var(--border-subtle)',
+                          color: vencida ? 'var(--red)' : 'var(--text-secondary)',
+                        }}>
+                          <span style={{ fontWeight: 600, color: vencida ? 'var(--red)' : 'var(--text-primary)' }}>
+                            {d.descricao}
+                          </span>
+                          <br />
+                          <span style={{ fontSize: 10, opacity: 0.7 }}>
+                            {diasAberto}d aberta{d.prazo ? ` · prazo: ${fmtDate(d.prazo)}` : ''}{vencida ? ' · VENCIDA' : ''}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </InfoCard>
               )}
+
             </div>
 
             {/* Right content */}
@@ -269,6 +343,7 @@ export function PersonView() {
                   { id: 'pautas',    label: 'Pautas' },
                   { id: 'acoes',     label: 'Ações' },
                   { id: 'ciclo',     label: 'Relatório de Ciclo' },
+                  ...(person.jiraEmail || person.githubUsername ? [{ id: 'dados-ext' as const, label: 'Dados Ext.' }] : []),
                 ] as const).map(({ id, label }) => (
                   <button
                     key={id}
@@ -313,13 +388,42 @@ export function PersonView() {
                   {agendaError}
                 </div>
               )}
-              {activeTab === 'perfil'    && <PerfilTab perfil={perfil} />}
+              {activeTab === 'perfil'    && (
+                <>
+                  {fm?.ultimo_1on1 && (
+                    <SinceLastMeetingCard
+                      ultimo1on1={fm.ultimo_1on1}
+                      artifacts={artifacts}
+                      actions={actions}
+                    />
+                  )}
+                  {person.pdi && person.pdi.length > 0 && (
+                    <PDISection pdi={person.pdi} />
+                  )}
+                  <PerfilTab perfil={perfil} />
+                  {resumoRH && (
+                    <details style={{ marginTop: 18, background: 'var(--surface-2)', borderRadius: 'var(--r)', border: '1px solid var(--border)' }}>
+                      <summary style={{
+                        padding: '10px 16px', fontSize: 12, fontWeight: 600,
+                        color: 'var(--text-secondary)', cursor: 'pointer',
+                        fontFamily: 'var(--font)',
+                      }}>
+                        Resumo Executivo RH (Qulture Rocks){resumoRH.date ? ` · ${fmtDate(resumoRH.date)}` : ''}
+                      </summary>
+                      <div style={{ padding: '0 16px 14px' }}>
+                        <MarkdownPreview content={resumoRH.resumo} />
+                      </div>
+                    </details>
+                  )}
+                </>
+              )}
               {activeTab === 'artefatos' && <ArtifactsTab artifacts={artifacts} />}
               {activeTab === 'pautas'    && <PautasTab pautas={pautas} onGenerate={handleGenerateAgenda} generating={generatingAgenda} hasPerfil={!!perfil} />}
               {activeTab === 'acoes'     && (
                 <AcoesTab
                   actions={actions}
                   personSlug={person.slug}
+                  personPdi={person.pdi}
                   onUpdateStatus={async (id, status) => {
                     try {
                       await window.api.actions.updateStatus(person.slug, id, status)
@@ -357,6 +461,7 @@ export function PersonView() {
                 />
               )}
               {activeTab === 'ciclo'     && <CycleTab slug={person.slug} person={person} />}
+              {activeTab === 'dados-ext' && <ExternalTab slug={person.slug} />}
             </div>
 
           </div>
@@ -442,6 +547,23 @@ function PerfilTab({ perfil }: { perfil: PerfilData | null }) {
             ))}
           </div>
         </PerfilSection>
+      )}
+
+      {sections.resumosAnterioresRaw && (
+        <details style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
+          <summary style={{
+            padding: '10px 16px', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em',
+            textTransform: 'uppercase' as const, color: 'var(--text-muted)', cursor: 'pointer',
+            borderBottom: '1px solid var(--border-subtle)',
+          }}>
+            Resumos anteriores
+          </summary>
+          <div style={{ padding: '12px 16px' }}>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0 }}>
+              {sections.resumosAnterioresRaw}
+            </p>
+          </div>
+        </details>
       )}
     </div>
   )
@@ -725,6 +847,7 @@ function PautaCard({ pauta: p }: { pauta: PautaMeta }) {
 function AcoesTab({
   actions,
   personSlug,
+  personPdi,
   onUpdateStatus,
   onDelete,
   onSaveAction,
@@ -732,6 +855,7 @@ function AcoesTab({
 }: {
   actions: Action[]
   personSlug: string
+  personPdi?: PDIItem[]
   onUpdateStatus: (id: string, status: 'open' | 'done' | 'cancelled') => Promise<void>
   onDelete: (id: string) => Promise<void>
   onSaveAction: (action: Action) => Promise<void>
@@ -742,6 +866,7 @@ function AcoesTab({
   const [formTexto, setFormTexto]       = useState('')
   const [formOwner, setFormOwner]       = useState<ActionOwner>('liderado')
   const [formPrazo, setFormPrazo]       = useState('')
+  const [formPdiRef, setFormPdiRef]     = useState('')
   const [sentToDemandas, setSentToDemandas] = useState<string | null>(null)
 
   async function submitForm() {
@@ -755,12 +880,14 @@ function AcoesTab({
       status: 'open',
       criadoEm: t,
       prazo: formPrazo || null,
+      ...(formPdiRef ? { pdi_objetivo_ref: formPdiRef } : {}),
     }
     await onSaveAction(action)
     setShowForm(false)
     setFormTexto('')
     setFormOwner('liderado')
     setFormPrazo('')
+    setFormPdiRef('')
   }
 
   async function handleSendToDemandas(action: Action) {
@@ -872,9 +999,29 @@ function AcoesTab({
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0 2px', fontSize: 12 }}
               >×</button>
             )}
+            {personPdi && personPdi.length > 0 && (
+              <>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', marginLeft: 6 }}>PDI</label>
+                <select
+                  value={formPdiRef}
+                  onChange={(e) => setFormPdiRef(e.target.value)}
+                  style={{
+                    padding: '4px 8px', borderRadius: 6, fontSize: 12.5,
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    color: formPdiRef ? 'var(--text-primary)' : 'var(--text-muted)',
+                    fontFamily: 'var(--font)', cursor: 'pointer', maxWidth: 180,
+                  }}
+                >
+                  <option value="">— nenhum —</option>
+                  {personPdi.map((p, i) => (
+                    <option key={i} value={p.objetivo}>{p.objetivo}</option>
+                  ))}
+                </select>
+              </>
+            )}
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
               <button
-                onClick={() => { setShowForm(false); setFormTexto(''); setFormOwner('liderado'); setFormPrazo('') }}
+                onClick={() => { setShowForm(false); setFormTexto(''); setFormOwner('liderado'); setFormPrazo(''); setFormPdiRef('') }}
                 style={acoesStyles.btnSecondary}
               >Cancelar</button>
               <button onClick={submitForm} style={acoesStyles.btnPrimary} disabled={!formTexto.trim()}>
@@ -1124,7 +1271,12 @@ function parsePerfilSections(raw: string) {
   )
   const temas = temasRaw.split('\n').filter((l) => l.startsWith('- ')).map((l) => l.slice(2).trim())
 
-  return { resumo: stripMd(resumoRaw), acoes, atencao, conquistas, temas }
+  const resumosAnterioresRaw = extractBlock(
+    '<!-- BLOCO GERENCIADO PELA IA — histórico de resumos (max 3) -->',
+    '<!-- FIM BLOCO RESUMOS_ANTERIORES -->',
+  )
+
+  return { resumo: stripMd(resumoRaw), acoes, atencao, conquistas, temas, resumosAnterioresRaw }
 }
 
 function escapeRe(s: string): string {
@@ -1252,5 +1404,164 @@ function Badge({ children }: { children: React.ReactNode }) {
     }}>
       {children}
     </span>
+  )
+}
+
+// ── T-R4.3: Desde a última 1:1 ────────────────────────────────────────────────
+
+function SinceLastMeetingCard({
+  ultimo1on1, artifacts, actions,
+}: {
+  ultimo1on1: string
+  artifacts: ArtifactMeta[]
+  actions: Action[]
+}) {
+  const today = new Date().toISOString().slice(0, 10)
+  const newArtifacts = artifacts.filter(a => a.date > ultimo1on1)
+  const closedActions = actions.filter(a => a.status === 'done' && a.concluidoEm && a.concluidoEm > ultimo1on1)
+  const expiredActions = actions.filter(a => a.status === 'open' && a.prazo && a.prazo < today)
+
+  const hasActivity = newArtifacts.length > 0 || closedActions.length > 0 || expiredActions.length > 0
+
+  // Detect health change: compare most recent artifact health with last artifact before ultimo1on1
+  const sorted = [...artifacts].sort((a, b) => a.date.localeCompare(b.date))
+  const lastBefore = sorted.filter(a => a.date <= ultimo1on1).at(-1)
+  const firstAfter  = sorted.find(a => a.date > ultimo1on1)
+  const healthChanged = lastBefore && firstAfter && (lastBefore as ArtifactMeta & { saude?: string }).saude !== (firstAfter as ArtifactMeta & { saude?: string }).saude
+
+  return (
+    <div style={{
+      background: 'var(--surface)', border: '1px solid var(--border)',
+      borderRadius: 6, padding: '10px 16px', marginBottom: 14,
+      display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+    }}>
+      <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', color: 'var(--text-muted)', textTransform: 'uppercase', marginRight: 4 }}>
+        Desde {fmtDate(ultimo1on1)}
+      </span>
+      {!hasActivity && !healthChanged && (
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Nenhuma ingestão desde o último 1:1</span>
+      )}
+      {newArtifacts.length > 0 && (
+        <span style={{ fontSize: 11.5, padding: '2px 8px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
+          {newArtifacts.length} artefato{newArtifacts.length !== 1 ? 's' : ''} novo{newArtifacts.length !== 1 ? 's' : ''}
+        </span>
+      )}
+      {closedActions.length > 0 && (
+        <span style={{ fontSize: 11.5, padding: '2px 8px', borderRadius: 12, background: 'rgba(100,180,100,0.1)', border: '1px solid rgba(100,180,100,0.3)', color: 'var(--green)' }}>
+          {closedActions.length} ação{closedActions.length !== 1 ? 'ões' : ''} concluída{closedActions.length !== 1 ? 's' : ''}
+        </span>
+      )}
+      {expiredActions.length > 0 && (
+        <span style={{ fontSize: 11.5, padding: '2px 8px', borderRadius: 12, background: 'rgba(184,64,64,0.08)', border: '1px solid rgba(184,64,64,0.3)', color: 'var(--red)' }}>
+          {expiredActions.length} ação{expiredActions.length !== 1 ? 'ões' : ''} vencida{expiredActions.length !== 1 ? 's' : ''}
+        </span>
+      )}
+      {healthChanged && (
+        <span style={{ fontSize: 11.5, padding: '2px 8px', borderRadius: 12, background: 'rgba(232,135,58,0.1)', border: '1px solid rgba(232,135,58,0.3)', color: '#e8873a' }}>
+          saúde alterada
+        </span>
+      )}
+    </div>
+  )
+}
+
+// ── T-R4.1: PDI Section ────────────────────────────────────────────────────────
+
+function PDISection({ pdi }: { pdi: PDIItem[] }) {
+  const concluidos = pdi.filter(p => p.status === 'concluido').length
+  const pct = pdi.length > 0 ? Math.round((concluidos / pdi.length) * 100) : 0
+
+  const statusColor = (s: string) =>
+    s === 'concluido' ? 'var(--green)' : s === 'em_andamento' ? '#e8873a' : 'var(--text-muted)'
+  const statusBg = (s: string) =>
+    s === 'concluido' ? 'rgba(100,180,100,0.12)' : s === 'em_andamento' ? 'rgba(232,135,58,0.1)' : 'var(--surface-2)'
+  const statusBorder = (s: string) =>
+    s === 'concluido' ? 'rgba(100,180,100,0.3)' : s === 'em_andamento' ? 'rgba(232,135,58,0.3)' : 'var(--border)'
+  const statusLabel = (s: string) =>
+    s === 'concluido' ? 'Concluído' : s === 'em_andamento' ? 'Em andamento' : 'Não iniciado'
+
+  return (
+    <div style={{
+      background: 'var(--surface)', border: '1px solid var(--border)',
+      borderRadius: 6, overflow: 'hidden', marginBottom: 14,
+    }}>
+      <div style={{
+        padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      }}>
+        <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--text-muted)' }}>
+          PDI
+        </span>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+          {concluidos}/{pdi.length}
+        </span>
+      </div>
+      <div style={{ padding: '6px 16px 4px', background: 'var(--surface-2)' }}>
+        <div style={{ height: 4, borderRadius: 2, background: 'var(--border)', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${pct}%`, background: 'var(--green)', borderRadius: 2, transition: 'width 0.3s' }} />
+        </div>
+      </div>
+      <div style={{ padding: '8px 16px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {pdi.map((item, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{
+              fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 10, flexShrink: 0,
+              background: statusBg(item.status), border: `1px solid ${statusBorder(item.status)}`,
+              color: statusColor(item.status),
+            }}>
+              {statusLabel(item.status)}
+            </span>
+            <span style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.4 }}>{item.objetivo}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── T-R4.2: External Tab ───────────────────────────────────────────────────────
+
+function ExternalTab({ slug }: { slug: string }) {
+  const [historico, setHistorico] = useState<Record<string, { github?: { commits30d?: number; prsMerged30d?: number } | null }> | null>(null)
+
+  useEffect(() => {
+    window.api.external.getHistorico(slug).then(setHistorico)
+  }, [slug])
+
+  const months = historico ? Object.keys(historico).sort().reverse().slice(0, 6) : []
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <ExternalDataCard slug={slug} />
+      {months.length > 1 && (
+        <div style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 6, overflow: 'hidden',
+        }}>
+          <div style={{
+            padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)',
+            fontSize: 10, fontWeight: 600, letterSpacing: '0.1em',
+            textTransform: 'uppercase' as const, color: 'var(--text-muted)',
+          }}>
+            Histórico mensal
+          </div>
+          <div style={{ padding: '10px 16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600 }}>
+              <span>Mês</span><span style={{ textAlign: 'right' }}>Commits</span><span style={{ textAlign: 'right' }}>PRs merged</span>
+            </div>
+            {months.map(m => {
+              const gh = historico![m]?.github
+              return (
+                <div key={m} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 12, padding: '3px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{m}</span>
+                  <span style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{gh?.commits30d ?? '—'}</span>
+                  <span style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{gh?.prsMerged30d ?? '—'}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

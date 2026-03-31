@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('api', {
     delete:     (slug: string)  => ipcRenderer.invoke('people:delete', slug),
     getPerfil:  (slug: string)  => ipcRenderer.invoke('people:get-perfil', slug),
     listPautas: (slug: string)  => ipcRenderer.invoke('people:list-pautas', slug),
+    lastResumoRH: (slug: string) => ipcRenderer.invoke('people:last-resumo-rh', slug),
   },
 
   artifacts: {
@@ -47,6 +48,7 @@ contextBridge.exposeInMainWorld('api', {
 
   eu: {
     listDemandas:        ()                                                          => ipcRenderer.invoke('demandas:list'),
+    listDemandasByPerson: (slug: string)                                             => ipcRenderer.invoke('demandas:list-by-person', slug),
     saveDemanda:         (data: unknown)                                             => ipcRenderer.invoke('demandas:save', data),
     deleteDemanda:       (id: string)                                                => ipcRenderer.invoke('demandas:delete', id),
     updateDemandaStatus: (id: string, status: string, addToCiclo: boolean)          => ipcRenderer.invoke('demandas:update-status', id, status, addToCiclo),
@@ -108,11 +110,16 @@ contextBridge.exposeInMainWorld('api', {
     refreshMonthly: (yearMonth?: string) => ipcRenderer.invoke('external:refresh-monthly', yearMonth),
     refreshPerson:  (slug: string)  => ipcRenderer.invoke('external:refresh-person', slug),
     getData:        (slug: string)  => ipcRenderer.invoke('external:get-data', slug),
+    getHistorico:   (slug: string)  => ipcRenderer.invoke('external:get-historico', slug),
     listReports:    ()              => ipcRenderer.invoke('external:list-reports'),
     getReport:      (path: string)  => ipcRenderer.invoke('external:get-report', path),
   },
 
   github: {
     syncTeamRepos: () => ipcRenderer.invoke('github:sync-team-repos'),
+  },
+
+  audit: {
+    run: () => ipcRenderer.invoke('audit:run'),
   },
 })
