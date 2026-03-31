@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-04-PLAN.md
-last_updated: "2026-03-31T22:23:16.639Z"
+stopped_at: Completed 01-prompt-refinements/01-01-PLAN.md
+last_updated: "2026-03-31T22:23:23.820Z"
 last_activity: 2026-03-31
 progress:
   total_phases: 4
@@ -70,6 +70,8 @@ Recent decisions affecting current work:
 - [Phase 01]: Calibracao por role embutida na instrucao do campo (sem logica TypeScript) — LLM interpreta o managerRole passado via params
 - [Phase 01]: detectPreprocessingMode usa conteudo como sinal primario e filename como fallback para nomes ambiguos
 - [Phase 01]: speaker_confidence opcional na validacao (isValidResult) para backward-compat com respostas antigas do Gemini
+- [Phase 01-prompt-refinements]: PRMT-01 a PRMT-05 ja estavam implementados nos commits v3 — auditoria confirmou sem gaps
+- [Phase 01-prompt-refinements]: PRMT-06/07: pontos_ativos reformatado em multiplas linhas; terceiro exemplo de conquista adicionado
 
 ### Pending Todos
 
@@ -82,6 +84,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-31T22:22:46.597Z
-Stopped at: Completed 01-04-PLAN.md
+Last session: 2026-03-31T22:23:23.817Z
+Stopped at: Completed 01-prompt-refinements/01-01-PLAN.md
 Resume file: None

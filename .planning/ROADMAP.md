@@ -10,7 +10,7 @@ Este milestone fecha os 35 gaps remanescentes da revisao extensiva (de 101 ident
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Prompt Refinements** - Refinar os 17 prompts de ingestao, 1:1 deep, cerimonia, compression, cycle, autoavaliacao e Gemini
+- [x] **Phase 1: Prompt Refinements** - Refinar os 17 prompts de ingestao, 1:1 deep, cerimonia, compression, cycle, autoavaliacao e Gemini (completed 2026-03-31)
 - [ ] **Phase 2: Pipeline & Schema** - Corrigir deduplicacao de temas, cleanup de health history e IPC tipado
 - [ ] **Phase 3: GitHub Metrics & CrossAnalyzer** - Adicionar metricas de code review, colaboracao e test coverage; enriquecer CrossAnalyzer e relatorios
 - [ ] **Phase 4: Action System & UX Avancado** - Sync Jira bidirecional, audit trail, escalation, PDI evidence aggregation e insights cross-team
@@ -30,7 +30,7 @@ Este milestone fecha os 35 gaps remanescentes da revisao extensiva (de 101 ident
 **Plans**: 5 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Auditar/confirmar PRMT-01 a PRMT-07 (ingestion, 1on1-deep, cerimonia-sinal, compression)
+- [x] 01-01-PLAN.md — Auditar/confirmar PRMT-01 a PRMT-07 (ingestion, 1on1-deep, cerimonia-sinal, compression)
 - [x] 01-02-PLAN.md — Auditar PRMT-08, PRMT-09 e implementar PRMT-10 (cycle.prompt.ts)
 - [x] 01-03-PLAN.md — Implementar PRMT-11, PRMT-12 (autoavaliacao.prompt.ts)
 - [x] 01-04-PLAN.md — Implementar PRMT-13, PRMT-14, PRMT-15 (gemini-preprocessing.prompt.ts)
@@ -76,7 +76,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Prompt Refinements | 4/5 | In Progress|  |
+| 1. Prompt Refinements | 5/5 | Complete   | 2026-03-31 |
 | 2. Pipeline & Schema | 0/TBD | Not started | - |
 | 3. GitHub Metrics & CrossAnalyzer | 0/TBD | Not started | - |
 | 4. Action System & UX Avancado | 0/TBD | Not started | - |

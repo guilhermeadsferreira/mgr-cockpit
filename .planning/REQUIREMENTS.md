@@ -9,22 +9,22 @@ Requirements para este milestone. Cada um mapeia para phases do roadmap.
 
 ### Prompt Refinements — Ingestion
 
-- [ ] **PRMT-01**: Pipeline detecta `pessoas_esperadas_ausentes` em cerimonias (planning/retro/daily)
-- [ ] **PRMT-02**: Pipeline detecta early stagnation nos primeiros 3 meses (janela minima explicita)
+- [x] **PRMT-01**: Pipeline detecta `pessoas_esperadas_ausentes` em cerimonias (planning/retro/daily)
+- [x] **PRMT-02**: Pipeline detecta early stagnation nos primeiros 3 meses (janela minima explicita)
 
 ### Prompt Refinements — 1on1 Deep
 
-- [ ] **PRMT-03**: Tendencia emocional "deteriorando" requer evidencia de 2+ entradas de 1:1 no historico
+- [x] **PRMT-03**: Tendencia emocional "deteriorando" requer evidencia de 2+ entradas de 1:1 no historico
 
 ### Prompt Refinements — Cerimonia
 
-- [ ] **PRMT-04**: Participacao minima diferenciada por tipo de cerimonia (daily/planning/retro/review)
-- [ ] **PRMT-05**: Saude calibrada por cargo/nivel (Staff silencioso != Junior silencioso)
+- [x] **PRMT-04**: Participacao minima diferenciada por tipo de cerimonia (daily/planning/retro/review)
+- [x] **PRMT-05**: Saude calibrada por cargo/nivel (Staff silencioso != Junior silencioso)
 
 ### Prompt Refinements — Compression
 
-- [ ] **PRMT-06**: Definicao unica e harmonizada de "ponto resolvido" (strikethrough + contradicao por evidencia)
-- [ ] **PRMT-07**: Conquistas preservam formato "titulo — outcome" na compressao
+- [x] **PRMT-06**: Definicao unica e harmonizada de "ponto resolvido" (strikethrough + contradicao por evidencia)
+- [x] **PRMT-07**: Conquistas preservam formato "titulo — outcome" na compressao
 
 ### Prompt Refinements — Cycle
 
@@ -98,13 +98,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PRMT-01 | Phase 1 | Pending |
-| PRMT-02 | Phase 1 | Pending |
-| PRMT-03 | Phase 1 | Pending |
-| PRMT-04 | Phase 1 | Pending |
-| PRMT-05 | Phase 1 | Pending |
-| PRMT-06 | Phase 1 | Pending |
-| PRMT-07 | Phase 1 | Pending |
+| PRMT-01 | Phase 1 | Complete |
+| PRMT-02 | Phase 1 | Complete |
+| PRMT-03 | Phase 1 | Complete |
+| PRMT-04 | Phase 1 | Complete |
+| PRMT-05 | Phase 1 | Complete |
+| PRMT-06 | Phase 1 | Complete |
+| PRMT-07 | Phase 1 | Complete |
 | PRMT-08 | Phase 1 | Pending |
 | PRMT-09 | Phase 1 | Pending |
 | PRMT-10 | Phase 1 | Pending |
