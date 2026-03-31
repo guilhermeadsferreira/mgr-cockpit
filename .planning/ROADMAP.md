@@ -27,7 +27,14 @@ Este milestone fecha os 35 gaps remanescentes da revisao extensiva (de 101 ident
   3. Ao comprimir historico, conquistas mantêm o formato "titulo — outcome" e pontos resolvidos usam definicao unica (strikethrough ou contradicao por evidencia)
   4. O relatorio de ciclo gera linha_do_tempo com 5-10 eventos significativos, expectativas benchmarked por cargo e evidencias de promovibilidade com comportamento observado concreto
   5. O modo do Gemini e determinado pelo conteudo (num_speakers), captura conteudo emocional em full mode e registra confidence de speaker identification como metadata
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Auditar/confirmar PRMT-01 a PRMT-07 (ingestion, 1on1-deep, cerimonia-sinal, compression)
+- [ ] 01-02-PLAN.md — Auditar PRMT-08, PRMT-09 e implementar PRMT-10 (cycle.prompt.ts)
+- [ ] 01-03-PLAN.md — Implementar PRMT-11, PRMT-12 (autoavaliacao.prompt.ts)
+- [ ] 01-04-PLAN.md — Implementar PRMT-13, PRMT-14, PRMT-15 (gemini-preprocessing.prompt.ts)
+- [ ] 01-05-PLAN.md — Implementar PRMT-16, PRMT-17 (gestor-ciclo.prompt.ts)
 
 ### Phase 2: Pipeline & Schema
 **Goal**: O pipeline persiste dados sem duplicatas, mantem health history enxuto e retorna dados externos com tipagem segura
@@ -69,7 +76,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Prompt Refinements | 0/TBD | Not started | - |
+| 1. Prompt Refinements | 0/5 | Not started | - |
 | 2. Pipeline & Schema | 0/TBD | Not started | - |
 | 3. GitHub Metrics & CrossAnalyzer | 0/TBD | Not started | - |
 | 4. Action System & UX Avancado | 0/TBD | Not started | - |
