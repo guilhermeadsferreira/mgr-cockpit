@@ -115,3 +115,60 @@ O `PRD_TECH.md` é o documento vivo da implementação. Atualizar sempre que:
 | Fase concluída ou replaneada | Plano de Implementação V1 |
 | Novo risco identificado ou mitigado | Riscos Técnicos |
 | Scripts npm definidos na Fase 0 | Comandos |
+
+<!-- GSD:project-start source:PROJECT.md -->
+## Project
+
+**Pulse Cockpit — Revisao Extensiva**
+
+Pulse Cockpit e um app desktop (Electron + React) para gestores de tecnologia que transforma transcricoes e anotacoes de cerimonias (1:1s, dailies, plannings, retros) num sistema vivo de inteligencia sobre pessoas. O nucleo (V1), qualidade de ingestao (V2) e inteligencia externa Jira/GitHub (V3) estao em producao. Este milestone foca em curadoria e qualidade: refinar prompts, pipeline, metricas e UX a partir de uma revisao extensiva que identificou 101 gaps (66 ja corrigidos, 35 pendentes).
+
+**Core Value:** Garantir que toda informacao coletada pelo pipeline seja de alta qualidade, acionavel e visivel para o gestor.
+
+### Constraints
+
+- **Producao:** App em uso real com dados irreversiveis — nenhuma operacao destrutiva sem confirmacao
+- **Tech stack:** Electron + React + TypeScript — nao mudar sem PDR
+- **IA:** Exclusivamente Claude Code CLI (`claude -p`) — nunca SDK/API
+- **Dados:** Workspace em disco (Markdown + YAML) — sem banco de dados
+- **Schema:** Mudancas em perfil.md devem ser aditivas; nunca remover campos sem migration
+- **Sem testes:** Zero coverage — priorizar mudancas cirurgicas
+<!-- GSD:project-end -->
+
+<!-- GSD:stack-start source:STACK.md -->
+## Technology Stack
+
+Technology stack not yet documented. Will populate after codebase mapping or first phase.
+<!-- GSD:stack-end -->
+
+<!-- GSD:conventions-start source:CONVENTIONS.md -->
+## Conventions
+
+Conventions not yet established. Will populate as patterns emerge during development.
+<!-- GSD:conventions-end -->
+
+<!-- GSD:architecture-start source:ARCHITECTURE.md -->
+## Architecture
+
+Architecture not yet mapped. Follow existing patterns found in the codebase.
+<!-- GSD:architecture-end -->
+
+<!-- GSD:workflow-start source:GSD defaults -->
+## GSD Workflow Enforcement
+
+Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
+
+Use these entry points:
+- `/gsd:quick` for small fixes, doc updates, and ad-hoc tasks
+- `/gsd:debug` for investigation and bug fixing
+- `/gsd:execute-phase` for planned phase work
+
+Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+<!-- GSD:workflow-end -->
+
+<!-- GSD:profile-start -->
+## Developer Profile
+
+> Profile not yet configured. Run `/gsd:profile-user` to generate your developer profile.
+> This section is managed by `generate-claude-profile` -- do not edit manually.
+<!-- GSD:profile-end -->

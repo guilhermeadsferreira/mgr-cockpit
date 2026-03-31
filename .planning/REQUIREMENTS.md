@@ -98,47 +98,47 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PRMT-01 | TBD | Pending |
-| PRMT-02 | TBD | Pending |
-| PRMT-03 | TBD | Pending |
-| PRMT-04 | TBD | Pending |
-| PRMT-05 | TBD | Pending |
-| PRMT-06 | TBD | Pending |
-| PRMT-07 | TBD | Pending |
-| PRMT-08 | TBD | Pending |
-| PRMT-09 | TBD | Pending |
-| PRMT-10 | TBD | Pending |
-| PRMT-11 | TBD | Pending |
-| PRMT-12 | TBD | Pending |
-| PRMT-13 | TBD | Pending |
-| PRMT-14 | TBD | Pending |
-| PRMT-15 | TBD | Pending |
-| PRMT-16 | TBD | Pending |
-| PRMT-17 | TBD | Pending |
-| PIPE-01 | TBD | Pending |
-| PIPE-02 | TBD | Pending |
-| PIPE-03 | TBD | Pending |
-| MTRC-01 | TBD | Pending |
-| MTRC-02 | TBD | Pending |
-| MTRC-03 | TBD | Pending |
-| MTRC-04 | TBD | Pending |
-| MTRC-05 | TBD | Pending |
-| MTRC-06 | TBD | Pending |
-| MTRC-07 | TBD | Pending |
-| ACTN-01 | TBD | Pending |
-| ACTN-02 | TBD | Pending |
-| ACTN-03 | TBD | Pending |
-| ACTN-04 | TBD | Pending |
-| ACTN-05 | TBD | Pending |
-| UX-01 | TBD | Pending |
-| UX-02 | TBD | Pending |
-| UX-03 | TBD | Pending |
+| PRMT-01 | Phase 1 | Pending |
+| PRMT-02 | Phase 1 | Pending |
+| PRMT-03 | Phase 1 | Pending |
+| PRMT-04 | Phase 1 | Pending |
+| PRMT-05 | Phase 1 | Pending |
+| PRMT-06 | Phase 1 | Pending |
+| PRMT-07 | Phase 1 | Pending |
+| PRMT-08 | Phase 1 | Pending |
+| PRMT-09 | Phase 1 | Pending |
+| PRMT-10 | Phase 1 | Pending |
+| PRMT-11 | Phase 1 | Pending |
+| PRMT-12 | Phase 1 | Pending |
+| PRMT-13 | Phase 1 | Pending |
+| PRMT-14 | Phase 1 | Pending |
+| PRMT-15 | Phase 1 | Pending |
+| PRMT-16 | Phase 1 | Pending |
+| PRMT-17 | Phase 1 | Pending |
+| PIPE-01 | Phase 2 | Pending |
+| PIPE-02 | Phase 2 | Pending |
+| PIPE-03 | Phase 2 | Pending |
+| MTRC-01 | Phase 3 | Pending |
+| MTRC-02 | Phase 3 | Pending |
+| MTRC-03 | Phase 3 | Pending |
+| MTRC-04 | Phase 3 | Pending |
+| MTRC-05 | Phase 3 | Pending |
+| MTRC-06 | Phase 3 | Pending |
+| MTRC-07 | Phase 3 | Pending |
+| ACTN-01 | Phase 4 | Pending |
+| ACTN-02 | Phase 4 | Pending |
+| ACTN-03 | Phase 4 | Pending |
+| ACTN-04 | Phase 4 | Pending |
+| ACTN-05 | Phase 4 | Pending |
+| UX-01 | Phase 4 | Pending |
+| UX-02 | Phase 4 | Pending |
+| UX-03 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 35 total
-- Mapped to phases: 0
-- Unmapped: 35
+- Mapped to phases: 35
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-31*
-*Last updated: 2026-03-31 after initial definition*
+*Last updated: 2026-03-31 after roadmap creation*
