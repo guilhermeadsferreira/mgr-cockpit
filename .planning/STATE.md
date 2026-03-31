@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 02
-last_updated: "2026-03-31T23:32:44.524Z"
+last_updated: "2026-03-31T23:34:36.520Z"
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 7
-  completed_plans: 6
+  completed_plans: 7
 ---
 
 # Project State — Pulse Cockpit V2.1
@@ -43,6 +43,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 - [Phase 01]: PRMT-10 implementado via substituicao cirurgica da regra de evidencias_promovibilidade com comportamento observado obrigatorio para flag=nao
 - [Phase 02]: Substring match bidirecional para dedup de temas — mais especifico sobrevive
 - [Phase 02]: Health history threshold 50 entradas com compressao mensal automatica
+- [Phase 02]: Tipos ExternalDataSnapshot definidos localmente no main process index.ts — evita dependencia cross-process
 
 ## Phases
 
@@ -71,6 +72,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 | 999.5 | 01 | ~35min | 6/6 | 6 |
 | Phase 01 P02 | 5 | 2 tasks | 1 files |
 | Phase 02 P01 | 12min | 2 tasks | 1 files |
+| Phase 02 P02 | 741 | 1 tasks | 2 files |
 
 ## Next Action
 

@@ -52,7 +52,7 @@ Requirements para este milestone. Cada um mapeia para phases do roadmap.
 
 - [x] **PIPE-01**: Temas deduplicados via fuzzy matching (substring/keyword merge) antes de persistir
 - [x] **PIPE-02**: Health history com cleanup automatico (manter ultimas 50 entradas, comprimir anteriores)
-- [ ] **PIPE-03**: External data IPC retorna JSON tipado em vez de parsing regex no frontend
+- [x] **PIPE-03**: External data IPC retorna JSON tipado em vez de parsing regex no frontend
 
 ### GitHub Metrics & CrossAnalyzer
 
@@ -117,7 +117,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PRMT-17 | Phase 1 | Complete |
 | PIPE-01 | Phase 2 | Complete |
 | PIPE-02 | Phase 2 | Complete |
-| PIPE-03 | Phase 2 | Pending |
+| PIPE-03 | Phase 2 | Complete |
 | MTRC-01 | Phase 3 | Pending |
 | MTRC-02 | Phase 3 | Pending |
 | MTRC-03 | Phase 3 | Pending |
