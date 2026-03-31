@@ -34,14 +34,14 @@ Requirements para este milestone. Cada um mapeia para phases do roadmap.
 
 ### Prompt Refinements — Autoavaliacao
 
-- [ ] **PRMT-11**: Valores calibrados por tipo de role (manager vs IC)
-- [ ] **PRMT-12**: Desafios reconhecidos como campo obrigatorio quando ha evidencia
+- [x] **PRMT-11**: Valores calibrados por tipo de role (manager vs IC)
+- [x] **PRMT-12**: Desafios reconhecidos como campo obrigatorio quando ha evidencia
 
 ### Prompt Refinements — Gemini
 
-- [ ] **PRMT-13**: Mode detection por conteudo (num_speakers), nao por filename
-- [ ] **PRMT-14**: Emotional content (frustacao, excitacao) capturado em full mode
-- [ ] **PRMT-15**: Speaker identification confidence (alta/media/baixa) como metadata
+- [x] **PRMT-13**: Mode detection por conteudo (num_speakers), nao por filename
+- [x] **PRMT-14**: Emotional content (frustacao, excitacao) capturado em full mode
+- [x] **PRMT-15**: Speaker identification confidence (alta/media/baixa) como metadata
 
 ### Prompt Refinements — Gestor Ciclo
 
@@ -108,11 +108,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PRMT-08 | Phase 1 | Pending |
 | PRMT-09 | Phase 1 | Pending |
 | PRMT-10 | Phase 1 | Pending |
-| PRMT-11 | Phase 1 | Pending |
-| PRMT-12 | Phase 1 | Pending |
-| PRMT-13 | Phase 1 | Pending |
-| PRMT-14 | Phase 1 | Pending |
-| PRMT-15 | Phase 1 | Pending |
+| PRMT-11 | Phase 1 | Complete |
+| PRMT-12 | Phase 1 | Complete |
+| PRMT-13 | Phase 1 | Complete |
+| PRMT-14 | Phase 1 | Complete |
+| PRMT-15 | Phase 1 | Complete |
 | PRMT-16 | Phase 1 | Pending |
 | PRMT-17 | Phase 1 | Pending |
 | PIPE-01 | Phase 2 | Pending |
