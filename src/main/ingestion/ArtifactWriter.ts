@@ -168,7 +168,8 @@ export class ArtifactWriter {
     }).join('\n') || '- [ ] (sem ações comprometidas)'
     const atencaoLines = result.pontos_de_atencao.map((p) => `- **${today}:** ${formatPontoAtencao(p)}`).join('\n') || ''
     const elogioLines  = result.elogios_e_conquistas.map((e) => `- **${today}:** ${e}`).join('\n') || ''
-    const temasLines   = result.temas_atualizados.map((t) => `- ${t}`).join('\n') || ''
+    const dedupedTemasNew = this.deduplicateThemes(result.temas_atualizados)
+    const temasLines   = dedupedTemasNew.map((t) => `- ${t}`).join('\n') || ''
 
     const sentimentosStr = serializeSentimentos(result)
     return `---
@@ -284,8 +285,9 @@ ${SECTION.sinais_terceiros.close}
       updated = this.appendToBlock(updated, 'conquistas', newLines)
     }
 
-    // 6. Replace Temas Recorrentes (deduped list)
-    const temasLines = result.temas_atualizados.map((t) => `- ${t}`).join('\n')
+    // 6. Replace Temas Recorrentes (fuzzy deduped list)
+    const dedupedTemas = this.deduplicateThemes(result.temas_atualizados)
+    const temasLines = dedupedTemas.map((t) => `- ${t}`).join('\n')
     updated = this.replaceBlock(updated, 'temas', temasLines)
 
     // 7. Append Histórico de Artefatos
@@ -300,6 +302,9 @@ ${SECTION.sinais_terceiros.close}
     } else {
       updated = updated.trimEnd() + `\n\n## Histórico de Saúde\n${SECTION.saude_historico.open}\n${saudeLine}\n${SECTION.saude_historico.close}\n`
     }
+
+    // Auto-compress health history when exceeding 50 active entries
+    updated = this.compressHealthHistory(updated)
 
     return updated
   }
@@ -652,7 +657,7 @@ ${SECTION.sinais_terceiros.close}
         .split('\n')
         .map((l) => l.replace(/^-\s*/, '').trim())
         .filter(Boolean)
-      const merged = [...new Set([...currentTemas, ...newTemas])]
+      const merged = this.deduplicateThemes([...currentTemas, ...newTemas])
       const temasLines = merged.map((t) => `- ${t}`).join('\n')
       updated = this.replaceBlock(updated, 'temas', temasLines)
     }
@@ -665,6 +670,9 @@ ${SECTION.sinais_terceiros.close}
     } else {
       updated = updated.trimEnd() + `\n\n## Histórico de Saúde\n${SECTION.saude_historico.open}\n${saudeLine}\n${SECTION.saude_historico.close}\n`
     }
+
+    // Auto-compress health history when exceeding 50 active entries
+    updated = this.compressHealthHistory(updated)
 
     writeFileSync(tmpPath, updated, 'utf-8')
     renameSync(tmpPath, perfilPath)
@@ -801,6 +809,154 @@ ${SECTION.sinais_terceiros.close}
     }
 
     return content.replace(/^---\n[\s\S]*?\n---/, `---\n${fm}\n---`)
+  }
+
+  /**
+   * Compresses health history when active entries exceed 50.
+   * Oldest entries beyond the 50 most recent are grouped by month (YYYY-MM)
+   * into summary lines with indicator counts and most frequent motivo.
+   * Already-compressed lines (matching "- YYYY-MM:") are preserved as-is.
+   */
+  private compressHealthHistory(content: string): string {
+    const body = this.extractBlock(content, 'saude_historico')
+    if (!body.trim()) return content
+
+    const lines = body.split('\n').filter((l) => l.trim())
+
+    // Separate already-compressed summaries from active entries
+    const compressed: string[] = []
+    const active: { line: string; date: string; month: string; indicador: string; motivo: string }[] = []
+
+    for (const line of lines) {
+      const activeMatch = line.match(/^-\s*(\d{4}-\d{2}-\d{2})\s*\|\s*(.+?)\s*\|\s*(.+)$/)
+      if (activeMatch) {
+        const [, date, indicador, motivo] = activeMatch
+        active.push({
+          line,
+          date,
+          month: date.slice(0, 7),
+          indicador: indicador.trim().replace(/\s*\(baixa confiança\)/, ''),
+          motivo: motivo.trim(),
+        })
+      } else if (line.match(/^-\s*\d{4}-\d{2}:/)) {
+        // Already compressed monthly summary
+        compressed.push(line)
+      } else {
+        // Unknown format — preserve as active to avoid data loss
+        active.push({ line, date: '0000-00-00', month: '0000-00', indicador: '', motivo: '' })
+      }
+    }
+
+    if (active.length <= 50) return content
+
+    // Sort active by date ascending
+    active.sort((a, b) => a.date.localeCompare(b.date))
+
+    // Keep the 50 most recent, compress the rest
+    const toKeep = active.slice(-50)
+    const toCompress = active.slice(0, active.length - 50)
+
+    // Group oldest entries by month
+    const monthGroups = new Map<string, typeof toCompress>()
+    for (const entry of toCompress) {
+      if (!entry.indicador) {
+        // Unknown format entries — keep as-is in compressed section
+        compressed.push(entry.line)
+        continue
+      }
+      const group = monthGroups.get(entry.month) || []
+      group.push(entry)
+      monthGroups.set(entry.month, group)
+    }
+
+    // Generate monthly summaries
+    const newSummaries: string[] = []
+    const sortedMonths = [...monthGroups.keys()].sort()
+    for (const month of sortedMonths) {
+      const entries = monthGroups.get(month)!
+      const indicadorCounts = new Map<string, number>()
+      const motivoCounts = new Map<string, number>()
+
+      for (const e of entries) {
+        indicadorCounts.set(e.indicador, (indicadorCounts.get(e.indicador) || 0) + 1)
+        motivoCounts.set(e.motivo, (motivoCounts.get(e.motivo) || 0) + 1)
+      }
+
+      const indicadorStr = [...indicadorCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([ind, count]) => `${count}x ${ind}`)
+        .join(', ')
+
+      // Most frequent motivo
+      let topMotivo = ''
+      let topCount = 0
+      for (const [m, c] of motivoCounts) {
+        if (c > topCount) { topMotivo = m; topCount = c }
+      }
+
+      newSummaries.push(`- ${month}: ${indicadorStr} (${topMotivo})`)
+    }
+
+    // Rebuild block: old compressed + new summaries + recent 50
+    const allCompressed = [...compressed, ...newSummaries].sort()
+    const recentLines = toKeep.map((e) => e.line)
+    const newBody = [...allCompressed, ...recentLines].join('\n')
+
+    return this.replaceBlock(content, 'saude_historico', newBody)
+  }
+
+  /**
+   * Normalizes a theme string for comparison: lowercase, no accents, trimmed.
+   */
+  private normalizeForComparison(tema: string): string {
+    return tema
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+  }
+
+  /**
+   * Deduplicates themes using normalized substring matching.
+   * When two themes overlap (one contains the other after normalization),
+   * only the LONGER (more specific) original label survives.
+   * Preserves original labels with accents.
+   */
+  private deduplicateThemes(themes: string[]): string[] {
+    const result: { original: string; normalized: string }[] = []
+
+    for (const tema of themes) {
+      const normalized = this.normalizeForComparison(tema)
+      if (!normalized) continue
+
+      let dominated = false
+      let dominatesIndex = -1
+
+      for (let i = 0; i < result.length; i++) {
+        const existing = result[i]
+        if (existing.normalized.includes(normalized)) {
+          // Existing is more specific (longer includes shorter) — skip new
+          dominated = true
+          break
+        }
+        if (normalized.includes(existing.normalized)) {
+          // New is more specific — will replace existing
+          dominatesIndex = i
+          break
+        }
+      }
+
+      if (dominated) continue
+
+      if (dominatesIndex >= 0) {
+        // Replace the less specific theme with the more specific one
+        result[dominatesIndex] = { original: tema, normalized }
+      } else {
+        result.push({ original: tema, normalized })
+      }
+    }
+
+    return result.map((r) => r.original)
   }
 
   private extractBlock(content: string, blockKey: keyof typeof SECTION): string {
