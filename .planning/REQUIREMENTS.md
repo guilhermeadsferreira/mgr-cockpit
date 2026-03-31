@@ -28,9 +28,9 @@ Requirements para este milestone. Cada um mapeia para phases do roadmap.
 
 ### Prompt Refinements — Cycle
 
-- [ ] **PRMT-08**: `linha_do_tempo` flexivel (5-10 eventos, IA decide densidade por significancia)
-- [ ] **PRMT-09**: Expectativas benchmarked por cargo/nivel
-- [ ] **PRMT-10**: Evidencias de promovibilidade nunca triviais — gaps com comportamento observado
+- [x] **PRMT-08**: `linha_do_tempo` flexivel (5-10 eventos, IA decide densidade por significancia)
+- [x] **PRMT-09**: Expectativas benchmarked por cargo/nivel
+- [x] **PRMT-10**: Evidencias de promovibilidade nunca triviais — gaps com comportamento observado
 
 ### Prompt Refinements — Autoavaliacao
 
@@ -45,8 +45,8 @@ Requirements para este milestone. Cada um mapeia para phases do roadmap.
 
 ### Prompt Refinements — Gestor Ciclo
 
-- [ ] **PRMT-16**: Decisao exige trade-off explicito ou rejeicao de alternativa
-- [ ] **PRMT-17**: Aprendizado obrigatorio (minimo 1 por ciclo)
+- [x] **PRMT-16**: Decisao exige trade-off explicito ou rejeicao de alternativa
+- [x] **PRMT-17**: Aprendizado obrigatorio (minimo 1 por ciclo)
 
 ### Pipeline & Schema
 
@@ -105,16 +105,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PRMT-05 | Phase 1 | Complete |
 | PRMT-06 | Phase 1 | Complete |
 | PRMT-07 | Phase 1 | Complete |
-| PRMT-08 | Phase 1 | Pending |
-| PRMT-09 | Phase 1 | Pending |
-| PRMT-10 | Phase 1 | Pending |
+| PRMT-08 | Phase 1 | Complete |
+| PRMT-09 | Phase 1 | Complete |
+| PRMT-10 | Phase 1 | Complete |
 | PRMT-11 | Phase 1 | Complete |
 | PRMT-12 | Phase 1 | Complete |
 | PRMT-13 | Phase 1 | Complete |
 | PRMT-14 | Phase 1 | Complete |
 | PRMT-15 | Phase 1 | Complete |
-| PRMT-16 | Phase 1 | Pending |
-| PRMT-17 | Phase 1 | Pending |
+| PRMT-16 | Phase 1 | Complete |
+| PRMT-17 | Phase 1 | Complete |
 | PIPE-01 | Phase 2 | Pending |
 | PIPE-02 | Phase 2 | Pending |
 | PIPE-03 | Phase 2 | Pending |
