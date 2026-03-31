@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-last_updated: "2026-03-31T22:28:32.552Z"
+status: Executing Phase 02
+last_updated: "2026-03-31T23:32:44.524Z"
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 7
+  completed_plans: 6
 ---
 
 # Project State — Pulse Cockpit V2.1
@@ -18,7 +18,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-03-26)
 
 **Core value:** O contexto acumulado ao longo do ciclo deve estar acessível para o gestor na hora que importa: na tela do perfil, na pauta e no relatório de calibração.
-**Current focus:** Phase 999.5 — Gemini Preprocessing (complete)
+**Current focus:** Phase 02 — pipeline-schema
 
 ## Current Status
 
@@ -41,6 +41,8 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 - [Phase 999.5]: Temperatura 0.1 no Gemini para respostas determinísticas na limpeza de transcrições
 - [Phase 999.5]: Fallback silencioso — se pré-processamento falha, usa texto original (nunca perde dados)
 - [Phase 01]: PRMT-10 implementado via substituicao cirurgica da regra de evidencias_promovibilidade com comportamento observado obrigatorio para flag=nao
+- [Phase 02]: Substring match bidirecional para dedup de temas — mais especifico sobrevive
+- [Phase 02]: Health history threshold 50 entradas com compressao mensal automatica
 
 ## Phases
 
@@ -68,6 +70,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 | 999.4 | 01 | 83s | 2/2 | 2 |
 | 999.5 | 01 | ~35min | 6/6 | 6 |
 | Phase 01 P02 | 5 | 2 tasks | 1 files |
+| Phase 02 P01 | 12min | 2 tasks | 1 files |
 
 ## Next Action
 

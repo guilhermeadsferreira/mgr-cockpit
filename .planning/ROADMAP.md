@@ -47,7 +47,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Fuzzy theme dedup + health history auto-compression (PIPE-01, PIPE-02)
+- [x] 02-01-PLAN.md — Fuzzy theme dedup + health history auto-compression (PIPE-01, PIPE-02)
 - [ ] 02-02-PLAN.md — Typed external data IPC with validation (PIPE-03)
 
 ### Phase 3: GitHub Metrics & CrossAnalyzer
