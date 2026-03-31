@@ -1,81 +1,144 @@
-# Requirements: Pulse Cockpit V2.1
+# Requirements: Pulse Cockpit — Revisao Extensiva
 
-**Defined:** 2026-03-26
-**Core Value:** O contexto acumulado ao longo do ciclo — insights de 1:1, sinais de cerimônias, tendência emocional — deve estar acessível para o gestor na hora que importa: na tela do perfil, na pauta do próximo 1:1 e no relatório de calibração.
+**Defined:** 2026-03-31
+**Core Value:** Garantir que toda informacao coletada pelo pipeline seja de alta qualidade, acionavel e visivel para o gestor.
 
-## V2.1 Requirements
+## v1 Requirements
 
-Os dados de inteligência já são produzidos pelo pipeline V2. O gap é de superfície: exibição na UI e consumo nos prompts restantes.
+Requirements para este milestone. Cada um mapeia para phases do roadmap.
 
-### UI — PersonView
+### Prompt Refinements — Ingestion
 
-- [ ] **UI-01**: Gestor vê seção "Insights de 1:1" no perfil de cada liderado, com insights do Pass de 1:1 listados em ordem cronológica reversa
-- [ ] **UI-02**: Gestor vê seção "Sinais de Terceiros" no perfil, com sinais do Pass de Cerimônia e correlações confirmadas em 1:1
-- [ ] **UI-03**: Gestor consegue copiar o "Resumo Executivo QR" de um artefato de 1:1 para o clipboard com um clique
+- [ ] **PRMT-01**: Pipeline detecta `pessoas_esperadas_ausentes` em cerimonias (planning/retro/daily)
+- [ ] **PRMT-02**: Pipeline detecta early stagnation nos primeiros 3 meses (janela minima explicita)
 
-### UI — SettingsView
+### Prompt Refinements — 1on1 Deep
 
-- [ ] **SET-01**: Gestor consegue disparar reingestão em batch de todos os artefatos processados diretamente na tela de Settings, com modal de confirmação e barra de progresso em tempo real
+- [ ] **PRMT-03**: Tendencia emocional "deteriorando" requer evidencia de 2+ entradas de 1:1 no historico
 
-### Prompts — Pauta e Autoavaliação
+### Prompt Refinements — Cerimonia
 
-- [ ] **PMPT-01**: Pauta roll-up com o gestor exibe tendências emocionais do time, correlações entre liderados e riscos compostos (múltiplos sinais de risco na mesma pessoa)
-- [ ] **PMPT-02**: Prompt de autoavaliação do gestor consome campos V2: insights de feedback_dado, tendência emocional dos liderados, accountability (ações do gestor com ciclos_sem_mencao elevado)
+- [ ] **PRMT-04**: Participacao minima diferenciada por tipo de cerimonia (daily/planning/retro/review)
+- [ ] **PRMT-05**: Saude calibrada por cargo/nivel (Staff silencioso != Junior silencioso)
 
-### Performance — Ingestão
+### Prompt Refinements — Compression
 
-- [x] **PERF-01**: Gestor consegue ativar o modelo híbrido (OpenRouter para Pass Cerimônia) via Settings e observar redução de latência de ingestão em relação ao baseline do Claude CLI. Critérios de aceitação: (1) campo openRouterApiKey e toggle useHybridModel aparecem na SettingsView e persistem em ~/.pulsecockpit/settings.json; (2) com híbrido ativo, Pass Cerimônia chama OpenRouter em vez de Claude CLI; (3) se OpenRouter falha, há fallback automático para Claude CLI com log de warning visível nos logs do main process.
+- [ ] **PRMT-06**: Definicao unica e harmonizada de "ponto resolvido" (strikethrough + contradicao por evidencia)
+- [ ] **PRMT-07**: Conquistas preservam formato "titulo — outcome" na compressao
 
-## V3 Requirements (deferred)
+### Prompt Refinements — Cycle
 
-### Entidade Projeto
+- [ ] **PRMT-08**: `linha_do_tempo` flexivel (5-10 eventos, IA decide densidade por significancia)
+- [ ] **PRMT-09**: Expectativas benchmarked por cargo/nivel
+- [ ] **PRMT-10**: Evidencias de promovibilidade nunca triviais — gaps com comportamento observado
 
-- **PROJ-01**: Gestor cadastra projetos com config.yaml análogo ao de pessoas
-- **PROJ-02**: Pipeline de ingestão identifica projetos mencionados em artefatos e cria/atualiza status.md por projeto
-- **PROJ-03**: Ações comprometidas incluem campo projeto_slug (retrocompatível com V2)
+### Prompt Refinements — Autoavaliacao
 
-### View Hoje / Esta Semana
+- [ ] **PRMT-11**: Valores calibrados por tipo de role (manager vs IC)
+- [ ] **PRMT-12**: Desafios reconhecidos como campo obrigatorio quando ha evidencia
 
-- **TODAY-01**: View diária mostra reuniões registradas, pautas pendentes, follow-ups vencendo e alertas ativos
-- **TODAY-02**: View de semana consolida o que aconteceu e o que está pendente
+### Prompt Refinements — Gemini
 
-### Integrações MCP
+- [ ] **PRMT-13**: Mode detection por conteudo (num_speakers), nao por filename
+- [ ] **PRMT-14**: Emotional content (frustacao, excitacao) capturado em full mode
+- [ ] **PRMT-15**: Speaker identification confidence (alta/media/baixa) como metadata
 
-- **MCP-01**: Adapter Slack escreve mensagens de canais configurados como .md em inbox/
-- **MCP-02**: Adapter Jira importa daily report por pessoa, bloqueios, métricas de fluxo
+### Prompt Refinements — Gestor Ciclo
 
-### Inteligência Avançada
+- [ ] **PRMT-16**: Decisao exige trade-off explicito ou rejeicao de alternativa
+- [ ] **PRMT-17**: Aprendizado obrigatorio (minimo 1 por ciclo)
 
-- **AI-01**: Insights cruzados do time — padrões que aparecem em múltiplas pessoas simultaneamente
-- **AI-02**: Caso de promoção gerado por IA com base em perfil + projetos + artefatos + PDI
+### Pipeline & Schema
+
+- [ ] **PIPE-01**: Temas deduplicados via fuzzy matching (substring/keyword merge) antes de persistir
+- [ ] **PIPE-02**: Health history com cleanup automatico (manter ultimas 50 entradas, comprimir anteriores)
+- [ ] **PIPE-03**: External data IPC retorna JSON tipado em vez de parsing regex no frontend
+
+### GitHub Metrics & CrossAnalyzer
+
+- [ ] **MTRC-01**: Code review depth: avgCommentsPerReview, turnaround de primeira review, approval rate
+- [ ] **MTRC-02**: Collaboration score (0-100): co-authored commits, PRs cross-repo, mentions em issues
+- [ ] **MTRC-03**: Test coverage trend: % de PRs com mudancas de teste, trend historico
+- [ ] **MTRC-04**: CrossAnalyzer inclui campo `causa_raiz` nos insights (awaiting review vs changes vs stale)
+- [ ] **MTRC-05**: Desalinhamento checado contra contexto do perfil (ferias, licenca) antes de flaggar
+- [ ] **MTRC-06**: Relatorios incluem narrative context paragraph injetado do perfil
+- [ ] **MTRC-07**: Relatorios incluem baseline comparison pessoal (media dos ultimos 3 meses)
+
+### Action System Avancado
+
+- [ ] **ACTN-01**: Sync bidirecional acoes <> Jira: issue fechada no Jira auto-fecha acao no app
+- [ ] **ACTN-02**: Escalation: acao vencida do gestor gera follow-up automatico para liderado
+- [ ] **ACTN-03**: Action audit trail: array `statusHistory[]` com status, date, source
+- [ ] **ACTN-04**: Prioridade de acoes atualizada automaticamente pelo deep pass
+- [ ] **ACTN-05**: Evidence aggregation: multiplos artefatos acumulam evidencias para mesmo objetivo PDI
+
+### UX Avancado
+
+- [ ] **UX-01**: Insights cross-team: padroes detectados em multiplos perfis exibidos no Dashboard
+- [ ] **UX-02**: Risk panel estendido para pares e gestores (nao apenas liderados)
+- [ ] **UX-03**: Agenda generation agendada: pauta gerada automaticamente N dias antes do proximo 1:1
+
+## v2 Requirements
+
+Nao ha v2 neste milestone — todas as tasks identificadas estao no escopo v1.
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| API Anthropic / @anthropic-ai/sdk | Decisão arquitetural permanente: Claude Code CLI somente |
-| Banco de dados relacional | Markdown+YAML é o storage escolhido; manter portabilidade e transparência |
-| Sync com servidor remoto | App local-first; iCloud/Google Drive são o mecanismo de sync |
-| Multi-tenant / multi-usuário | Um gestor por instalação — simplifica modelo de dados e segurança |
-| Mobile / web app | Electron desktop somente por ora |
+| Features novas fora da revisao | Foco e curadoria e qualidade, nao expansao |
+| Entidade Projeto | Requer novo modelo de dados — milestone futuro |
+| Integracao MCP Slack | Requer novo adapter de ingestao |
+| Testes automatizados | Abordagem defensiva via uso real |
+| API Anthropic / SDK | Decisao arquitetural: sempre Claude Code CLI |
 
 ## Traceability
 
+Which phases cover which requirements. Updated during roadmap creation.
+
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UI-01 | Phase 1 | Pending |
-| UI-02 | Phase 1 | Pending |
-| UI-03 | Phase 1 | Pending |
-| SET-01 | Phase 2 | Pending |
-| PMPT-01 | Phase 3 | Pending |
-| PMPT-02 | Phase 3 | Pending |
-| PERF-01 | Phase 999.3 | Complete |
+| PRMT-01 | TBD | Pending |
+| PRMT-02 | TBD | Pending |
+| PRMT-03 | TBD | Pending |
+| PRMT-04 | TBD | Pending |
+| PRMT-05 | TBD | Pending |
+| PRMT-06 | TBD | Pending |
+| PRMT-07 | TBD | Pending |
+| PRMT-08 | TBD | Pending |
+| PRMT-09 | TBD | Pending |
+| PRMT-10 | TBD | Pending |
+| PRMT-11 | TBD | Pending |
+| PRMT-12 | TBD | Pending |
+| PRMT-13 | TBD | Pending |
+| PRMT-14 | TBD | Pending |
+| PRMT-15 | TBD | Pending |
+| PRMT-16 | TBD | Pending |
+| PRMT-17 | TBD | Pending |
+| PIPE-01 | TBD | Pending |
+| PIPE-02 | TBD | Pending |
+| PIPE-03 | TBD | Pending |
+| MTRC-01 | TBD | Pending |
+| MTRC-02 | TBD | Pending |
+| MTRC-03 | TBD | Pending |
+| MTRC-04 | TBD | Pending |
+| MTRC-05 | TBD | Pending |
+| MTRC-06 | TBD | Pending |
+| MTRC-07 | TBD | Pending |
+| ACTN-01 | TBD | Pending |
+| ACTN-02 | TBD | Pending |
+| ACTN-03 | TBD | Pending |
+| ACTN-04 | TBD | Pending |
+| ACTN-05 | TBD | Pending |
+| UX-01 | TBD | Pending |
+| UX-02 | TBD | Pending |
+| UX-03 | TBD | Pending |
 
 **Coverage:**
-- V2.1 requirements: 7 total
-- Mapeados para fases: 7
-- Não mapeados: 0 ✓
+- v1 requirements: 35 total
+- Mapped to phases: 0
+- Unmapped: 35
 
 ---
-*Requirements defined: 2026-03-26*
-*Last updated: 2026-03-27 after adding PERF-01 (hybrid model performance)*
+*Requirements defined: 2026-03-31*
+*Last updated: 2026-03-31 after initial definition*
