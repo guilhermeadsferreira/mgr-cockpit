@@ -57,10 +57,10 @@ Garantir que toda informacao coletada pelo pipeline seja de alta qualidade, acio
 - [ ] Gestor-ciclo: decisao = trade-off explicito
 - [ ] Gestor-ciclo: aprendizado obrigatorio (min 1)
 
-**Alta prioridade — Pipeline & Schema (3 tasks):**
-- [ ] Temas: deduplicacao fuzzy (substring/keyword merge)
-- [ ] Health history: cleanup automatico (manter ultimas 50 entradas)
-- [ ] External data IPC: retorno com JSON tipado (nao regex)
+**Alta prioridade — Pipeline & Schema (3 tasks):** ✅ Validated in Phase 02: Pipeline & Schema
+- [x] Temas: deduplicacao fuzzy (substring/keyword merge)
+- [x] Health history: cleanup automatico (manter ultimas 50 entradas)
+- [x] External data IPC: retorno com JSON tipado (nao regex)
 
 **Media prioridade — GitHub Metrics + CrossAnalyzer (7 tasks):**
 - [ ] Code review depth (avgCommentsPerReview, turnaround)
@@ -91,7 +91,7 @@ Garantir que toda informacao coletada pelo pipeline seja de alta qualidade, acio
 
 ## Context
 
-**Estado atual (2026-03-31):** Branch `feat/v3-external-refinements`. Revisao extensiva identificou 101 tasks em 10 secoes (R1-R10). 66 tasks concluidas, 35 pendentes. O app esta em producao com dados reais de liderados no iCloud.
+**Estado atual (2026-03-31):** Branch `feat/v3-external-refinements`. Revisao extensiva identificou 101 tasks em 10 secoes (R1-R10). 66 tasks concluidas, 35 pendentes. Phase 02 (Pipeline & Schema) complete — theme dedup, health history compression, typed IPC. O app esta em producao com dados reais de liderados no iCloud.
 
 **Referencia de tasks:** `tasks/PLANO_REVISAO_EXTENSIVA.md` e `tasks/backlog.md` (secoes R1-R10 com criterios de aceite detalhados).
 
