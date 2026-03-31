@@ -3,6 +3,8 @@ import { join } from 'path'
 import { SettingsManager } from '../registry/SettingsManager'
 import { PersonRegistry } from '../registry/PersonRegistry'
 import { ExternalDataPass } from './ExternalDataPass'
+import { DailyReportGenerator } from './DailyReportGenerator'
+import { SprintReportGenerator } from './SprintReportGenerator'
 import { JiraClient } from './JiraClient'
 import { Logger } from '../logging/Logger'
 
@@ -45,6 +47,17 @@ export class Scheduler {
       log.info('daily trigger: iniciando refresh externo')
       await this.runForAllPeople()
       this.markDailyRun()
+
+      // Generate daily report if enabled
+      if (settings.dailyReportEnabled) {
+        try {
+          const generator = new DailyReportGenerator(this.workspacePath)
+          await generator.generate()
+          log.info('daily report gerado com sucesso')
+        } catch (err) {
+          log.warn('daily report falhou', { error: err instanceof Error ? err.message : String(err) })
+        }
+      }
     }
 
     if (jiraEnabled && settings.jiraBoardId) {
@@ -71,6 +84,41 @@ export class Scheduler {
       log.warn('refresh person falhou', { slug, error: err instanceof Error ? err.message : String(err) })
       return false
     }
+  }
+
+  /**
+   * On-demand daily report generation, triggered via IPC.
+   */
+  async generateDailyReport(): Promise<string> {
+    const generator = new DailyReportGenerator(this.workspacePath)
+    return generator.generate()
+  }
+
+  /**
+   * On-demand sprint report generation, triggered via IPC.
+   */
+  async generateSprintReport(): Promise<string | null> {
+    const settings = SettingsManager.load()
+    if (!settings.jiraEnabled || !settings.jiraBaseUrl || !settings.jiraApiToken || !settings.jiraBoardId) {
+      log.warn('sprint report requer Jira ativo com board configurado')
+      return null
+    }
+
+    const client = new JiraClient({
+      baseUrl: settings.jiraBaseUrl,
+      email: settings.jiraEmail ?? '',
+      apiToken: settings.jiraApiToken,
+      boardId: settings.jiraBoardId,
+    })
+
+    const sprint = await client.getCurrentSprint(settings.jiraBoardId)
+    if (!sprint) {
+      log.warn('nenhum sprint ativo encontrado')
+      return null
+    }
+
+    const generator = new SprintReportGenerator(this.workspacePath)
+    return generator.generate(sprint)
   }
 
   // ── Daily logic ───────────────────────────────────────────────
@@ -113,6 +161,17 @@ export class Scheduler {
 
         // Sprint changed → refresh all people
         await this.runForAllPeople()
+
+        // Generate sprint report if enabled
+        if (settings.sprintReportEnabled) {
+          try {
+            const generator = new SprintReportGenerator(this.workspacePath)
+            await generator.generate(sprint)
+            log.info('sprint report gerado com sucesso', { sprint: sprint.name })
+          } catch (err) {
+            log.warn('sprint report falhou', { error: err instanceof Error ? err.message : String(err) })
+          }
+        }
       }
     } catch (err) {
       log.warn('sprint change check falhou', { error: err instanceof Error ? err.message : String(err) })
