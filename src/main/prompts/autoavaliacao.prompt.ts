@@ -47,7 +47,10 @@ Sintetize as contribuições de ${managerName} nos três eixos de autoavaliaçã
 
 Regras:
 - o_que_fiz_e_entreguei: mínimo 3 itens. Cite datas, projetos e resultados concretos quando disponíveis.
-- como_demonstrei_valores: mínimo 2 itens. Inclua evidências específicas (situações reais).
+- como_demonstrei_valores: mínimo 2 itens. Inclua evidências específicas (situações reais). CALIBRE pelo tipo de papel:
+  - Se managerRole indica GESTÃO (ex: Engineering Manager, Tech Lead, Head of, Director): foque em comportamentos de gestão e liderança organizacional — "como facilitei o crescimento do time", "como tomei decisões sob incerteza", "como alinhei expectativas com stakeholders", "como criei ambiente de segurança psicológica", "como influenciei a direção técnica do produto".
+  - Se managerRole indica IC (ex: Software Engineer, Senior Engineer, Staff Engineer, Principal, Arquiteto): foque em comportamentos de impacto técnico e colaboração — "como contribuí para qualidade técnica", "como compartilhei conhecimento", "como elevei o padrão do time com code reviews", "como demonstrei ownership de problemas complexos", "como influenciei decisões de arquitetura".
+  - Nunca use os mesmos eixos genéricos para ambos os casos — o valor de um IC e o valor de um manager são fundamentalmente diferentes.
 - como_me_vejo_no_futuro: narrativa reflexiva em parágrafo corrido, não uma lista. Mencione onde quer chegar e o que precisa desenvolver.
 - Se não houver dados suficientes para um eixo, escreva um item honesto reconhecendo isso.
 - Escreva em português brasileiro claro e profissional.
