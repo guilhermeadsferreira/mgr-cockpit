@@ -74,8 +74,15 @@ Plans:
   2. Cada acao tem array `statusHistory[]` auditavel e sua prioridade e atualizada automaticamente pelo deep pass quando novo contexto surge
   3. O Dashboard exibe padroes detectados em multiplos perfis (insights cross-team) e o risk panel mostra pares e gestores alem de liderados
   4. A pauta de 1:1 e gerada automaticamente N dias antes do proximo encontro sem o gestor precisar acionar manualmente
-**Plans**: TBD
+**Plans**: 5 plans
 **UI hint**: yes
+
+Plans:
+- [ ] 04-01-PLAN.md — Audit trail (statusHistory[]) + sync bidirecional Jira (ACTN-03, ACTN-01)
+- [ ] 04-02-PLAN.md — Escalation de acoes gestor + prioridade via deep pass (ACTN-02, ACTN-04)
+- [ ] 04-03-PLAN.md — Evidence aggregation para PDI (ACTN-05)
+- [ ] 04-04-PLAN.md — Cross-team insights + risk panel estendido (UX-01, UX-02)
+- [ ] 04-05-PLAN.md — Agenda generation agendada pre-1:1 (UX-03)
 
 ## Progress
 
@@ -87,4 +94,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Prompt Refinements | 5/5 | Complete   | 2026-03-31 |
 | 2. Pipeline & Schema | 0/2 | Not started | - |
 | 3. GitHub Metrics & CrossAnalyzer | 0/3 | Not started | - |
-| 4. Action System & UX Avancado | 0/TBD | Not started | - |
+| 4. Action System & UX Avancado | 0/5 | Not started | - |
