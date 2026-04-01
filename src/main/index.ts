@@ -47,6 +47,11 @@ interface ExternalGitHubSnapshot {
   tempoMedioAbertoDias: number
   tempoMedioReviewDias: number
   tamanhoMedioPR: { additions: number; deletions: number }
+  avgCommentsPerReview?: number
+  firstReviewTurnaroundDias?: number
+  approvalRate?: number
+  collaborationScore?: number
+  testCoverageRatio?: number
 }
 
 interface ExternalCrossInsight {
@@ -55,6 +60,7 @@ interface ExternalCrossInsight {
   descricao: string
   evidencia?: string
   acaoSugerida?: string
+  causa_raiz?: string
 }
 
 interface ExternalDataSnapshot {

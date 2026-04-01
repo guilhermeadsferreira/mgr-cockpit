@@ -27,6 +27,11 @@ interface ExternalDataSnapshot {
     tempoMedioAbertoDias: number
     tempoMedioReviewDias: number
     tamanhoMedioPR: { additions: number; deletions: number }
+    avgCommentsPerReview?: number
+    firstReviewTurnaroundDias?: number
+    approvalRate?: number
+    collaborationScore?: number
+    testCoverageRatio?: number
   } | null
   insights: Array<{
     tipo: string
@@ -34,6 +39,7 @@ interface ExternalDataSnapshot {
     descricao: string
     evidencia?: string
     acaoSugerida?: string
+    causa_raiz?: string
   }>
 }
 
@@ -141,6 +147,11 @@ export function ExternalDataCard({ slug }: ExternalDataCardProps) {
             {data.github.prsMerged30d != null && <DataRow label="PRs merged" value={String(data.github.prsMerged30d)} />}
             {data.github.prsAbertos != null && <DataRow label="PRs abertos" value={String(data.github.prsAbertos)} />}
             {data.github.prsRevisados != null && <DataRow label="Reviews" value={String(data.github.prsRevisados)} />}
+            {data.github.avgCommentsPerReview != null && <DataRow label="Avg comments/review" value={String(data.github.avgCommentsPerReview)} />}
+            {data.github.approvalRate != null && <DataRow label="Approval rate" value={`${data.github.approvalRate}%`} />}
+            {data.github.collaborationScore != null && <DataRow label="Collaboration" value={`${data.github.collaborationScore}/100`} />}
+            {data.github.testCoverageRatio != null && <DataRow label="PRs c/ testes" value={`${data.github.testCoverageRatio}%`} />}
+            {data.github.firstReviewTurnaroundDias != null && <DataRow label="1st review turnaround" value={`${data.github.firstReviewTurnaroundDias}d`} />}
           </div>
         </div>
       )}
@@ -158,6 +169,7 @@ export function ExternalDataCard({ slug }: ExternalDataCardProps) {
                 padding: '3px 0',
               }}>
                 {insight.severidade === 'alta' ? '\u26A0\uFE0F' : insight.severidade === 'media' ? '\uD83D\uDD36' : '\u2139\uFE0F'} {insight.descricao}
+                {insight.causa_raiz && <span style={{ fontSize: 9, color: 'var(--text-muted)', marginLeft: 4 }}>({insight.causa_raiz.replace(/_/g, ' ')})</span>}
               </div>
             ))}
           </div>

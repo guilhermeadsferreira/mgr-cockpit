@@ -26,6 +26,8 @@ interface PersonWeeklyData {
   snapshot: ExternalDataSnapshot | null
   weeklyGithub: WeeklyGitHubData
   previous: WeeklyPreviousData
+  narrativeContext: string
+  baseline: { avgCommits: number; avgPRsMerged: number; avgReviews: number } | null
 }
 
 const MESES = [
@@ -94,12 +96,17 @@ export class WeeklyReportGenerator {
         }
       }
 
+      const narrativeContext = this.externalPass.extractNarrativeContext(person.slug)
+      const baseline = this.externalPass.computeBaseline3Months(person.slug)
+
       personReports.push({
         nome: person.nome,
         slug: person.slug,
         snapshot,
         weeklyGithub,
         previous,
+        narrativeContext,
+        baseline,
       })
 
       await sleep(200)
@@ -190,6 +197,10 @@ export class WeeklyReportGenerator {
     for (const report of personReports) {
       lines.push(`## ${report.nome}`, '')
 
+      if (report.narrativeContext) {
+        lines.push(`> ${report.narrativeContext}`, '')
+      }
+
       const jira = report.snapshot?.jira
       const weekly = report.weeklyGithub
 
@@ -205,6 +216,9 @@ export class WeeklyReportGenerator {
       lines.push(`- Commits: **${weekly.commits}**${formatTrend(weekly.commits, weeklyAvgCommits, 'vs avg/semana anterior')}`)
       lines.push(`- PRs merged: **${weekly.prsMerged}**${formatTrend(weekly.prsMerged, weeklyAvgPRs, 'vs avg/semana anterior')}`)
       lines.push(`- Code reviews: **${weekly.reviews}**`)
+      if (report.baseline) {
+        lines.push(`- Baseline pessoal (3 meses): commits ${report.baseline.avgCommits}/sem, PRs ${report.baseline.avgPRsMerged}/sem, reviews ${report.baseline.avgReviews}/sem`)
+      }
       totalCommits += weekly.commits
       totalPRs += weekly.prsMerged
       totalReviews += weekly.reviews

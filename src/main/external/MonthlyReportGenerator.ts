@@ -25,6 +25,8 @@ interface PersonMonthlyData {
   snapshot: ExternalDataSnapshot | null
   monthlyGithub: MonthlyGitHubData
   previous: MonthlyPreviousData
+  narrativeContext: string
+  baseline: { avgCommits: number; avgPRsMerged: number; avgReviews: number } | null
 }
 
 const MESES = [
@@ -98,12 +100,17 @@ export class MonthlyReportGenerator {
         }
       }
 
+      const narrativeContext = this.externalPass.extractNarrativeContext(person.slug)
+      const baseline = this.externalPass.computeBaseline3Months(person.slug)
+
       personReports.push({
         nome: person.nome,
         slug: person.slug,
         snapshot,
         monthlyGithub,
         previous,
+        narrativeContext,
+        baseline,
       })
 
       await sleep(200)
@@ -179,6 +186,10 @@ export class MonthlyReportGenerator {
     for (const report of personReports) {
       lines.push(`## ${report.nome}`, '')
 
+      if (report.narrativeContext) {
+        lines.push(`> ${report.narrativeContext}`, '')
+      }
+
       const jira = report.snapshot?.jira
       const monthly = report.monthlyGithub
 
@@ -191,6 +202,9 @@ export class MonthlyReportGenerator {
       lines.push(`- Commits: **${monthly.commits}**${formatTrend(monthly.commits, report.previous.commits30d, 'vs mês anterior')}`)
       lines.push(`- PRs merged: **${monthly.prsMerged}**${formatTrend(monthly.prsMerged, report.previous.prsMerged30d, 'vs mês anterior')}`)
       lines.push(`- Code reviews: **${monthly.reviews}**`)
+      if (report.baseline) {
+        lines.push(`- Baseline pessoal (3 meses): commits ${report.baseline.avgCommits}/mes, PRs ${report.baseline.avgPRsMerged}/mes, reviews ${report.baseline.avgReviews}/mes`)
+      }
       totalCommits += monthly.commits
       totalPRs += monthly.prsMerged
       totalReviews += monthly.reviews
