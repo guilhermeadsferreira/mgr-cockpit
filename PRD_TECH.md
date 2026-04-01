@@ -3,8 +3,8 @@
 > Documento vivo — atualizar a cada mudança de stack, arquitetura, schema ou convenção técnica relevante.
 
 **Criado em:** 2026-03-18
-**Status:** V1 concluída · V2 Fase 1–5 implementadas · Schema v5
-**Última atualização:** 2026-03-26
+**Status:** V1 ✅ · V2 core ✅ · V3 External Intelligence ✅ · Revisão Extensiva ✅ · Schema v5
+**Última atualização:** 2026-04-01
 
 ---
 
@@ -34,27 +34,54 @@
 ```
 Main Process (Node.js)
 ├── index.ts — BrowserWindow, lifecycle, todos os IPC handlers
+├── audit/
+│   └── SystemAuditor — verificações determinísticas (7 categorias, score 0-100)
+├── external/                        ← V3: inteligência externa
+│   ├── JiraClient — REST API com rate limiting + cache
+│   ├── JiraMetrics — cycle time, velocity, workload, blockers por pessoa
+│   ├── GitHubClient — REST API com rate limiting + cache
+│   ├── GitHubMetrics — PRs, commits, reviews, collaboration score, test coverage
+│   ├── CrossAnalyzer — insights cruzados Jira × GitHub sem IA (causa raiz, desalinhamentos)
+│   ├── ExternalDataPass — orquestrador: busca dados, calcula métricas, gera insights
+│   ├── Scheduler — refresh automático (daily 1x, sprint detection)
+│   ├── DailyReportGenerator — relatório diário com TL;DR, sprint context, análise Haiku
+│   ├── WeeklyReportGenerator — relatório semanal com trends
+│   ├── MonthlyReportGenerator — relatório mensal com velocity trend
+│   └── SprintReportGenerator — relatório de sprint com cycle time por pessoa
 ├── ingestion/
 │   ├── FileWatcher — chokidar, monitora inbox/
 │   ├── IngestionPipeline — fila paralela (max 3 simultâneos) + per-person lock
 │   ├── FileReader — lê .md/.txt/.pdf
-│   ├── ClaudeRunner — spawn do CLI headless + retry + parse JSON
+│   ├── ClaudeRunner — spawn do CLI headless + retry + parse JSON + OpenRouter fallback
 │   ├── ArtifactWriter — escreve artefato e atualiza perfil.md atomicamente (retorna totalArtefatos)
+│   ├── GeminiPreprocessor — pré-processamento de transcrições via Google AI API
 │   ├── ProfileCompressor — comprime perfil.md a cada 10 artefatos via Claude (fire-and-forget)
 │   └── SchemaValidator — valida schema do JSON retornado pelo Claude
+├── logging/
+│   ├── Logger — singleton com file rotation diária, ring buffer, ModuleLogger por módulo
+│   └── index.ts — barrel export
 ├── registry/
 │   ├── PersonRegistry — CRUD de pessoas + getPerfil (com migration automática)
-│   ├── ActionRegistry — CRUD de ações estruturadas (actions.yaml)
+│   ├── ActionRegistry — CRUD de ações estruturadas (actions.yaml) + escalations + audit trail
+│   ├── DemandaRegistry — demandas do gestor (módulo Eu)
+│   ├── CicloRegistry — entradas de ciclo do gestor
 │   ├── DetectedRegistry — pessoas detectadas, não cadastradas
 │   └── SettingsManager — ~/.pulsecockpit/settings.json
 ├── migration/
-│   └── ProfileMigration — migra perfil.md entre schema versions
+│   └── ProfileMigration — migra perfil.md entre schema versions (v1→v5)
 ├── prompts/
-│   ├── ingestion.prompt.ts
-│   ├── agenda.prompt.ts         ← suporta dadosStale para suprimir alertas
-│   ├── agenda-gestor.prompt.ts  ← pauta com o próprio gestor (roll-up do time)
-│   ├── cycle.prompt.ts          ← orçamento de 80k chars; retorna truncatedArtifacts
-│   └── compression.prompt.ts   ← compressão periódica de perfil.md
+│   ├── constants.ts              ← enums compartilhados entre prompts
+│   ├── ingestion.prompt.ts       ← two-pass (identify → enrich)
+│   ├── 1on1-deep.prompt.ts       ← V2: pass profundo de 1:1 (follow-up, insights, PDI, tendência)
+│   ├── cerimonia-sinal.prompt.ts ← V2: extrai sinais por pessoa em reuniões coletivas
+│   ├── agenda.prompt.ts          ← suporta dadosStale + ações com ciclos_sem_mencao + PDI
+│   ├── agenda-gestor.prompt.ts   ← pauta com o próprio gestor (roll-up do time)
+│   ├── cycle.prompt.ts           ← orçamento de 80k chars; evidências de promovibilidade
+│   ├── compression.prompt.ts     ← compressão periódica de perfil.md
+│   ├── autoavaliacao.prompt.ts   ← autoavaliação do gestor (módulo Eu)
+│   ├── gestor-ciclo.prompt.ts    ← ciclo do gestor com trade-offs e aprendizados
+│   ├── gemini-preprocessing.prompt.ts ← pré-processamento de transcrições (Google AI)
+│   └── daily-analysis.prompt.ts  ← V3: análise cruzada do daily via Claude Haiku
 └── workspace/
     └── WorkspaceSetup — cria estrutura de pastas + templates de artefato
 
@@ -62,21 +89,30 @@ Renderer Process (React)
 ├── App.tsx — RouterProvider + Layout shell
 ├── router.tsx — history stack simples (sem react-router)
 ├── views/
-│   ├── DashboardView — grid de cards + TeamRiskPanel (visão de risco do time)
+│   ├── DashboardView — grid de cards + TeamRiskPanel + CrossTeamInsightsPanel + UrgênciasHoje
 │   ├── InboxView — drop zone + fila de processamento
-│   ├── PersonView — cockpit individual (perfil, artefatos, pautas, relatório)
-│   ├── PersonFormView — formulário de cadastro/edição de pessoa
+│   ├── PersonView — cockpit individual (perfil, artefatos, pautas, relatório, external data)
+│   ├── PersonFormView — formulário de cadastro/edição (inclui jiraEmail, githubUsername)
 │   ├── MeetingsFeedView — feed global de artefatos
-│   ├── SettingsView — workspace, Claude CLI, notificações
+│   ├── CycleReportView — relatório de ciclo com seletor de período
+│   ├── EuView — container do módulo "Eu" (demandas + ciclo)
+│   ├── MyDemandsView — demandas do gestor com filtros e CRUD
+│   ├── MyCycleView — autoavaliação do gestor + entradas de ciclo
+│   ├── RelatoriosView — V3: browser de relatórios gerados (daily/weekly/monthly/sprint)
+│   ├── RefinamentosView — drop zone + lista de refinamentos com preview
+│   ├── AuditView — findings filtráveis do SystemAuditor
+│   ├── LogsView — log viewer com filtros, auto-scroll, export
+│   ├── SettingsView — workspace, Claude CLI, Jira/GitHub config, reingestão
 │   └── SetupView — tela de verificação do ambiente (primeira abertura)
 ├── components/
 │   ├── Sidebar.tsx — nav principal + footer do gestor
 │   ├── Layout.tsx — wrapper com sidebar fixa
-│   └── MarkdownPreview.tsx — renderização de markdown com react-markdown
+│   ├── MarkdownPreview.tsx — renderização de markdown com react-markdown
+│   └── ExternalDataCard.tsx — V3: métricas Jira/GitHub + insights no cockpit da pessoa
 └── lib/utils.ts — labelNivel, labelRelacao, daysSince, etc.
 
 IPC Bridge (preload/index.ts)
-└── contextBridge → window.api (ping, settings, people, artifacts, detected, ingestion, ai, shell, actions)
+└── contextBridge → window.api (ping, settings, people, artifacts, detected, ingestion, ai, shell, actions, insights, eu, refinamentos, external, github, audit, logs, update)
 ```
 
 ---
@@ -89,25 +125,43 @@ pulse-cockpit/
 ├── electron.vite.config.ts
 ├── tsconfig.json / tsconfig.node.json / tsconfig.web.json
 │
-├── tasks/                           # Backlog local de implementação
+├── tasks/                           # Backlog técnico local
 │   ├── backlog.md
 │   ├── active.md
-│   ├── done.md
-│   └── sequencia.md
+│   └── done.md
 │
 ├── src/
 │   ├── main/
 │   │   ├── index.ts                 # BrowserWindow, lifecycle, TODOS os IPC handlers
+│   │   ├── audit/
+│   │   │   └── SystemAuditor.ts     # verificações determinísticas (score 0-100)
+│   │   ├── external/                # V3: inteligência externa
+│   │   │   ├── JiraClient.ts        # REST API + rate limiting + cache
+│   │   │   ├── JiraMetrics.ts       # cycle time, velocity, workload, blockers
+│   │   │   ├── GitHubClient.ts      # REST API + rate limiting + cache
+│   │   │   ├── GitHubMetrics.ts     # PRs, commits, reviews, collaboration score
+│   │   │   ├── CrossAnalyzer.ts     # insights cruzados sem IA
+│   │   │   ├── ExternalDataPass.ts  # orquestrador de dados externos
+│   │   │   ├── Scheduler.ts         # refresh automático (daily, sprint detection)
+│   │   │   ├── DailyReportGenerator.ts
+│   │   │   ├── WeeklyReportGenerator.ts
+│   │   │   ├── MonthlyReportGenerator.ts
+│   │   │   └── SprintReportGenerator.ts
 │   │   ├── ingestion/
 │   │   │   ├── FileWatcher.ts
 │   │   │   ├── IngestionPipeline.ts
 │   │   │   ├── FileReader.ts
-│   │   │   ├── ClaudeRunner.ts
+│   │   │   ├── ClaudeRunner.ts      # spawn CLI + OpenRouter fallback
 │   │   │   ├── ArtifactWriter.ts
+│   │   │   ├── GeminiPreprocessor.ts # pré-processamento via Google AI
+│   │   │   ├── ProfileCompressor.ts
 │   │   │   └── SchemaValidator.ts   # valida JSON do Claude antes de usar
+│   │   ├── logging/
+│   │   │   ├── Logger.ts            # singleton, file rotation, ring buffer
+│   │   │   └── index.ts
 │   │   ├── registry/
 │   │   │   ├── PersonRegistry.ts
-│   │   │   ├── ActionRegistry.ts    # ações estruturadas + follow-up + criação via 1on1
+│   │   │   ├── ActionRegistry.ts    # ações + escalation + audit trail (statusHistory)
 │   │   │   ├── DemandaRegistry.ts   # demandas do gestor (módulo Eu)
 │   │   │   ├── CicloRegistry.ts     # entradas de ciclo do gestor
 │   │   │   ├── DetectedRegistry.ts
@@ -115,15 +169,18 @@ pulse-cockpit/
 │   │   ├── migration/
 │   │   │   └── ProfileMigration.ts  # migração automática v1→v5
 │   │   ├── prompts/
+│   │   │   ├── constants.ts         # enums compartilhados entre prompts
 │   │   │   ├── ingestion.prompt.ts
-│   │   │   ├── 1on1-deep.prompt.ts  # V2: Pass de 1:1 profundo
+│   │   │   ├── 1on1-deep.prompt.ts  # pass profundo de 1:1
 │   │   │   ├── cerimonia-sinal.prompt.ts
-│   │   │   ├── agenda.prompt.ts     # V2: enriquecida com insights, sinais, PDI
+│   │   │   ├── agenda.prompt.ts     # enriquecida com insights, sinais, PDI
 │   │   │   ├── agenda-gestor.prompt.ts
-│   │   │   ├── cycle.prompt.ts      # V2: enriquecido com insights, correlações
-│   │   │   ├── gestor-ciclo.prompt.ts
+│   │   │   ├── cycle.prompt.ts      # orçamento 80k chars, evidências promovibilidade
+│   │   │   ├── compression.prompt.ts
 │   │   │   ├── autoavaliacao.prompt.ts
-│   │   │   └── compression.prompt.ts
+│   │   │   ├── gestor-ciclo.prompt.ts
+│   │   │   ├── gemini-preprocessing.prompt.ts
+│   │   │   └── daily-analysis.prompt.ts  # V3: análise cruzada via Haiku
 │   │   └── workspace/
 │   │       └── WorkspaceSetup.ts    # cria dirs + templates de artefato
 │   │
@@ -136,17 +193,26 @@ pulse-cockpit/
 │       │   ├── ipc.ts               # tipos compartilhados main/renderer
 │       │   └── global.d.ts
 │       ├── views/
-│       │   ├── DashboardView.tsx    # suporta prop relacao + TeamRiskPanel
+│       │   ├── DashboardView.tsx    # cards + TeamRiskPanel + CrossTeamInsights + Urgências
 │       │   ├── InboxView.tsx
-│       │   ├── PersonView.tsx
-│       │   ├── PersonFormView.tsx
+│       │   ├── PersonView.tsx       # cockpit individual + external data
+│       │   ├── PersonFormView.tsx   # inclui jiraEmail, githubUsername
+│       │   ├── CycleReportView.tsx
 │       │   ├── MeetingsFeedView.tsx
-│       │   ├── SettingsView.tsx
+│       │   ├── EuView.tsx           # container módulo "Eu"
+│       │   ├── MyDemandsView.tsx
+│       │   ├── MyCycleView.tsx
+│       │   ├── RelatoriosView.tsx   # V3: browser de relatórios
+│       │   ├── RefinamentosView.tsx
+│       │   ├── AuditView.tsx
+│       │   ├── LogsView.tsx
+│       │   ├── SettingsView.tsx     # inclui config Jira/GitHub
 │       │   └── SetupView.tsx
 │       ├── components/
 │       │   ├── Sidebar.tsx
 │       │   ├── Layout.tsx
-│       │   └── MarkdownPreview.tsx
+│       │   ├── MarkdownPreview.tsx
+│       │   └── ExternalDataCard.tsx # V3: métricas Jira/GitHub no cockpit
 │       └── lib/utils.ts
 ```
 
@@ -321,15 +387,53 @@ A migração é transparente — aplicada em `PersonRegistry.getPerfil()` e pers
 | `ai:generate-agenda` | renderer → main | Gera pauta de 1:1 |
 | `ai:cycle-report` | renderer → main | Relatório de ciclo/avaliação |
 | `shell:open` | renderer → main | Abre arquivo no editor externo |
-| `ingestion:batch-reingest` | renderer → main | V2: reingestão em batch (lista de paths) |
-| `ingestion:reset-data` | renderer → main | V2: limpa dados gerados preservando config |
-| `ingestion:list-processados` | renderer → main | V2: lista arquivos em inbox/processados/ |
+| `ingestion:batch-reingest` | renderer → main | Reingestão em batch (lista de paths) |
+| `ingestion:reset-data` | renderer → main | Limpa dados gerados preservando config |
+| `ingestion:reset-person-data` | renderer → main | Limpa dados de uma pessoa específica |
+| `ingestion:list-processados` | renderer → main | Lista arquivos em inbox/processados/ |
+| `insights:cross-team` | renderer → main | Padrões detectados em múltiplos perfis |
+| `demandas:list` | renderer → main | Lista demandas do gestor |
+| `demandas:list-by-person` | renderer → main | Demandas do gestor por pessoa |
+| `demandas:save` | renderer → main | Cria/atualiza demanda |
+| `demandas:delete` | renderer → main | Remove demanda |
+| `demandas:update-status` | renderer → main | Atualiza status de demanda |
+| `ciclo:list` | renderer → main | Lista entradas de ciclo do gestor |
+| `ciclo:add-manual` | renderer → main | Adiciona entrada manual ao ciclo |
+| `ciclo:delete` | renderer → main | Remove entrada de ciclo |
+| `ciclo:ingest-artifact` | renderer → main | Ingere artefato no ciclo do gestor |
+| `ciclo:autoavaliacao` | renderer → main | Gera autoavaliação do gestor |
+| `refinamentos:list` | renderer → main | Lista refinamentos |
+| `refinamentos:save` | renderer → main | Salva refinamento (copia para workspace) |
+| `refinamentos:read` | renderer → main | Lê conteúdo de refinamento |
+| `refinamentos:delete` | renderer → main | Remove refinamento |
+| `external:refresh-daily` | renderer → main | V3: gera daily report |
+| `external:refresh-sprint` | renderer → main | V3: gera sprint report |
+| `external:refresh-weekly` | renderer → main | V3: gera weekly report |
+| `external:refresh-monthly` | renderer → main | V3: gera monthly report |
+| `external:refresh-person` | renderer → main | V3: refresh dados externos de uma pessoa |
+| `external:get-data` | renderer → main | V3: retorna dados externos de uma pessoa |
+| `external:get-historico` | renderer → main | V3: histórico mensal de dados externos |
+| `external:list-reports` | renderer → main | V3: lista relatórios gerados em disco |
+| `external:get-report` | renderer → main | V3: lê conteúdo de um relatório |
+| `external:regenerate-report` | renderer → main | V3: regenera um relatório |
+| `github:sync-team-repos` | renderer → main | V3: sincroniza repos do time |
+| `audit:run` | renderer → main | Executa auditoria do sistema |
+| `log:write` | renderer → main | Escreve log do renderer no main |
+| `log:recent` | renderer → main | Consulta logs recentes (ring buffer) |
+| `log:files` | renderer → main | Lista arquivos de log em disco |
+| `log:read-file` | renderer → main | Lê arquivo de log completo |
+| `update:install` | renderer → main | Instala atualização disponível |
+| `update:get-status` | renderer → main | Consulta status de atualização |
+| `people:rate-pauta` | renderer → main | Avalia qualidade de uma pauta gerada |
+| `people:list-pauta-ratings` | renderer → main | Lista avaliações de pautas |
+| `people:last-resumo-rh` | renderer → main | Último resumo executivo RH da pessoa |
+| `actions:delete` | renderer → main | Remove ação |
+| `actions:escalations` | renderer → main | Lista ações escaladas (14+ dias vencidas) |
 | `ingestion:started` | main → renderer | Arquivo entrou na fila |
 | `ingestion:completed` | main → renderer | Ingestão concluída |
 | `ingestion:failed` | main → renderer | Erro no processamento |
-| `ingestion:1on1-deep-completed` | main → renderer | V2: Pass de 1:1 concluído |
-| `ingestion:batch-progress` | main → renderer | V2: progresso da reingestão |
-| `ingestion:batch-completed` | main → renderer | V2: reingestão batch concluída |
+| `update:status` | main → renderer | Status de atualização do app |
+| `log:entry` | main → renderer | Push de novo log entry em real-time |
 
 ---
 

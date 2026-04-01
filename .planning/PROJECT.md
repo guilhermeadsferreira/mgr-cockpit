@@ -1,137 +1,125 @@
-# Pulse Cockpit — Revisao Extensiva
+# Pulse Cockpit
 
-## What This Is
+## O que é
 
-Pulse Cockpit e um app desktop (Electron + React) para gestores de tecnologia que transforma transcricoes e anotacoes de cerimonias (1:1s, dailies, plannings, retros) num sistema vivo de inteligencia sobre pessoas. O nucleo (V1), qualidade de ingestao (V2) e inteligencia externa Jira/GitHub (V3) estao em producao. Este milestone foca em curadoria e qualidade: refinar prompts, pipeline, metricas e UX a partir de uma revisao extensiva que identificou 101 gaps (66 ja corrigidos, 35 pendentes).
+App desktop (Electron + React) para gestores de tecnologia que transforma transcricoes, anotacoes e dados de cerimonias (1:1s, dailies, plannings, retros) num sistema vivo de inteligencia sobre pessoas. O gestor arrasta um arquivo na inbox, a IA analisa, e o perfil de cada pessoa cresce com o tempo — alimentando pautas, alertas e relatorios de ciclo.
 
-## Core Value
+## Persona
 
-Garantir que toda informacao coletada pelo pipeline seja de alta qualidade, acionavel e visivel para o gestor.
+**Guilherme** — Engineering Manager de fintech, 8-12 reports diretos entre liderados, pares e gestores. Faz 1:1s semanais/quinzenais, conduz plannings e retros, defende liderados em foruns de calibracao trimestrais. Ja usa transcricao automatica (Gemini no Meet) e Claude Code CLI no dia a dia. Quer parar de gerir de cabeca.
 
-## Requirements
+**Dores reais:**
+- Chega no forum de calibracao sem evidencias concretas — compila tudo na vespera
+- Pautas de 1:1 genericas porque nao lembra o que aconteceu nas ultimas semanas
+- Acoes comprometidas em reunioes se perdem — ninguem cobra, ninguem rastreia
+- Nao sabe quem do time esta travado ate que ja e tarde demais
+- Dados de gestao espalhados em Notion, Drive, Slack, email e memoria
 
-### Validated
+**Comportamento:** power user tecnico. Prefere dados locais, markdown, CLI. Nao quer SaaS de RH. Quer algo que funcione como "segundo cerebro" — ele alimenta, o sistema acumula e devolve inteligencia.
 
-- ✓ People Registry: CRUD com config.yaml por pessoa — v1
-- ✓ Inbox + Pipeline de ingestao two-pass (Pass 1 sem perfil, Pass 2 com perfil) — v1
-- ✓ Perfil Vivo: escrita, atualizacao e migracao automatica de schema — v1
-- ✓ Action Loop: actions.yaml estruturado com rastreamento de acoes comprometidas — v1
-- ✓ Pauta de 1:1 sob demanda com contexto acumulado — v1
-- ✓ Pauta com o gestor (roll-up do time com saude dos liderados) — v1
-- ✓ Relatorio de Ciclo com flag de promovibilidade e evidencias — v1
-- ✓ Dashboard + Painel de Riscos do Time — v1
-- ✓ Modulo "Eu": demandas do gestor, ciclo pessoal, autoavaliacao — v1
-- ✓ Pass de 1:1 profundo: follow-ups, compromissos tacitos, insights, correlacoes — v2
-- ✓ Pass de Cerimonia refinado: skills com evidencia, cruzamento com perfil — v2
-- ✓ External Intelligence: Jira + GitHub metrics, CrossAnalyzer, relatorios — v3
-- ✓ PDI como cidadao de primeira classe na UI — revisao R4
-- ✓ Dados externos em aba dedicada com historico — revisao R4
-- ✓ SinceLastMeetingCard: mudancas desde ultimo 1:1 — revisao R4
-- ✓ PromptConstants compartilhados entre prompts — revisao R2
-- ✓ Sentimentos como array contextual — revisao R2
-- ✓ Thresholds calibraveis por nivel/cargo — revisao R3
-- ✓ Insights positivos no CrossAnalyzer — revisao R3
-- ✓ Trend indicators nos relatorios — revisao R3
-- ✓ Loops de retroalimentacao corrigidos (6 pontos) — revisao R1
+## JTBD
 
-### Active
+**Job principal:**
+> Quando estou num forum de calibracao defendendo um liderado, quero ter uma narrativa clara com evidencias da evolucao dele no ciclo — para defender com confianca se merece promocao, ficou acima/abaixo das expectativas e qual foi seu papel nos desafios do time.
 
-<!-- 35 tasks pendentes da revisao extensiva, organizadas por prioridade -->
+**Jobs secundarios:**
+- Antes de um 1:1, ter pauta gerada com base no historico real da pessoa
+- Ser alertado sobre liderados sem contato recente ou com sinais de risco
+- Rastrear acoes comprometidas sem esforco manual
+- Ter visao consolidada do time: quem precisa de atencao agora
 
-**Alta prioridade — Prompt Refinements (17 tasks):**
-- [ ] Ingestion: campo `pessoas_esperadas_ausentes` para cerimonias
-- [ ] Ingestion: early stagnation detection nos primeiros 3 meses
-- [ ] 1on1-deep: tendencia emocional requer 2+ entradas para "deteriorando"
-- [ ] Cerimonia: participacao minima diferenciada por tipo (daily/planning/retro)
-- [ ] Cerimonia: saude calibrada por cargo/nivel
-- [ ] Compression: harmonizar definicao de "ponto resolvido"
-- [ ] Compression: conquistas preservam titulo + outcome
-- [ ] Cycle: linha_do_tempo flexivel (5-10 eventos)
-- [ ] Cycle: expectativas benchmarked por cargo
-- [ ] Cycle: evidencias de promovibilidade nunca triviais
-- [ ] Autoavaliacao: valores calibrados por cargo
-- [ ] Autoavaliacao: desafios reconhecidos como campo
-- [ ] Gemini: mode detection por conteudo (nao filename)
-- [ ] Gemini: emotional content em full mode
-- [ ] Gemini: speaker identification confidence
-- [ ] Gestor-ciclo: decisao = trade-off explicito
-- [ ] Gestor-ciclo: aprendizado obrigatorio (min 1)
+## Principios de produto
 
-**Alta prioridade — Pipeline & Schema (3 tasks):** ✅ Validated in Phase 02: Pipeline & Schema
-- [x] Temas: deduplicacao fuzzy (substring/keyword merge)
-- [x] Health history: cleanup automatico (manter ultimas 50 entradas)
-- [x] External data IPC: retorno com JSON tipado (nao regex)
+1. **Acumulacao > feature.** O valor do Pulse vem do efeito composto: cada ingestao enriquece o perfil, que melhora a pauta, que melhora o 1:1, que gera melhor transcricao. Priorizar qualidade do que ja existe sobre adicionar coisas novas.
 
-**Media prioridade — GitHub Metrics + CrossAnalyzer (7 tasks):** ✅ Validated in Phase 03: GitHub Metrics & CrossAnalyzer
-- [x] Code review depth (avgCommentsPerReview, turnaround)
-- [x] Collaboration score (co-authors, cross-team)
-- [x] Test coverage trend per PR
-- [x] CrossAnalyzer: campo causa_raiz nos insights
-- [x] CrossAnalyzer: desalinhamento checado contra contexto (ferias, licenca)
-- [x] Relatorios: narrative context paragraph do perfil
-- [x] Relatorios: baseline comparison pessoal (media 3 meses)
+2. **O app encontra o gestor.** Alertas, pautas e briefings aparecem sem o gestor precisar procurar. O default e proatividade, nao navegacao.
 
-**Baixa prioridade — Action System + UX Avancado (8 tasks):**
-- [ ] Sync bidirecional acoes <> Jira (auto-fechar quando issue Done)
-- [ ] Insights cross-team (padroes em multiplos perfis)
-- [ ] Risk panel para pares e gestores (nao so liderados)
-- [ ] Escalation: acao vencida do gestor gera follow-up para liderado
-- [ ] Action audit trail: statusHistory[]
-- [ ] Prioridade de acoes atualizada pelo deep pass
-- [ ] Evidence aggregation para PDI
-- [ ] Agenda generation agendada (pre-1:1 automatico)
+3. **IA sugere, gestor decide.** Nenhum dado e sobrescrito automaticamente sem confirmacao. O gestor e o dono do contexto — a IA e assistente, nao autora.
 
-### Out of Scope
+4. **Dados locais, transparentes, portaveis.** Tudo em Markdown + YAML no disco. Sem servidor, sem banco, sem lock-in. O gestor pode abrir qualquer arquivo no VS Code.
 
-- Features novas nao mapeadas na revisao extensiva — foco e curadoria, nao expansao
-- Entidade Projeto (projetos/{slug}) — requer novo modelo de dados
-- Integracao MCP com Slack — requer novo adapter de ingestao
-- API Anthropic ou SDK direto — decisao arquitetural: sempre Claude Code CLI
-- Testes automatizados — abordagem defensiva, validacao via uso real
+5. **Cirurgico, nao ambicioso.** Mudancas pequenas e precisas que melhoram o que existe. Sem refatoracoes largas. Sem features especulativas. Sem abstractions prematuros.
 
-## Context
+6. **Qualidade de extracao e tudo.** Se o prompt extrai mal, todo o sistema degrada. Prompt refinement e a alavanca de maior impacto.
 
-**Estado atual (2026-04-01):** Branch `feat/v3-external-refinements`. Revisao extensiva identificou 101 tasks em 10 secoes (R1-R10). 73 tasks concluidas, 28 pendentes. Phase 03 (GitHub Metrics & CrossAnalyzer) complete — advanced review/collaboration/test metrics, causa_raiz in CrossAnalyzer, narrative context and baseline comparison in reports. O app esta em producao com dados reais de liderados no iCloud.
+## Como geramos valor
 
-**Referencia de tasks:** `tasks/PLANO_REVISAO_EXTENSIVA.md` e `tasks/backlog.md` (secoes R1-R10 com criterios de aceite detalhados).
+```
+Gestor ingere artefato (transcricao, anotacao, PDF)
+  → IA analisa em 2 passes (sem contexto → com perfil acumulado)
+    → Perfil Vivo cresce (resumo evolutivo, acoes, temas, saude, sentimento)
+      → Pauta de 1:1 usa contexto acumulado → 1:1 melhor → transcricao mais rica
+      → Alertas proativos (risco, estagnacao, 1:1 atrasado)
+      → Relatorio de Ciclo com evidencias concretas para calibracao
+```
 
-**Arquitetura:** Electron (Main Process + Renderer React). IA via `child_process.spawn('claude', ['-p', prompt])`. Workspace em disco (Markdown + YAML) sincronizado com iCloud Drive.
+**Loop central:** ingestao → perfil mais rico → outputs melhores → gestor ingere mais.
 
-**Cobertura de testes:** Zero. Qualidade garantida por revisao manual e uso real. Mudancas cirurgicas, nao refatoracoes amplas.
+## O que ja foi entregue
+
+- **V1 core:** People Registry, Inbox + Pipeline two-pass, Perfil Vivo, Pauta 1:1, Relatorio de Ciclo, Dashboard + TeamRiskPanel
+- **V2 core:** Pipeline paralelo, schema v5, Action Loop com audit trail e escalation, alertas inteligentes, Modulo "Eu" (demandas + autoavaliacao), templates de artefato, flag_promovibilidade com evidencias
+- **V3 External Intelligence:** JiraClient, GitHubClient, metricas (cycle time, velocity, code review depth, collaboration score), CrossAnalyzer, 4 report generators (daily/weekly/monthly/sprint), RelatoriosView
+- **Revisao Extensiva:** 17 prompt refinements, pipeline & schema cleanup, GitHub metrics avancados, action system com audit trail, cross-team insights, agenda generation agendada
+
+## Backlog — ideias e features futuras
+
+> Itens para considerar em futuros milestones. Nao sao compromissos — sao opcoes.
+
+### Alta prioridade (proximo milestone provavel)
+
+- **View Hoje / Esta Semana** — ancora de habito diario: "quem tenho 1:1 essa semana?", "quais acoes vencem hoje?", "alertas ativos"
+- **Icone do app** (macOS .icns) — identidade visual pendente
+- **Font family** — inconsistencia atual (DM Sans no CSS, Inter no Tailwind). Bench de 10 fontes.
+- **Action Loop surfaces restantes** — follow-ups na pauta automatico, widget de acoes no dashboard, editar prazo na UI
+
+### Media prioridade
+
+- **Integracao Slack MCP** — ingestao passiva de mensagens de canais do time
+- **Entidade Projeto** — perfil vivo por projeto, analogo ao perfil de pessoas
+- **Revisao de notas manuais pos-ciclo** — IA sugere atualizacao de notas_manuais apos gerar relatorio
+- **PDI com UI dedicada** — evidence aggregation ja existe no deep pass, falta view propria
+- **Caso de promocao** — gerado pela IA com base no perfil + projetos + artefatos
+
+### Baixa prioridade / exploratoria
+
+- **Modulo de Incidentes** — cockpit le repo git de IRs, calcula disponibilidade por BU
+- **Knowledge Base de sistemas** — docs de sistemas com consulta via IA
+- **Google Drive integration** — monitorar pasta de transcricoes sem download manual
+- **Session learning** — log de sessao ao fechar o app (artefatos processados, temas abordados)
+- **Alertas inteligentes avancados** — negligencia (atencao desigual), estagnacao (tema repetido 3+x), evolucao comprovada
+- **Feed de reunioes** — timeline reversa filtavel (ja existe MeetingsFeedView, melhorar)
+- **Weekly Digest** — agregacao semanal (time + eu + jira)
+- **Tags de skills** — inferidas automaticamente de artefatos
+- **Frameworks por cargo** — mapeamento cargo → framework em prompts
+
+### Tecnico (backlog de qualidade)
+
+- **T-R6.19** — Evidencias nunca triviais: guard nos prompts rejeitando "participou da reuniao"
+- **T6.3** — Cycle time por pessoa no Sprint Report (dado existe, falta expor)
+- **T6.4** — Lead time do time no Weekly Report (metrica nova)
+- **T6.5** — Velocity trend no Monthly Report (historico de SP)
+- **T6.2** — PR sem reviewer (alerta especifico no CrossAnalyzer)
+- **T-R10.4** — Schema validation no retorno de dados externos (Zod)
+- **T-R5.2** — Sync bidirecional acoes ↔ Jira (direcao inversa: issue → acao)
 
 ## Constraints
 
 - **Producao:** App em uso real com dados irreversiveis — nenhuma operacao destrutiva sem confirmacao
-- **Tech stack:** Electron + React + TypeScript — nao mudar sem PDR
+- **Tech stack:** Electron + React + TypeScript — nao mudar
 - **IA:** Exclusivamente Claude Code CLI (`claude -p`) — nunca SDK/API
 - **Dados:** Workspace em disco (Markdown + YAML) — sem banco de dados
 - **Schema:** Mudancas em perfil.md devem ser aditivas; nunca remover campos sem migration
 - **Sem testes:** Zero coverage — priorizar mudancas cirurgicas
 
-## Key Decisions
+## Criterios de sucesso
 
-| Decision | Rationale | Outcome |
-|----------|-----------|---------|
-| Migrar tracking de pm-agent para GSD | Centralizar gestao de projeto num unico sistema (GSD) em vez de manter pm-agent + tasks/ em paralelo | -- Pending |
-| Priorizar prompt refinements sobre metricas avancadas | Prompts afetam qualidade de TODA ingestao; metricas avancadas sao aditivas | -- Pending |
-| Manter tasks/ como referencia historica | backlog.md e done.md contem criterios de aceite detalhados uteis durante implementacao | -- Pending |
-
-## Evolution
-
-This document evolves at phase transitions and milestone boundaries.
-
-**After each phase transition** (via `/gsd:transition`):
-1. Requirements invalidated? -> Move to Out of Scope with reason
-2. Requirements validated? -> Move to Validated with phase reference
-3. New requirements emerged? -> Add to Active
-4. Decisions to log? -> Add to Key Decisions
-5. "What This Is" still accurate? -> Update if drifted
-
-**After each milestone** (via `/gsd:complete-milestone`):
-1. Full review of all sections
-2. Core Value check — still the right priority?
-3. Audit Out of Scope — reasons still valid?
-4. Update Context with current state
+| Metrica | Meta |
+|---------|------|
+| Tempo para gerar relatorio de ciclo | < 2 minutos |
+| Esforco de preparacao para forum | De 2h+ → < 20min |
+| Ingestao semanal apos 30 dias | >= 1 artefato/semana |
+| Pauta util (gestor nao descarta) | >= 80% das pautas geradas |
 
 ---
-*Last updated: 2026-04-01 after Phase 03 completion (GitHub Metrics & CrossAnalyzer)*
+*Last updated: 2026-04-01*

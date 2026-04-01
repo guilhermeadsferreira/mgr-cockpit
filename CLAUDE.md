@@ -1,4 +1,4 @@
-# MgrCockpit — CLAUDE.md
+# Pulse Cockpit — CLAUDE.md
 
 ---
 
@@ -18,66 +18,33 @@
 
 ---
 
-## PM Agent
+## Planejamento — GSD (source of truth)
 
-A documentação de produto deste projeto vive no PM Agent:
-
-**Caminho:** `/Users/guilhermeaugusto/Documents/workspace-projects/pm-agent/projects/pulse-cockpit/`
+Todo o planejamento de produto e técnico vive no GSD:
 
 ```
-pm-agent/projects/pulse-cockpit/
-├── README.md          ← visão PM: o que é, status, decisões-chave
-├── PRD.md             ← requisitos de produto (documento vivo)
-├── decisions/         ← PDRs (Product Decision Records)
-├── tasks/
-│   ├── backlog.md     ← features e tarefas planejadas
-│   ├── active.md      ← o que está em andamento agora
-│   └── done.md        ← concluídas
-└── docs/              ← PITCH.md, PRODUCT_STATUS.md (quando criados)
+.planning/
+├── PROJECT.md     ← visão de produto, persona, principios, backlog de ideias
+├── ROADMAP.md     ← phases do milestone atual
+├── REQUIREMENTS.md ← requirements com traceability
+├── STATE.md       ← estado atual do milestone
+└── phases/        ← plans e verificações por phase
 ```
 
-**Antes de implementar qualquer feature:** consulte `tasks/backlog.md` e `tasks/active.md` para entender o que está planejado e priorizado.
+**Antes de implementar qualquer feature:** consulte `.planning/PROJECT.md` (backlog) e `.planning/ROADMAP.md` (phases).
 
----
+**Para planejar:** use `/gsd:discuss-phase` → `/gsd:plan-phase` → `/gsd:execute-phase`.
+**Para ideias rápidas:** use `/gsd:add-backlog` ou edite o backlog no PROJECT.md.
 
-## Tasks locais (auditoria técnica)
+### Referência técnica
 
-Este repo mantém um diretório `/tasks` com o plano de execução da auditoria técnica (TECH.md):
+- **PRD_TECH.md** (raiz do repo) — arquitetura, schema, IPC channels, prompts
+- **PITCH.md** (raiz do repo) — positioning do produto
 
-```
-tasks/
-├── backlog.md    ← tarefas identificadas na auditoria, ainda não iniciadas
-├── active.md     ← tarefas em andamento
-├── done.md       ← tarefas concluídas (com data e resultado)
-└── sequencia.md  ← sequência de execução recomendada (Fase 1 → 2 → 3)
-```
+### Histórico
 
-Estas tasks são independentes do pm-agent — rastreiam issues técnicas (bugs, débito, arquitetura), não features de produto.
-
----
-
-## Living Documentation
-
-A documentação de produto vive **no PM Agent**, não neste repo.
-
-**Caminho para docs de produto:** `/Users/guilhermeaugusto/Documents/workspace-projects/pm-agent/projects/pulse-cockpit/docs/`
-
-| Situação | Documento a atualizar |
-|----------|----------------------|
-| Adicionei, conclui ou removi uma feature | `docs/PRODUCT_STATUS.md` no pm-agent |
-| Mudei escopo ou público-alvo | `docs/PITCH.md` no pm-agent |
-| Mudei stack, arquitetura, schema, rotas ou convenções técnicas | `PRD_TECH.md` na raiz deste repo |
-| Conclui uma task | Mover de `tasks/active.md` para `tasks/done.md` no pm-agent |
-
-A documentação técnica vive em `PRD_TECH.md` na raiz **deste repo**.
-
-### Checklist pré-commit obrigatório
-
-- [ ] Adicionei, conclui ou removi uma feature? → atualizar `docs/PRODUCT_STATUS.md` no pm-agent
-- [ ] Mudei stack, arquitetura, schema, rotas ou convenções técnicas? → atualizar `PRD_TECH.md` neste repo
-- [ ] Mudei escopo ou público-alvo? → atualizar `docs/PITCH.md` no pm-agent
-- [ ] Conclui uma task? → mover de `tasks/active.md` para `tasks/done.md` no pm-agent
-- [ ] Atualizei algum doc? → bumpar "Última atualização" nesse doc
+- `tasks/done.md` — histórico de tasks técnicas concluídas (referência, não ativo)
+- pm-agent (`pm-agent/projects/pulse-cockpit/`) — arquivado, não usar para planejamento
 
 ---
 
@@ -94,41 +61,36 @@ O usuário deve ter o Claude Code CLI instalado e autenticado localmente. O path
 
 ---
 
-## PRD
-
-- **PRD de produto:** `/Users/guilhermeaugusto/Documents/workspace-projects/pm-agent/projects/pulse-cockpit/PRD.md`
-- **PRD técnico:** `PRD_TECH.md` (na raiz deste repo)
-
----
-
-## PRD_TECH — o que atualizar durante a implementação
+## PRD_TECH.md — quando atualizar
 
 O `PRD_TECH.md` é o documento vivo da implementação. Atualizar sempre que:
 
 | Mudança | Seção a atualizar |
 |---------|------------------|
-| Nova dependência adicionada ao package.json | Stack |
-| Mudança na estrutura de pastas do projeto | Estrutura de Arquivos do Projeto |
+| Nova dependência | Stack |
+| Mudança na estrutura de pastas | Estrutura de Arquivos do Projeto |
 | Mudança no schema do config.yaml ou perfil.md | Modelagem de Dados |
 | Novo IPC channel ou mudança de contrato | IPC Channels |
-| Mudança no prompt de ingestão/pauta/ciclo | Prompts — Estrutura |
-| Fase concluída ou replaneada | Plano de Implementação V1 |
-| Novo risco identificado ou mitigado | Riscos Técnicos |
-| Scripts npm definidos na Fase 0 | Comandos |
+| Mudança em prompt | Prompts — Estrutura |
+| Novo risco identificado | Riscos Técnicos |
 
 <!-- GSD:project-start source:PROJECT.md -->
 ## Project
 
-**Pulse Cockpit — Revisao Extensiva**
+**Pulse Cockpit** — app desktop (Electron + React) para gestores de tecnologia. Transforma transcricoes e anotacoes em inteligencia sobre pessoas. V1 + V2 + V3 + Revisao Extensiva em producao.
 
-Pulse Cockpit e um app desktop (Electron + React) para gestores de tecnologia que transforma transcricoes e anotacoes de cerimonias (1:1s, dailies, plannings, retros) num sistema vivo de inteligencia sobre pessoas. O nucleo (V1), qualidade de ingestao (V2) e inteligencia externa Jira/GitHub (V3) estao em producao. Este milestone foca em curadoria e qualidade: refinar prompts, pipeline, metricas e UX a partir de uma revisao extensiva que identificou 101 gaps (66 ja corrigidos, 35 pendentes).
+**Core Value:** Acumulacao de contexto ao longo do tempo — cada ingestao enriquece o perfil, que melhora pautas, alertas e relatorios de ciclo.
 
-**Core Value:** Garantir que toda informacao coletada pelo pipeline seja de alta qualidade, acionavel e visivel para o gestor.
+**Persona:** Engineering Manager de fintech, 8-12 reports, power user tecnico. Quer parar de gerir de cabeca.
+
+**Principios:** Acumulacao > feature. O app encontra o gestor. IA sugere, gestor decide. Dados locais. Cirurgico, nao ambicioso. Qualidade de extracao e tudo.
+
+Para contexto completo de produto, persona, JTBD e backlog: `.planning/PROJECT.md`
 
 ### Constraints
 
 - **Producao:** App em uso real com dados irreversiveis — nenhuma operacao destrutiva sem confirmacao
-- **Tech stack:** Electron + React + TypeScript — nao mudar sem PDR
+- **Tech stack:** Electron + React + TypeScript — nao mudar
 - **IA:** Exclusivamente Claude Code CLI (`claude -p`) — nunca SDK/API
 - **Dados:** Workspace em disco (Markdown + YAML) — sem banco de dados
 - **Schema:** Mudancas em perfil.md devem ser aditivas; nunca remover campos sem migration

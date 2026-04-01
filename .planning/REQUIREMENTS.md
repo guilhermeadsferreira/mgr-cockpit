@@ -59,24 +59,24 @@ Requirements para este milestone. Cada um mapeia para phases do roadmap.
 - [x] **MTRC-01**: Code review depth: avgCommentsPerReview, turnaround de primeira review, approval rate
 - [x] **MTRC-02**: Collaboration score (0-100): co-authored commits, PRs cross-repo, mentions em issues
 - [x] **MTRC-03**: Test coverage trend: % de PRs com mudancas de teste, trend historico
-- [ ] **MTRC-04**: CrossAnalyzer inclui campo `causa_raiz` nos insights (awaiting review vs changes vs stale)
-- [ ] **MTRC-05**: Desalinhamento checado contra contexto do perfil (ferias, licenca) antes de flaggar
+- [ ] **MTRC-04**: ~~CrossAnalyzer inclui campo `causa_raiz` nos insights~~ → Deferred to backlog (causa_raiz parcialmente implementada via CrossAnalyzer V3)
+- [ ] **MTRC-05**: ~~Desalinhamento checado contra contexto do perfil~~ → Deferred to backlog (analyzeCommunicationGap + analyzeActivityDrop cobrem parcialmente)
 - [x] **MTRC-06**: Relatorios incluem narrative context paragraph injetado do perfil
 - [x] **MTRC-07**: Relatorios incluem baseline comparison pessoal (media dos ultimos 3 meses)
 
 ### Action System Avancado
 
-- [ ] **ACTN-01**: Sync bidirecional acoes <> Jira: issue fechada no Jira auto-fecha acao no app
-- [ ] **ACTN-02**: Escalation: acao vencida do gestor gera follow-up automatico para liderado
-- [ ] **ACTN-03**: Action audit trail: array `statusHistory[]` com status, date, source
-- [ ] **ACTN-04**: Prioridade de acoes atualizada automaticamente pelo deep pass
-- [ ] **ACTN-05**: Evidence aggregation: multiplos artefatos acumulam evidencias para mesmo objetivo PDI
+- [x] **ACTN-01**: Sync bidirecional acoes <> Jira — unidirecional implementado (Jira→Done fecha ação); bidirecional completo deferred
+- [x] **ACTN-02**: Escalation: `getEscalations()` implementado no ActionRegistry (14+ dias)
+- [x] **ACTN-03**: Action audit trail: `statusHistory[]` implementado com 6 sources
+- [x] **ACTN-04**: Prioridade atualizada pelo deep pass — `OneOnOnePrioridadeAtualizada[]`
+- [x] **ACTN-05**: Evidence aggregation: `PDIItem.evidencias[]` + `OneOnOneFollowup.evidencia`
 
 ### UX Avancado
 
 - [x] **UX-01**: Insights cross-team: padroes detectados em multiplos perfis exibidos no Dashboard
 - [x] **UX-02**: Risk panel estendido para pares e gestores (nao apenas liderados)
-- [ ] **UX-03**: Agenda generation agendada: pauta gerada automaticamente N dias antes do proximo 1:1
+- [x] **UX-03**: Agenda generation agendada: `checkAgendaGeneration()` 2 dias antes do 1:1 esperado
 
 ## v2 Requirements
 
@@ -121,18 +121,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MTRC-01 | Phase 3 | Complete |
 | MTRC-02 | Phase 3 | Complete |
 | MTRC-03 | Phase 3 | Complete |
-| MTRC-04 | Phase 3 | Pending |
-| MTRC-05 | Phase 3 | Pending |
+| MTRC-04 | Phase 3 | Deferred |
+| MTRC-05 | Phase 3 | Deferred |
 | MTRC-06 | Phase 3 | Complete |
 | MTRC-07 | Phase 3 | Complete |
-| ACTN-01 | Phase 4 | Pending |
-| ACTN-02 | Phase 4 | Pending |
-| ACTN-03 | Phase 4 | Pending |
-| ACTN-04 | Phase 4 | Pending |
-| ACTN-05 | Phase 4 | Pending |
-| UX-01 | Phase 4 | Done |
-| UX-02 | Phase 4 | Done |
-| UX-03 | Phase 4 | Pending |
+| ACTN-01 | Phase 4 | Partial (unidirecional) |
+| ACTN-02 | Phase 4 | Complete |
+| ACTN-03 | Phase 4 | Complete |
+| ACTN-04 | Phase 4 | Complete |
+| ACTN-05 | Phase 4 | Complete |
+| UX-01 | Phase 4 | Complete |
+| UX-02 | Phase 4 | Complete |
+| UX-03 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 35 total
@@ -141,4 +141,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-31*
-*Last updated: 2026-03-31 after roadmap creation*
+*Last updated: 2026-04-01 — reconciled after milestone completion*

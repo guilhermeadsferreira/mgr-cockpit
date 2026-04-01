@@ -146,12 +146,18 @@ Cada artefato processado vira um `.md` legível por humanos. O perfil vivo é um
 
 ---
 
+## O que já foi entregue além do core
+
+- **Módulo "Eu"** — cockpit do próprio gestor: demandas delegadas a você, autoavaliação, entradas de ciclo
+- **Integração nativa com Jira e GitHub (V3)** — métricas de fluxo (cycle time, velocity), code review depth, collaboration score, relatórios automáticos (daily/weekly/monthly/sprint), CrossAnalyzer com insights cruzados
+- **Revisão Extensiva** — 17 prompt refinements, action audit trail, escalation, evidence aggregation para PDI, cross-team insights, agenda generation agendada
+
 ## O que está vindo
 
-- **Módulo "Eu"** — cockpit sobre sua própria jornada: feedbacks que você recebeu do gestor, tarefas que foram delegadas a você em qualquer canal (reunião, Jira, daily, retro), seu desenvolvimento ao longo do tempo
-- **Integração com Jira** via MCP — snapshot diário do board por pessoa, bloqueios, métricas de fluxo
 - **Integração com Slack** via MCP — ingestão passiva de mensagens de canais configurados
 - **View Hoje / Esta Semana** — o que precisa da sua atenção agora
+- **Entidade Projeto** — perfil vivo por projeto, análogo ao perfil de pessoas
+- **Caso de promoção** — gerado pela IA com base no perfil + projetos + artefatos do período
 
 ---
 
