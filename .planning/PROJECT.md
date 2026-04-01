@@ -62,14 +62,14 @@ Garantir que toda informacao coletada pelo pipeline seja de alta qualidade, acio
 - [x] Health history: cleanup automatico (manter ultimas 50 entradas)
 - [x] External data IPC: retorno com JSON tipado (nao regex)
 
-**Media prioridade — GitHub Metrics + CrossAnalyzer (7 tasks):**
-- [ ] Code review depth (avgCommentsPerReview, turnaround)
-- [ ] Collaboration score (co-authors, cross-team)
-- [ ] Test coverage trend per PR
-- [ ] CrossAnalyzer: campo causa_raiz nos insights
-- [ ] CrossAnalyzer: desalinhamento checado contra contexto (ferias, licenca)
-- [ ] Relatorios: narrative context paragraph do perfil
-- [ ] Relatorios: baseline comparison pessoal (media 3 meses)
+**Media prioridade — GitHub Metrics + CrossAnalyzer (7 tasks):** ✅ Validated in Phase 03: GitHub Metrics & CrossAnalyzer
+- [x] Code review depth (avgCommentsPerReview, turnaround)
+- [x] Collaboration score (co-authors, cross-team)
+- [x] Test coverage trend per PR
+- [x] CrossAnalyzer: campo causa_raiz nos insights
+- [x] CrossAnalyzer: desalinhamento checado contra contexto (ferias, licenca)
+- [x] Relatorios: narrative context paragraph do perfil
+- [x] Relatorios: baseline comparison pessoal (media 3 meses)
 
 **Baixa prioridade — Action System + UX Avancado (8 tasks):**
 - [ ] Sync bidirecional acoes <> Jira (auto-fechar quando issue Done)
@@ -91,7 +91,7 @@ Garantir que toda informacao coletada pelo pipeline seja de alta qualidade, acio
 
 ## Context
 
-**Estado atual (2026-03-31):** Branch `feat/v3-external-refinements`. Revisao extensiva identificou 101 tasks em 10 secoes (R1-R10). 66 tasks concluidas, 35 pendentes. Phase 02 (Pipeline & Schema) complete — theme dedup, health history compression, typed IPC. O app esta em producao com dados reais de liderados no iCloud.
+**Estado atual (2026-04-01):** Branch `feat/v3-external-refinements`. Revisao extensiva identificou 101 tasks em 10 secoes (R1-R10). 73 tasks concluidas, 28 pendentes. Phase 03 (GitHub Metrics & CrossAnalyzer) complete — advanced review/collaboration/test metrics, causa_raiz in CrossAnalyzer, narrative context and baseline comparison in reports. O app esta em producao com dados reais de liderados no iCloud.
 
 **Referencia de tasks:** `tasks/PLANO_REVISAO_EXTENSIVA.md` e `tasks/backlog.md` (secoes R1-R10 com criterios de aceite detalhados).
 
@@ -134,4 +134,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-31 after initialization (Revisao Extensiva milestone)*
+*Last updated: 2026-04-01 after Phase 03 completion (GitHub Metrics & CrossAnalyzer)*
