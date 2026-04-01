@@ -35,6 +35,14 @@ export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
   const [actionsMap, setActionsMap] = useState<Record<string, Action[]>>({})
   const [detected, setDetected] = useState<DetectedPerson[]>([])
   const [loading,  setLoading]  = useState(true)
+  const [escalations, setEscalations] = useState<Array<{
+    slug: string; nome: string;
+    gestorAction: { id: string; texto: string; descricao?: string; criadoEm: string };
+    diasPendente: number; relatedCount: number;
+  }>>([])
+  const [crossTeamInsights, setCrossTeamInsights] = useState<Array<{
+    tipo: string; descricao: string; pessoas: string[]; severidade: 'alta' | 'media' | 'baixa'
+  }>>([])
 
   const meta = RELACAO_META[relacao] ?? RELACAO_META['liderado']
 
@@ -81,6 +89,22 @@ export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
     ])
     setPerfis(Object.fromEntries(perfilResults))
     setActionsMap(Object.fromEntries(actionResults))
+
+    // Load escalations (acoes do gestor vencidas)
+    try {
+      const esc = await window.api.actions.escalations()
+      setEscalations(esc)
+    } catch { setEscalations([]) }
+
+    // Load cross-team insights (only for liderados view)
+    if (relacao === 'liderado') {
+      try {
+        const insights = await window.api.insights.crossTeam()
+        setCrossTeamInsights(insights)
+      } catch {
+        setCrossTeamInsights([])
+      }
+    }
   }, [relacao])
 
   async function handleDismissDetected(slug: string) {
@@ -191,15 +215,47 @@ export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
                   />
                 )}
 
-                {/* Risk panel — only for liderados with signals */}
-                {relacao === 'liderado' && (
-                  <TeamRiskPanel
-                    people={people}
-                    perfis={perfis}
-                    actionsMap={actionsMap}
-                    onNavigate={(slug) => navigate('person', { slug })}
-                  />
+                {/* Risk panel — visible for all relations */}
+                <TeamRiskPanel
+                  people={people}
+                  perfis={perfis}
+                  actionsMap={actionsMap}
+                  onNavigate={(slug) => navigate('person', { slug })}
+                />
+
+                {/* Escalation alerts — acoes do gestor pendentes */}
+                {escalations.length > 0 && (
+                  <div style={{
+                    marginBottom: 16,
+                    background: 'rgba(200,100,80,0.05)',
+                    border: '1px solid rgba(200,100,80,0.2)',
+                    borderRadius: 'var(--r)',
+                    padding: '10px 16px',
+                  }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(200,100,80,0.9)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Acoes do gestor pendentes
+                    </div>
+                    {escalations.map((esc, i) => (
+                      <div key={i} style={{ padding: '4px 0', fontSize: 12, color: 'var(--text-primary)', borderBottom: i < escalations.length - 1 ? '1px solid rgba(200,100,80,0.1)' : 'none' }}>
+                        <span style={{ color: 'var(--red)', fontWeight: 500 }}>{esc.diasPendente}d</span>
+                        {' — '}
+                        <span style={{ cursor: 'pointer' }} onClick={() => navigate('person', { slug: esc.slug })}>
+                          {esc.nome}
+                        </span>
+                        {': '}{(esc.gestorAction.descricao ?? esc.gestorAction.texto).slice(0, 80)}
+                        {esc.relatedCount > 0 && (
+                          <span style={{ color: 'var(--text-muted)', fontSize: 10.5 }}> ({esc.relatedCount} acoes relacionadas)</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 )}
+
+                {/* Cross-team insights panel */}
+                {relacao === 'liderado' && crossTeamInsights.length > 0 && (
+                  <CrossTeamInsightsPanel insights={crossTeamInsights} />
+                )}
+
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(3, 1fr)',
@@ -260,6 +316,67 @@ export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
             )}
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+function CrossTeamInsightsPanel({ insights }: {
+  insights: Array<{ tipo: string; descricao: string; pessoas: string[]; severidade: 'alta' | 'media' | 'baixa' }>
+}) {
+  const severityColor: Record<string, string> = {
+    alta: 'var(--red)',
+    media: 'var(--yellow, #d4a843)',
+    baixa: 'var(--text-muted)',
+  }
+
+  return (
+    <div style={{
+      marginBottom: 24,
+      background: 'rgba(100,120,200,0.05)',
+      border: '1px solid rgba(100,120,200,0.2)',
+      borderRadius: 'var(--r)',
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        padding: '10px 16px',
+        borderBottom: '1px solid rgba(100,120,200,0.15)',
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <TrendingUp size={12} color="rgba(100,120,200,0.8)" />
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(100,120,200,0.9)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+          Insights do time
+        </span>
+        <span style={{
+          fontSize: 10, padding: '1px 6px', borderRadius: 20,
+          background: 'rgba(100,120,200,0.1)', color: 'rgba(100,120,200,0.9)',
+          fontFamily: 'var(--font-mono)',
+        }}>
+          {insights.length}
+        </span>
+      </div>
+      <div style={{ padding: '8px 16px' }}>
+        {insights.map((insight, i) => (
+          <div key={i} style={{
+            padding: '6px 0',
+            borderBottom: i < insights.length - 1 ? '1px solid rgba(100,120,200,0.1)' : 'none',
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+          }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: severityColor[insight.severidade],
+              flexShrink: 0, marginTop: 5,
+            }} />
+            <div>
+              <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>{insight.descricao}</div>
+              {insight.pessoas.length > 0 && (
+                <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 2 }}>
+                  {insight.pessoas.join(', ')}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )

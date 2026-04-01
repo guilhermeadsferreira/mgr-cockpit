@@ -58,6 +58,11 @@ declare global {
         save:         (action: unknown) => Promise<void>
         updateStatus: (slug: string, id: string, status: ActionStatus) => Promise<void>
         delete:       (slug: string, id: string) => Promise<void>
+        escalations:  () => Promise<Array<{ slug: string; nome: string; gestorAction: { id: string; texto: string; descricao?: string; criadoEm: string }; diasPendente: number; relatedCount: number }>>
+      }
+
+      insights: {
+        crossTeam: () => Promise<Array<{ tipo: string; descricao: string; pessoas: string[]; severidade: 'alta' | 'media' | 'baixa' }>>
       }
 
       eu: {

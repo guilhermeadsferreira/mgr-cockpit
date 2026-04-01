@@ -874,6 +874,141 @@ function registerIpcHandlers(): void {
     }
   })
 
+  // ── Escalations ───────────────────────────────────────────────
+  ipcMain.handle('actions:escalations', async () => {
+    const settings = SettingsManager.load()
+    const actionRegistry = new ActionRegistry(settings.workspacePath)
+    const personRegistry = new PersonRegistry(settings.workspacePath)
+    const liderados = personRegistry.list().filter(p => p.relacao === 'liderado')
+
+    const allEscalations: Array<{
+      slug: string
+      nome: string
+      gestorAction: { id: string; texto: string; descricao?: string; criadoEm: string }
+      diasPendente: number
+      relatedCount: number
+    }> = []
+
+    for (const person of liderados) {
+      const escalations = actionRegistry.getEscalations(person.slug)
+      for (const esc of escalations) {
+        allEscalations.push({
+          slug: person.slug,
+          nome: person.nome,
+          gestorAction: {
+            id: esc.gestorAction.id,
+            texto: esc.gestorAction.texto,
+            descricao: esc.gestorAction.descricao,
+            criadoEm: esc.gestorAction.criadoEm,
+          },
+          diasPendente: esc.diasPendente,
+          relatedCount: esc.relatedLideradoActions.length,
+        })
+      }
+    }
+
+    return allEscalations
+  })
+
+  // ── Cross-Team Insights ────────────────────────────────────────
+  ipcMain.handle('insights:cross-team', async () => {
+    const settings = SettingsManager.load()
+    const registry = new PersonRegistry(settings.workspacePath)
+    const actionReg = new ActionRegistry(settings.workspacePath)
+    const liderados = registry.list().filter(p => p.relacao === 'liderado')
+
+    const insights: Array<{ tipo: string; descricao: string; pessoas: string[]; severidade: 'alta' | 'media' | 'baixa' }> = []
+
+    // Coletar perfis e acoes de todos os liderados
+    const perfilMap: Record<string, Record<string, unknown>> = {}
+    const actionsMapCT: Record<string, import('../renderer/src/types/ipc').Action[]> = {}
+    for (const p of liderados) {
+      const perfilData = registry.getPerfil(p.slug)
+      perfilMap[p.slug] = perfilData?.frontmatter ?? {}
+      actionsMapCT[p.slug] = actionReg.list(p.slug)
+    }
+
+    // Insight 1: Multiplas pessoas com saude amarelo/vermelho
+    const saudeAmarelo = liderados.filter(p => perfilMap[p.slug]?.saude === 'amarelo')
+    const saudeVermelho = liderados.filter(p => perfilMap[p.slug]?.saude === 'vermelho')
+    if (saudeVermelho.length >= 2) {
+      insights.push({
+        tipo: 'saude_critica_generalizada',
+        descricao: `${saudeVermelho.length} pessoas com saude critica simultaneamente`,
+        pessoas: saudeVermelho.map(p => p.nome),
+        severidade: 'alta',
+      })
+    } else if (saudeAmarelo.length >= 3) {
+      insights.push({
+        tipo: 'saude_atencao_generalizada',
+        descricao: `${saudeAmarelo.length} pessoas com saude em atencao — possivel problema sistemico`,
+        pessoas: saudeAmarelo.map(p => p.nome),
+        severidade: 'media',
+      })
+    }
+
+    // Insight 2: Estagnacao em multiplos perfis
+    const estagnacao = liderados.filter(p => perfilMap[p.slug]?.alerta_estagnacao)
+    if (estagnacao.length >= 2) {
+      insights.push({
+        tipo: 'estagnacao_multipla',
+        descricao: `${estagnacao.length} pessoas com estagnacao detectada — avaliar oportunidades e desafios`,
+        pessoas: estagnacao.map(p => p.nome),
+        severidade: 'media',
+      })
+    }
+
+    // Insight 3: Muitas acoes vencidas no time
+    const today = new Date().toISOString().slice(0, 10)
+    const pessoasComVencidas = liderados.filter(p => {
+      const vencidas = (actionsMapCT[p.slug] ?? []).filter(a => a.status === 'open' && a.prazo && a.prazo < today)
+      return vencidas.length > 0
+    })
+    if (pessoasComVencidas.length >= 3) {
+      insights.push({
+        tipo: 'acoes_vencidas_generalizadas',
+        descricao: `${pessoasComVencidas.length} pessoas com acoes vencidas — revisao de followup necessaria`,
+        pessoas: pessoasComVencidas.map(p => p.nome),
+        severidade: 'media',
+      })
+    }
+
+    // Insight 4: Dados stale em muitas pessoas
+    const stale = liderados.filter(p => perfilMap[p.slug]?.dados_stale)
+    if (stale.length >= Math.ceil(liderados.length * 0.4) && stale.length >= 2) {
+      insights.push({
+        tipo: 'dados_desatualizados',
+        descricao: `${stale.length} de ${liderados.length} pessoas sem dados ha 30+ dias — cadencia de ingestao baixa`,
+        pessoas: stale.map(p => p.nome),
+        severidade: 'baixa',
+      })
+    }
+
+    // Insight 5: Nenhuma evolucao no time
+    const comEvolucao = liderados.filter(p => perfilMap[p.slug]?.sinal_evolucao)
+    if (liderados.length >= 3 && comEvolucao.length === 0) {
+      insights.push({
+        tipo: 'sem_evolucao',
+        descricao: 'Nenhum liderado com sinal de evolucao — avaliar se ha oportunidades de crescimento',
+        pessoas: [],
+        severidade: 'baixa',
+      })
+    }
+
+    // Insight 6: Tendencia emocional deteriorando em multiplos
+    const deteriorando = liderados.filter(p => perfilMap[p.slug]?.tendencia_emocional === 'deteriorando')
+    if (deteriorando.length >= 2) {
+      insights.push({
+        tipo: 'tendencia_deteriorando_multipla',
+        descricao: `${deteriorando.length} pessoas com tendencia emocional deteriorando — possivel problema de equipe`,
+        pessoas: deteriorando.map(p => p.nome),
+        severidade: 'alta',
+      })
+    }
+
+    return insights
+  })
+
   // ── System Audit ─────────────────────────────────────────────
   ipcMain.handle('audit:run', async () => {
     const { workspacePath } = SettingsManager.load()
