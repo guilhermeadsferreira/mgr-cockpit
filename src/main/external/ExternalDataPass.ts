@@ -239,6 +239,80 @@ export class ExternalDataPass {
     }
   }
 
+  // ── Narrative Context ──────────────────────────────────────────
+
+  /**
+   * Builds a narrative paragraph about a person from their config.yaml.
+   * Used by report generators to add human context to numeric data.
+   */
+  extractNarrativeContext(slug: string): string {
+    const registry = new PersonRegistry(this.workspacePath)
+    const person = registry.get(slug)
+    if (!person) return ''
+
+    const area = person.area ?? 'nao especificada'
+    const inicioEmpresa = person.inicio_na_empresa ?? 'data nao registrada'
+    const inicioFuncao = person.inicio_na_funcao ?? 'data nao registrada'
+
+    let promoText = ''
+    if (person.em_processo_promocao) {
+      promoText = ` Atualmente em processo de promocao para ${person.objetivo_cargo_alvo ?? 'proximo nivel'}.`
+    }
+
+    let pdiText = ''
+    const pdiAtivos = (person.pdi ?? []).filter(p => p.status !== 'concluido')
+    if (pdiAtivos.length > 0) {
+      pdiText = ` PDI com ${pdiAtivos.length} objetivo(s) ativo(s).`
+    }
+
+    return `${person.nome} atua como ${person.cargo} (${person.nivel}) na area ${area}, na empresa desde ${inicioEmpresa} e na funcao atual desde ${inicioFuncao}.${promoText}${pdiText}`
+  }
+
+  // ── Baseline 3 Months ────────────────────────────────────────
+
+  /**
+   * Computes the average commits, PRs merged and reviews over the last 3 months of history.
+   * Returns null if no historical data is available.
+   */
+  computeBaseline3Months(slug: string): { avgCommits: number; avgPRsMerged: number; avgReviews: number } | null {
+    const historico = this.loadHistorico(slug)
+    if (!historico) return null
+
+    const months = Object.keys(historico).sort().reverse().slice(0, 3)
+    if (months.length === 0) return null
+
+    let totalCommits = 0
+    let totalPRs = 0
+    let totalReviews = 0
+    let countCommits = 0
+    let countPRs = 0
+    let countReviews = 0
+
+    for (const key of months) {
+      const entry = historico[key]
+      if (entry.github?.commits30d != null) {
+        totalCommits += entry.github.commits30d
+        countCommits++
+      }
+      if (entry.github?.prsMerged30d != null) {
+        totalPRs += entry.github.prsMerged30d
+        countPRs++
+      }
+      if (entry.github?.prsRevisados != null) {
+        totalReviews += entry.github.prsRevisados
+        countReviews++
+      }
+    }
+
+    if (countCommits === 0 && countPRs === 0 && countReviews === 0) return null
+
+    return {
+      avgCommits: countCommits > 0 ? Math.round(totalCommits / countCommits) : 0,
+      avgPRsMerged: countPRs > 0 ? Math.round(totalPRs / countPRs) : 0,
+      avgReviews: countReviews > 0 ? Math.round(totalReviews / countReviews) : 0,
+    }
+  }
+
   // ── Cache ─────────────────────────────────────────────────────
 
   private readCache(slug: string): CacheEntry | null {
@@ -442,5 +516,9 @@ function summarizeGithub(github: GitHubPersonMetrics): Partial<GitHubPersonMetri
     prsMerged30d: github.prsMerged30d,
     prsRevisados: github.prsRevisados,
     tempoMedioAbertoDias: github.tempoMedioAbertoDias,
+    avgCommentsPerReview: github.avgCommentsPerReview,
+    approvalRate: github.approvalRate,
+    collaborationScore: github.collaborationScore,
+    testCoverageRatio: github.testCoverageRatio,
   }
 }
