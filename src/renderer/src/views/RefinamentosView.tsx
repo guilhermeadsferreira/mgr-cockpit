@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Trash2, FileText, X } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { MarkdownPreview } from '../components/MarkdownPreview'
 import type { DocItem } from '../types/ipc'
 
 function formatDate(d: string): string {
@@ -215,14 +214,8 @@ export function RefinamentosView() {
               {loading ? (
                 <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Carregando…</div>
               ) : (
-                <div className="markdown-body" style={{
-                  fontSize: 13.5, lineHeight: 1.7,
-                  color: 'var(--text-primary)',
-                  maxWidth: 1000,
-                }}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {content}
-                  </ReactMarkdown>
+                <div style={{ maxWidth: 1000 }}>
+                  <MarkdownPreview content={content} />
                 </div>
               )}
             </div>
