@@ -91,7 +91,50 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Prompt Refinements | 5/5 | Complete   | 2026-03-31 |
-| 2. Pipeline & Schema | 0/2 | Not started | - |
-| 3. GitHub Metrics & CrossAnalyzer | 0/3 | Not started | - |
-| 4. Action System & UX Avancado | 0/5 | Not started | - |
+| 1. Prompt Refinements | 5/5 | Complete | 2026-03-31 |
+| 2. Pipeline & Schema | 2/2 | Complete | 2026-03-31 |
+| 3. GitHub Metrics & CrossAnalyzer | 3/3 | Complete | 2026-03-31 |
+| 4. Action System & UX Avancado | 3/5 | In progress | - |
+
+---
+
+## Backlog
+
+### Phase 999.1: Resumo de 1:1 no estilo Qulture Rocks (BACKLOG)
+
+**Goal:** Após a ingestão de um 1:1, gerar um resumo estruturado no estilo Qulture Rocks — com o que foi discutido, compromissos assumidos (por responsável) e próximos passos — e exibi-lo no card do artefato na PersonView com botão de cópia.
+**Requirements:** QR-01
+**Plans:** 1/1 plans complete
+
+Plans:
+- [ ] 999.1-PLAN.md — Refinamento do prompt resumo_executivo_rh + bloco QR no ArtifactCard
+
+### Phase 999.2: Módulo Mentor AI (BACKLOG)
+
+**Goal:** IA de apoio ao gestor para tirar dúvidas sobre gestão, com contexto do projeto e dos liderados. Aproveitar prompt já existente (localização a confirmar).
+**Requirements:** TBD
+**Plans:** 0 plans
+**Note:** Prompt base já existe — recuperar e referenciar antes de planejar.
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
+
+### Phase 999.3: Performance de Ingestão + Modelo Híbrido (BACKLOG)
+
+**Goal:** Reduzir a latência do pipeline de ingestão via modelo híbrido por estágios: Estágio 1 = Pass Cerimônia via OpenRouter (modelo leve); Estágio 2 (futuro) = Pass 1 se Estágio 1 confirmar viabilidade.
+**Requirements:** PERF-01
+**Plans:** 3/3 plans complete
+
+Plans:
+- [x] 999.3-01-PLAN.md — Fundação híbrida: AppSettings com openRouterApiKey/useHybridModel + runOpenRouterPrompt no ClaudeRunner
+- [x] 999.3-02-PLAN.md — Rota condicional no Pass Cerimônia (IngestionPipeline) com fallback para Claude CLI
+- [x] 999.3-03-PLAN.md — UI: campo de API key + toggle na SettingsView
+
+### Phase 999.4: OpenRouter Estágio 2 — Pass 1 com modelo leve (BACKLOG)
+
+**Goal:** Migrar o Pass 1 (identificação de pessoa_principal e metadados básicos) para OpenRouter quando o modelo híbrido estiver ativo. Pass mais simples do pipeline — sem contexto de perfil, output estruturado básico — e com maior multiplicador de latência por rodar em todo artefato. Padrão já estabelecido no Pass Cerimônia (roteamento condicional + fallback para Claude CLI).
+**Requirements:** PERF-01
+**Plans:** 1/1 plans complete
+
+Plans:
+- [x] 999.4-01-PLAN.md — Rota híbrida no Pass 1: runOpenRouterPrompt com system prompt + roteamento condicional em processItem

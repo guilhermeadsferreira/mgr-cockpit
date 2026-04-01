@@ -387,6 +387,40 @@ export class IngestionPipeline {
                 aiResult.data_artefato,
               )
               this.log.info('sinal cerimônia aplicado', { slug, tipo: aiResult.tipo, data: aiResult.data_artefato })
+
+              // Accumulate PDI evidences from ceremony pontos_de_desenvolvimento
+              const sinalData = result.data as import('../prompts/cerimonia-sinal.prompt').CerimoniaSinalResult
+              if (sinalData.pontos_de_desenvolvimento?.length > 0) {
+                try {
+                  const registry = new PersonRegistry(this.workspacePath)
+                  const currentConfig = registry.get(slug)
+                  if (currentConfig?.pdi?.length > 0) {
+                    let pdiChanged = false
+                    for (const ponto of sinalData.pontos_de_desenvolvimento) {
+                      const pontoLower = ponto.toLowerCase()
+                      const match = currentConfig.pdi.find(p => {
+                        const objLower = p.objetivo.toLowerCase()
+                        return pontoLower.includes(objLower.split(' ').slice(0, 3).join(' '))
+                          || objLower.includes(pontoLower.split(' ').slice(0, 3).join(' '))
+                      })
+                      if (match) {
+                        if (!match.evidencias) match.evidencias = []
+                        const evidencia = `[${aiResult.data_artefato}] Cerimonia: ${ponto.slice(0, 100)}`
+                        if (!match.evidencias.includes(evidencia)) {
+                          match.evidencias.push(evidencia)
+                          pdiChanged = true
+                        }
+                      }
+                    }
+                    if (pdiChanged) {
+                      registry.save({ ...currentConfig, pdi: currentConfig.pdi })
+                      this.log.info('PDI evidencias acumuladas via cerimonia', { slug })
+                    }
+                  }
+                } catch (err) {
+                  this.log.warn('falha ao acumular evidencias PDI de cerimonia', { slug, error: err instanceof Error ? err.message : String(err) })
+                }
+              }
             } finally {
               release()
             }
@@ -738,6 +772,60 @@ export class IngestionPipeline {
           })
         }
         this.log.info('gestor actions → Demandas', { acoesCount: oneOnOneResult.acoes_gestor.length, personName, origem })
+      }
+
+      // 5. Accumulate PDI evidences from 1:1 deep pass
+      if (oneOnOneResult.pdi_update?.houve_mencao_pdi) {
+        try {
+          const registry = new PersonRegistry(this.workspacePath)
+          const currentConfig = registry.get(slug)
+          if (currentConfig?.pdi?.length > 0 || oneOnOneResult.pdi_update.novo_objetivo_sugerido) {
+            let pdiChanged = false
+            const pdi = currentConfig?.pdi ? [...currentConfig.pdi] : []
+
+            // Accumulate evidence for mentioned objectives
+            if (oneOnOneResult.pdi_update.objetivos_mencionados?.length > 0) {
+              for (const objMencionado of oneOnOneResult.pdi_update.objetivos_mencionados) {
+                const objLower = objMencionado.toLowerCase()
+                const match = pdi.find(p => p.objetivo.toLowerCase().includes(objLower) || objLower.includes(p.objetivo.toLowerCase()))
+                if (match) {
+                  const evidenciaTexto = oneOnOneResult.pdi_update.progresso_observado
+                    ? `[${date}] ${oneOnOneResult.pdi_update.progresso_observado}`
+                    : `[${date}] Mencionado em 1:1`
+
+                  if (!match.evidencias) match.evidencias = []
+                  if (!match.evidencias.includes(evidenciaTexto)) {
+                    match.evidencias.push(evidenciaTexto)
+                    pdiChanged = true
+                  }
+
+                  // Update status to em_andamento if was nao_iniciado
+                  if (match.status === 'nao_iniciado') {
+                    match.status = 'em_andamento'
+                    pdiChanged = true
+                  }
+                }
+              }
+            }
+
+            // Create new PDI objective if suggested
+            if (oneOnOneResult.pdi_update.novo_objetivo_sugerido) {
+              pdi.push({
+                objetivo: oneOnOneResult.pdi_update.novo_objetivo_sugerido,
+                status: 'nao_iniciado',
+                evidencias: [`[${date}] Sugerido em 1:1 — ${oneOnOneResult.pdi_update.progresso_observado ?? 'objetivo identificado'}`],
+              })
+              pdiChanged = true
+            }
+
+            if (pdiChanged && currentConfig) {
+              registry.save({ ...currentConfig, pdi })
+              this.log.info('PDI evidencias acumuladas via 1:1 deep pass', { slug, pdiCount: pdi.length })
+            }
+          }
+        } catch (err) {
+          this.log.warn('falha ao acumular evidencias PDI de 1:1', { slug, error: err instanceof Error ? err.message : String(err) })
+        }
       }
     } finally {
       release()

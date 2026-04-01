@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing
-last_updated: "2026-04-01T02:09:00Z"
+last_updated: "2026-04-01T02:10:00Z"
 progress:
-  total_phases: 4
-  completed_phases: 3
-  total_plans: 10
-  completed_plans: 10
+  total_phases: 7
+  completed_phases: 4
+  total_plans: 11
+  completed_plans: 9
 ---
 
 # Project State — Pulse Cockpit V2.1
@@ -24,7 +24,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 
 **Milestone:** V2.1 — Completar camada UI e prompts da V2
 **Active phase:** Phase 04 — action-system-ux-avancado (in progress)
-**Last action:** Completed 04-01 (Action Audit Trail + Jira Sync) — statusHistory[] em toda acao, auto-fechamento via Jira
+**Last action:** Completed 04-01 + 04-03 (Wave 1 in progress)
 
 ## Decisions
 
@@ -52,6 +52,8 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 - [Phase 03]: collaborationScore composto por 3 fatores com pesos 30/40/30 (co-authored/cross-repo/reviews)
 - [Phase 03]: Baseline calcula media apenas sobre meses com dados (nao zero-fill)
 - [Phase 03]: Narrative context construido a partir de PersonConfig sem ler perfil.md
+- [Phase 04-03]: Evidence accumulation both from 1:1 deep pass and ceremony signals for broader PDI coverage
+- [Phase 04-03]: Fuzzy matching for PDI objectives using first 3 words of each side
 
 ## Phases
 
@@ -65,6 +67,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 | 1 | PersonView Intelligence | ⬜ Pending |
 | 2 | Settings Reingest UX | ⬜ Pending |
 | 3 | Enriched Prompts | ⬜ Pending |
+| 04 | Action System UX Avancado | 🔄 In Progress |
 
 ## Planning Artifacts
 
@@ -85,7 +88,8 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 | Phase 03 P01 | 114 | 2 tasks | 2 files |
 | Phase 03 P03 | 167 | 2 tasks | 5 files |
 | 04 | 01 | 2min | 2/2 | 3 |
+| 04 | 03 | 3min | 1/1 | 2 |
 
 ## Next Action
 
-Phase 04 in progress. Plan 01 complete (Action Audit Trail + Jira Sync). Next: Plan 02 of Phase 04.
+Phase 04 Wave 1 in progress. Plans 01, 03 complete. Merging 05 next, then Wave 2.
