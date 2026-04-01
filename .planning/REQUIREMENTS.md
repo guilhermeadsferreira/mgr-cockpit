@@ -74,8 +74,8 @@ Requirements para este milestone. Cada um mapeia para phases do roadmap.
 
 ### UX Avancado
 
-- [ ] **UX-01**: Insights cross-team: padroes detectados em multiplos perfis exibidos no Dashboard
-- [ ] **UX-02**: Risk panel estendido para pares e gestores (nao apenas liderados)
+- [x] **UX-01**: Insights cross-team: padroes detectados em multiplos perfis exibidos no Dashboard
+- [x] **UX-02**: Risk panel estendido para pares e gestores (nao apenas liderados)
 - [ ] **UX-03**: Agenda generation agendada: pauta gerada automaticamente N dias antes do proximo 1:1
 
 ## v2 Requirements
@@ -130,8 +130,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ACTN-03 | Phase 4 | Pending |
 | ACTN-04 | Phase 4 | Pending |
 | ACTN-05 | Phase 4 | Pending |
-| UX-01 | Phase 4 | Pending |
-| UX-02 | Phase 4 | Pending |
+| UX-01 | Phase 4 | Done |
+| UX-02 | Phase 4 | Done |
 | UX-03 | Phase 4 | Pending |
 
 **Coverage:**

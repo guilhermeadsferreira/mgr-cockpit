@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing
-last_updated: "2026-04-01T02:10:00Z"
+last_updated: "2026-04-01T12:50:00Z"
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 11
-  completed_plans: 9
+  completed_plans: 10
 ---
 
 # Project State — Pulse Cockpit V2.1
@@ -24,7 +24,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 
 **Milestone:** V2.1 — Completar camada UI e prompts da V2
 **Active phase:** Phase 04 — action-system-ux-avancado (in progress)
-**Last action:** Completed 04-01 + 04-03 + 04-05 (Wave 1 complete)
+**Last action:** Completed 04-04 (cross-team insights e escalation alerts no Dashboard)
 
 ## Decisions
 
@@ -56,6 +56,8 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 - [Phase 04-03]: Fuzzy matching for PDI objectives using first 3 words of each side
 - [Phase 04-05]: Dynamic import no Scheduler para evitar circular dependency com index.ts
 - [Phase 04-05]: generateAgendaForPerson carrega settings internamente para obter openRouter config
+- [Phase 04-04]: CrossTeamInsightsPanel inline no DashboardView para manter consistencia com pattern existente
+- [Phase 04-04]: TeamRiskPanel removido do guard relacao === liderado para ser visivel para pares e gestores
 
 ## Phases
 
@@ -68,7 +70,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 | 01 | Prompt Refinements | ✅ Done |
 | 02 | Pipeline & Schema | ✅ Done |
 | 03 | GitHub Metrics & CrossAnalyzer | ✅ Done |
-| 04 | Action System + UX Avancado | 🔄 In Progress (3/5 plans) |
+| 04 | Action System + UX Avancado | 🔄 In Progress (4/5 plans) |
 
 ## Planning Artifacts
 
