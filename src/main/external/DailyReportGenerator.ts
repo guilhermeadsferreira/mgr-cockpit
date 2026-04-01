@@ -1,12 +1,9 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { PersonRegistry, type PersonConfig } from '../registry/PersonRegistry'
 import { SettingsManager, type AppSettings } from '../registry/SettingsManager'
 import { JiraClient, JiraConfig, type DailyStandupItem, type JiraIssue } from './JiraClient'
-import { GitHubClient, GitHubConfig, type GitHubCommit, type GitHubPR, type GitHubReview } from './GitHubClient'
-import { type ExternalDataSnapshot } from './ExternalDataPass'
-import { type Blocker, type SprintSummary } from './JiraMetrics'
-import { type CrossInsight } from './CrossAnalyzer'
+import { GitHubClient, GitHubConfig, type GitHubCommit, type GitHubPR, type GitHubReview, type GitHubReviewComment } from './GitHubClient'
 import { Logger } from '../logging/Logger'
 
 const log = Logger.getInstance().child('DailyReportGenerator')
@@ -18,6 +15,7 @@ interface DailyActivity {
   githubCommits: GitHubCommit[]
   githubPRsMerged: GitHubPR[]
   githubReviews: GitHubReview[]
+  githubReviewComments: GitHubReviewComment[]
 }
 
 interface PersonDailyData {
@@ -27,7 +25,6 @@ interface PersonDailyData {
   inProgressTasks: JiraIssue[]
   blockers: Array<{ key: string; summary: string; days: number; flagged: boolean; comments: string[] }>
   sprintSummary: { total: number; done: number; spTotal: number; spDone: number } | null
-  insights: CrossInsight[]
 }
 
 interface SprintOverview {
@@ -52,7 +49,6 @@ const MESES = [
   'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
 ]
 
-const IN_PROGRESS_STATUSES = ['in progress', 'in dev', 'development', 'doing', 'em andamento']
 const IN_REVIEW_STATUSES = ['in review', 'review', 'code review', 'em revisão']
 const DONE_STATUSES = ['done', 'closed', 'concluído', 'resolved']
 
@@ -63,12 +59,10 @@ const CONCURRENCY_LIMIT = 3
 export class DailyReportGenerator {
   private workspacePath: string
   private relatoriosDir: string
-  private cacheDir: string
 
   constructor(workspacePath: string) {
     this.workspacePath = workspacePath
     this.relatoriosDir = join(workspacePath, 'relatorios')
-    this.cacheDir = join(workspacePath, '..', 'cache', 'external')
   }
 
   async generate(date?: string): Promise<string> {
@@ -201,7 +195,10 @@ export class DailyReportGenerator {
     const eligible = people.filter(p => p.jiraEmail || p.githubUsername)
 
     const fetchPerson = async (person: PersonConfig): Promise<PersonDailyData> => {
-      let activity: DailyActivity = { jiraActivity: [], githubCommits: [], githubPRsMerged: [], githubReviews: [] }
+      let activity: DailyActivity = {
+        jiraActivity: [], githubCommits: [], githubPRsMerged: [],
+        githubReviews: [], githubReviewComments: [],
+      }
 
       try {
         activity = await this.fetchYesterdayActivity(person, settings)
@@ -209,13 +206,9 @@ export class DailyReportGenerator {
         log.warn('falha ao buscar atividade de ontem', { slug: person.slug, error: err instanceof Error ? err.message : String(err) })
       }
 
-      // In-progress tasks from sprint data
+      // In-progress tasks: use statusCategory 'indeterminate' (catches Dev, In Dev, In Progress, In Review, etc.)
       const sprintIssues = sprintIssuesByPerson.get(person.slug) ?? []
-      const inProgressTasks = sprintIssues.filter(i => {
-        const status = i.status.toLowerCase()
-        return IN_PROGRESS_STATUSES.some(s => status.includes(s)) ||
-               IN_REVIEW_STATUSES.some(s => status.includes(s))
-      })
+      const inProgressTasks = sprintIssues.filter(i => i.statusCategory === 'indeterminate')
 
       // Blockers from sprint data
       const blockers = sprintIssues
@@ -237,9 +230,6 @@ export class DailyReportGenerator {
         spDone: sprintIssues.filter(i => i.statusCategory === 'done').reduce((s, i) => s + (i.storyPoints ?? 0), 0),
       } : null
 
-      // Cached insights
-      const insights = this.readCachedInsights(person.slug)
-
       return {
         nome: person.nome,
         slug: person.slug,
@@ -247,15 +237,13 @@ export class DailyReportGenerator {
         inProgressTasks,
         blockers,
         sprintSummary,
-        insights,
       }
     }
 
-    // Process in batches of CONCURRENCY_LIMIT
     return batchParallel(eligible, fetchPerson, CONCURRENCY_LIMIT)
   }
 
-  // ── Yesterday activity (per person, now returns rich data) ──
+  // ── Yesterday activity (per person, returns rich data) ──────
 
   private async fetchYesterdayActivity(person: PersonConfig, settings: AppSettings): Promise<DailyActivity> {
     const yesterday = this.getYesterday()
@@ -268,6 +256,7 @@ export class DailyReportGenerator {
     let githubCommits: GitHubCommit[] = []
     let githubPRsMerged: GitHubPR[] = []
     let githubReviews: GitHubReview[] = []
+    let githubReviewComments: GitHubReviewComment[] = []
 
     // Jira: issues updated yesterday
     if (settings.jiraEnabled && settings.jiraBaseUrl && settings.jiraApiToken && jiraEmail) {
@@ -290,7 +279,7 @@ export class DailyReportGenerator {
       })())
     }
 
-    // GitHub: commits, PRs, reviews from yesterday (with details)
+    // GitHub: commits, PRs, reviews, review comments from yesterday
     if (settings.githubEnabled && settings.githubToken && githubUsername && settings.githubRepos) {
       promises.push((async () => {
         try {
@@ -301,15 +290,17 @@ export class DailyReportGenerator {
           }
           const githubClient = new GitHubClient(githubConfig)
 
-          const [commits, prs, reviews] = await Promise.all([
+          const [commits, prs, reviews, reviewComments] = await Promise.all([
             githubClient.getCommitsByUser(githubUsername, yesterday),
             githubClient.getPRsByUser(githubUsername, yesterday),
             githubClient.getReviewsByUser(githubUsername, yesterday),
+            githubClient.getReviewCommentsByUser(githubUsername, yesterday),
           ])
 
           githubCommits = commits
           githubPRsMerged = prs.filter(p => p.merged)
           githubReviews = reviews
+          githubReviewComments = reviewComments
         } catch (err) {
           log.warn('Falha ao buscar atividade GitHub', { slug: person.slug, error: err instanceof Error ? err.message : String(err) })
         }
@@ -318,20 +309,7 @@ export class DailyReportGenerator {
 
     await Promise.all(promises)
 
-    return { jiraActivity, githubCommits, githubPRsMerged, githubReviews }
-  }
-
-  // ── Read cached data ────────────────────────────────────────
-
-  private readCachedInsights(slug: string): CrossInsight[] {
-    const cachePath = join(this.cacheDir, `${slug}.json`)
-    if (!existsSync(cachePath)) return []
-    try {
-      const entry = JSON.parse(readFileSync(cachePath, 'utf-8'))
-      return entry?.data?.insights ?? []
-    } catch {
-      return []
-    }
+    return { jiraActivity, githubCommits, githubPRsMerged, githubReviews, githubReviewComments }
   }
 
   // ── Date helpers ────────────────────────────────────────────
@@ -390,7 +368,6 @@ export class DailyReportGenerator {
       days: number
       flagged: boolean
     }> = []
-    const allRisks: string[] = []
 
     for (const report of personReports) {
       lines.push(`## ${report.nome}`, '')
@@ -401,38 +378,50 @@ export class DailyReportGenerator {
       lines.push('### O que fez ontem', '')
       let hasActivity = false
 
-      // Jira activity (issues with status transitions)
+      // Jira activity (issues with status transitions) — sem limite
       if (activity.jiraActivity.length > 0) {
-        for (const item of activity.jiraActivity.slice(0, 5)) {
+        for (const item of activity.jiraActivity) {
           lines.push(`- **${item.issueKey}**: ${item.summary} → _${item.status}_`)
           hasActivity = true
         }
-        if (activity.jiraActivity.length > 5) {
-          lines.push(`- _... e mais ${activity.jiraActivity.length - 5} issue(s)_`)
-        }
       }
 
-      // GitHub commits (with repo and message)
+      // GitHub commits (with repo and message) — sem limite
       if (activity.githubCommits.length > 0) {
-        for (const commit of activity.githubCommits.slice(0, 5)) {
-          const msg = commit.message.length > 80 ? commit.message.slice(0, 77) + '...' : commit.message
+        for (const commit of activity.githubCommits) {
+          const msg = commit.message.length > 120 ? commit.message.slice(0, 117) + '...' : commit.message
           lines.push(`- 🔨 \`${commit.repo}\`: ${msg}`)
           hasActivity = true
         }
-        if (activity.githubCommits.length > 5) {
-          lines.push(`- _... e mais ${activity.githubCommits.length - 5} commit(s)_`)
-        }
       }
 
-      // GitHub reviews (with PR number and repo)
+      // GitHub reviews (with PR number, repo and state) — sem limite
       if (activity.githubReviews.length > 0) {
-        for (const review of activity.githubReviews.slice(0, 5)) {
-          const stateLabel = review.state === 'approved' ? 'approved' : review.state === 'changes_requested' ? 'changes requested' : 'commented'
+        // Group review comments by PR for enrichment
+        const commentsByPR = new Map<string, GitHubReviewComment[]>()
+        for (const c of activity.githubReviewComments) {
+          const key = `${c.repo}#${c.prNumber}`
+          if (!commentsByPR.has(key)) commentsByPR.set(key, [])
+          commentsByPR.get(key)!.push(c)
+        }
+
+        for (const review of activity.githubReviews) {
+          const stateLabel = review.state === 'approved' ? 'approved'
+            : review.state === 'changes_requested' ? 'changes requested'
+            : 'commented'
           lines.push(`- 👀 Review em \`${review.repo}#${review.prNumber}\` — ${stateLabel}`)
           hasActivity = true
-        }
-        if (activity.githubReviews.length > 5) {
-          lines.push(`- _... e mais ${activity.githubReviews.length - 5} review(s)_`)
+
+          // Show review comments for this PR
+          const prKey = `${review.repo}#${review.prNumber}`
+          const comments = commentsByPR.get(prKey) ?? []
+          for (const comment of comments) {
+            const body = comment.body.replace(/\n/g, ' ').trim()
+            const truncated = body.length > 150 ? body.slice(0, 147) + '...' : body
+            if (truncated) {
+              lines.push(`  > "${truncated}"`)
+            }
+          }
         }
       }
 
@@ -475,7 +464,8 @@ export class DailyReportGenerator {
       if (report.inProgressTasks.length > 0) {
         for (const task of report.inProgressTasks) {
           const sp = task.storyPoints ? ` (${task.storyPoints} SP)` : ''
-          const statusIcon = IN_REVIEW_STATUSES.some(s => task.status.toLowerCase().includes(s)) ? '🔄' : '🔵'
+          const isReview = IN_REVIEW_STATUSES.some(s => task.status.toLowerCase().includes(s))
+          const statusIcon = isReview ? '🔄' : '🔵'
           lines.push(`- ${statusIcon} **${task.key}**: ${task.summary}${sp} — _${task.status}_`)
         }
       } else {
@@ -501,13 +491,6 @@ export class DailyReportGenerator {
         lines.push('- *Nenhum impedimento*')
       }
       lines.push('')
-
-      // Collect risks from cached insights
-      for (const insight of report.insights) {
-        if (insight.severidade === 'alta') {
-          allRisks.push(`- ⚠️ [${report.nome}] ${insight.descricao}`)
-        }
-      }
     }
 
     // ── Team-level sections ───────────────────────────────────
@@ -522,23 +505,11 @@ export class DailyReportGenerator {
       lines.push('')
     }
 
-    if (allRisks.length > 0) {
-      lines.push('## Riscos', '')
-      for (const risk of allRisks) {
-        lines.push(risk)
-      }
-      lines.push('')
-    }
-
     return lines.join('\n')
   }
 }
 
 // ── Helpers ─────────────────────────────────────────────────────
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
 
 async function batchParallel<T, R>(items: T[], fn: (item: T) => Promise<R>, batchSize: number): Promise<R[]> {
   const results: R[] = []
