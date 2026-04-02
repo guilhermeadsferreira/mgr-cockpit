@@ -165,3 +165,13 @@ Plans:
 Plans:
 - [x] 999.9-01-PLAN.md — categorizeStatus refinado + Pipeline Health section com baseline (PLHF-01, PLHF-02, PLHF-03, PLHF-04)
 - [x] 999.9-02-PLAN.md — Compactar commits + enriquecer Haiku com pipeline data (PLHF-05, PLHF-06, PLHF-07)
+
+### Phase 999.10: Baseline cross-sprint para Pipeline Health (BACKLOG)
+
+**Goal:** Pipeline Health usa baseline histórico cross-sprint (últimos 3 meses) em vez de apenas done tasks do sprint atual. Persistir tempos por fase (Dev, CR, QA) em metricas.md a cada sprint fechado e agregar para baseline mais robusto.
+**Requirements:** TBD
+**Plans:** 0 plans
+**Note:** Phase 999.9 implementou baseline intra-sprint (done tasks do sprint atual). Esta evolução cruza múltiplos sprints via metricas.md. Depende de 999.9 (Pipeline Health) e 999.7 (MetricsWriter).
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
