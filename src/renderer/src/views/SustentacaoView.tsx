@@ -1,7 +1,82 @@
 import { useState, useEffect } from 'react'
 import { RefreshCw, Loader2, Wrench } from 'lucide-react'
 import { useRouter } from '../router'
-import type { SupportBoardSnapshot } from '../types/ipc'
+import type { SupportBoardSnapshot, SustentacaoHistoryEntry } from '../types/ipc'
+
+/** Retorna delta absoluto vs snapshot de ~7 dias atrás. null se não há referência. */
+function getDelta(
+  current: number,
+  history: SustentacaoHistoryEntry[],
+  field: keyof Pick<SustentacaoHistoryEntry, 'ticketsAbertos' | 'ticketsFechadosUltimos30d' | 'breachCount'>
+): number | null {
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
+  const ref = history
+    .filter((e) => e.fetchedAt <= Date.now() - sevenDaysMs)
+    .sort((a, b) => b.fetchedAt - a.fetchedAt)[0]
+  if (!ref) return null
+  return current - (ref[field] as number)
+}
+
+/** Formata delta para exibição: "↑ 3", "↓ 2", "=" */
+function formatDelta(delta: number | null): string {
+  if (delta === null) return '—'
+  if (delta === 0) return '='
+  return delta > 0 ? `↑ ${delta}` : `↓ ${Math.abs(delta)}`
+}
+
+/** Cor do delta baseada no campo e direção. Para breach: subir é ruim. Para fechados: subir é bom. */
+function deltaColor(delta: number | null, higherIsBad = false): string {
+  if (delta === null || delta === 0) return 'var(--text-muted)'
+  const isPositive = delta > 0
+  const isGood = higherIsBad ? !isPositive : isPositive
+  return isGood ? 'var(--accent)' : 'var(--red)'
+}
+
+/** Constrói array de pontos para um campo do histórico (últimos N dias). */
+function buildChartPoints(
+  history: SustentacaoHistoryEntry[],
+  field: keyof Pick<SustentacaoHistoryEntry, 'breachCount' | 'complianceRate7d' | 'complianceRate30d'>
+): number[] {
+  return history
+    .slice(-30)
+    .map((e) => (e[field] as number | null) ?? 0)
+}
+
+function MiniLineChart({
+  points,
+  width = 180,
+  height = 36,
+  color = 'var(--accent)',
+}: {
+  points: number[]
+  width?: number
+  height?: number
+  color?: string
+}) {
+  if (points.length < 2) return null
+  const min = Math.min(...points)
+  const max = Math.max(...points)
+  const range = max - min || 1
+
+  const coords = points.map((v, i) => {
+    const x = (i / (points.length - 1)) * width
+    const y = height - ((v - min) / range) * (height - 4) - 2 // 2px padding top/bottom
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  })
+
+  return (
+    <svg width={width} height={height} style={{ overflow: 'visible', display: 'block' }}>
+      <polyline
+        points={coords.join(' ')}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
 
 export function SustentacaoView() {
   const { navigate } = useRouter()
@@ -112,6 +187,9 @@ export function SustentacaoView() {
   }
 
   const breachCount = snapshot.ticketsEmBreach.length
+  const deltaAbertos = getDelta(snapshot.ticketsAbertos, snapshot.history, 'ticketsAbertos')
+  const deltaFechados = getDelta(snapshot.ticketsFechadosUltimos30d, snapshot.history, 'ticketsFechadosUltimos30d')
+  const deltaBreach = getDelta(breachCount, snapshot.history, 'breachCount')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -193,16 +271,80 @@ export function SustentacaoView() {
 
       {/* Content */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '28px 40px' }}>
-        {/* Métricas sumárias */}
+        {/* Row 1: Compliance cards (novos) */}
+        <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+          <div style={{
+            flex: 1, background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 8, padding: '16px 20px',
+          }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              SLA Compliance 7d
+            </div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font)', lineHeight: 1 }}>
+              {snapshot.complianceRate7d !== null ? `${snapshot.complianceRate7d}%` : '—'}
+            </div>
+          </div>
+          <div style={{
+            flex: 1, background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 8, padding: '16px 20px',
+          }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              SLA Compliance 30d
+            </div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font)', lineHeight: 1 }}>
+              {snapshot.complianceRate30d !== null ? `${snapshot.complianceRate30d}%` : '—'}
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2: Cards existentes com deltas */}
         <div style={{ display: 'flex', gap: 16, marginBottom: 28 }}>
-          <MetricCard label="Tickets Abertos" value={snapshot.ticketsAbertos} />
-          <MetricCard label="Fechados (30d)" value={snapshot.ticketsFechadosUltimos30d} />
+          <MetricCard
+            label="Tickets Abertos"
+            value={snapshot.ticketsAbertos}
+            delta={formatDelta(deltaAbertos)}
+            deltaColor={deltaColor(deltaAbertos, true)}
+          />
+          <MetricCard
+            label="Fechados (30d)"
+            value={snapshot.ticketsFechadosUltimos30d}
+            delta={formatDelta(deltaFechados)}
+            deltaColor={deltaColor(deltaFechados, false)}
+          />
           <MetricCard
             label="Em Breach de SLA"
             value={breachCount}
             highlight={breachCount > 0}
+            delta={formatDelta(deltaBreach)}
+            deltaColor={deltaColor(deltaBreach, true)}
           />
         </div>
+
+        {/* Mini Charts de evolução */}
+        {snapshot.history.length >= 2 && (
+          <Section title="Evolução (últimos 30 dias)">
+            <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Breach Count
+                </div>
+                <MiniLineChart
+                  points={buildChartPoints(snapshot.history, 'breachCount')}
+                  color="var(--red)"
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Compliance 7d (%)
+                </div>
+                <MiniLineChart
+                  points={buildChartPoints(snapshot.history, 'complianceRate7d')}
+                  color="var(--accent)"
+                />
+              </div>
+            </div>
+          </Section>
+        )}
 
         {/* Análise de IA */}
         {analysisResult && (
@@ -355,32 +497,36 @@ export function SustentacaoView() {
 function MetricCard({
   label,
   value,
-  highlight,
+  highlight = false,
+  delta,
+  deltaColor: deltaColorProp,
 }: {
   label: string
   value: number
   highlight?: boolean
+  delta?: string
+  deltaColor?: string
 }) {
   return (
     <div style={{
-      flex: 1, padding: '16px 20px',
-      background: 'var(--surface)', border: `1px solid ${highlight ? 'rgba(184,64,64,0.3)' : 'var(--border)'}`,
+      flex: 1,
+      background: 'var(--surface)',
+      border: `1px solid ${highlight ? 'rgba(184,64,64,0.4)' : 'var(--border)'}`,
       borderRadius: 8,
-      background: highlight ? 'rgba(184,64,64,0.04)' : 'var(--surface)',
-    } as React.CSSProperties}>
-      <div style={{
-        fontSize: 11, fontWeight: 600, letterSpacing: '0.08em',
-        textTransform: 'uppercase' as const, color: 'var(--text-muted)',
-        marginBottom: 8,
-      }}>
+      padding: '16px 20px',
+    }}>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         {label}
       </div>
-      <div style={{
-        fontSize: 28, fontWeight: 700, lineHeight: 1,
-        color: highlight ? 'var(--red)' : 'var(--text-primary)',
-        fontFamily: 'var(--font)',
-      }}>
-        {value}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <div style={{ fontSize: 28, fontWeight: 700, color: highlight ? 'var(--red)' : 'var(--text-primary)', fontFamily: 'var(--font)', lineHeight: 1 }}>
+          {value}
+        </div>
+        {delta && delta !== '—' && (
+          <div style={{ fontSize: 12, color: deltaColorProp ?? 'var(--text-muted)', fontFamily: 'var(--font)' }}>
+            {delta}
+          </div>
+        )}
       </div>
     </div>
   )
