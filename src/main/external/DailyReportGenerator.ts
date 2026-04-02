@@ -843,11 +843,15 @@ export class DailyReportGenerator {
       }
 
       if (activity.githubCommits.length > 0) {
+        // Agrupar commits por repo (per D-12: contagem resumida em vez de listing individual)
+        const commitsByRepo = new Map<string, number>()
         for (const commit of activity.githubCommits) {
-          const msg = commit.message.length > 120 ? commit.message.slice(0, 117) + '...' : commit.message
-          lines.push(`- 💻 \`${commit.repo}\`: ${msg}`)
-          hasActivity = true
+          commitsByRepo.set(commit.repo, (commitsByRepo.get(commit.repo) ?? 0) + 1)
         }
+        for (const [repo, count] of commitsByRepo) {
+          lines.push(`- 💻 ${count} commit${count > 1 ? 's' : ''} em \`${repo}\``)
+        }
+        hasActivity = true
       }
 
       if (activity.githubPRsMerged.length > 0) {
