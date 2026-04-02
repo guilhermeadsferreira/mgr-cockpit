@@ -128,6 +128,14 @@ Requirements para este milestone. Cada um mapeia para phases do roadmap.
 - [ ] **INTEL-03**: SustentacaoView exibe secao "Inteligencia Operacional" com grafico in/out semanal (SVG barras inline) e curva historica de backlog (MiniLineChart com ticketsAbertos do history[])
 - [ ] **INTEL-04**: Secao "Inteligencia Operacional" exibe top tipos expandidos (abertos+fechados 30d) e lista de recorrentes com alerta visual "Candidato a raiz — Nx em 30d"; secao nao renderiza quando sem dados
 
+### Sustentacao Alertas Proativos (Phase 999.14)
+
+- [ ] **ALRT-01**: `SustentacaoAlerta` tipo exportado em ipc.ts com campos `tipo` (4 valores), `mensagem` e `severidade` ('critico' | 'atencao'); `SupportBoardSnapshot` estendido com `alertas: SustentacaoAlerta[]`
+- [ ] **ALRT-02**: `calcularAlertas()` exportada no SupportBoardClient — recebe snapshot + history[] + issues[] + slaThresholds; retorna `SustentacaoAlerta[]` calculando as 4 condicoes (breach crescente, ticket envelhecendo, fila crescendo, spike de incidente) com defaults fixos
+- [ ] **ALRT-03**: IPC handler `fetchAndCacheSustentacao` chama `calcularAlertas()` apos montar snapshot e inclui resultado em `snapshot.alertas` antes de retornar ao renderer
+- [ ] **ALRT-04**: Sidebar exibe badge dot vermelho no item Sustentacao quando `snapshot.alertas.length > 0`; badge some automaticamente quando alertas zerados; estado carregado via IPC sustentacao:get-data no mount
+- [ ] **ALRT-05**: SustentacaoView exibe banner inline logo abaixo do header quando `snapshot.alertas.length > 0`; banner lista cada alerta com icone e mensagem; some automaticamente apos refresh sem alertas
+
 ## v2 Requirements
 
 Nao ha v2 neste milestone — todas as tasks identificadas estao no escopo v1.
@@ -220,6 +228,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INTEL-03 | Phase 999.13 | Planned |
 | INTEL-04 | Phase 999.13 | Planned |
 
+| ALRT-01 | Phase 999.14 | Planned |
+| ALRT-02 | Phase 999.14 | Planned |
+| ALRT-03 | Phase 999.14 | Planned |
+| ALRT-04 | Phase 999.14 | Planned |
+| ALRT-05 | Phase 999.14 | Planned |
+
 **Coverage:**
 - v1 requirements: 35 total
 - Mapped to phases: 35
@@ -230,7 +244,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 - Backlog requirements (999.11): 5 total
 - Backlog requirements (999.12): 5 total
 - Backlog requirements (999.13): 4 total
+- Backlog requirements (999.14): 5 total
 
 ---
 *Requirements defined: 2026-03-31*
-*Last updated: 2026-04-02 — added INTEL-01 to INTEL-04 for Phase 999.13*
+*Last updated: 2026-04-02 — added ALRT-01 to ALRT-05 for Phase 999.14*

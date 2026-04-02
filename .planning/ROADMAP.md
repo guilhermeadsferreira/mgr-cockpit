@@ -210,9 +210,13 @@ Plans:
 - [ ] 999.13-01-PLAN.md — Tipos InOutSemanalEntry + RecorrenteDetectado + cálculos no SupportBoardClient (INTEL-01, INTEL-02)
 - [ ] 999.13-02-PLAN.md — Seção "Inteligência Operacional" na SustentacaoView (INTEL-03, INTEL-04)
 
-### Phase 999.14: Sustentação — Alertas proativos (BACKLOG)
+### Phase 999.14: Sustentação — Alertas proativos
 
-**Goal:** Notificações proativas quando: breach count sobe acima de threshold, SLA compliance cai abaixo de %, ticket individual envelhece além do crítico, ou carga de um assignee dispara. O app avisa o gestor antes de virar crise.
-**Requirements:** TBD
-**Plans:** 0 plans
-**Note:** Gap coberto: sem alertas proativos. Fase D — depende de A (trending) para detecção de tendência.
+**Goal:** O app detecta automaticamente condições críticas na operação de sustentação e avisa o gestor antes de virar crise — via badge na sidebar e banner inline na SustentacaoView. Alertas calculados a cada refresh, somem sozinhos quando a condição melhora.
+**Requirements:** ALRT-01, ALRT-02, ALRT-03, ALRT-04, ALRT-05
+**Plans:** 2 plans
+**Note:** Gap coberto: sem alertas proativos. Fase D — depende de A (trending) para detecção de tendência. 4 condições: breach crescente, ticket envelhecendo, fila crescendo, spike de incidente.
+
+Plans:
+- [ ] 999.14-01-PLAN.md — SustentacaoAlerta tipo + calcularAlertas() + IPC integration (ALRT-01, ALRT-02, ALRT-03)
+- [ ] 999.14-02-PLAN.md — Badge na Sidebar + banner inline na SustentacaoView (ALRT-04, ALRT-05)
