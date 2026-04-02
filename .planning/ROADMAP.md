@@ -175,3 +175,40 @@ Plans:
 
 Plans:
 - [ ] TBD (promote with /gsd:review-backlog when ready)
+
+### Phase 999.11: Sustentação — Trending histórico + SLA compliance rate (BACKLOG)
+
+**Goal:** Acumular snapshots históricos de sustentação (não sobrescrever cache), calcular taxa de SLA compliance (% tickets resolvidos no prazo), gráficos de evolução de breach count e tickets fechados ao longo do tempo. Pré-requisito para todas as outras fases de sustentação.
+**Requirements:** TBD
+**Plans:** 0 plans
+**Note:** Gaps cobertos: zero tendência histórica + sem compliance rate. Fase A do pacote Sustentação Intelligence.
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
+
+### Phase 999.12: Sustentação — Reports + cruzamento com produtividade (BACKLOG)
+
+**Goal:** Sustentação entra nos reports (Daily/Weekly) com resumo de carga, breaches e alertas. Cruzar dados de sustentação com produtividade do time: "fulano teve velocity baixa E estava carregando 8 tickets de suporte". Análise de IA automatizada nos reports em vez de manual.
+**Requirements:** TBD
+**Plans:** 0 plans
+**Note:** Gaps cobertos: sustentação é silo + IA manual e descartável (parcial). Fase B — depende de 999.11 (trending). Depende também de 999.7 (MetricsWriter) para persistência.
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
+
+### Phase 999.13: Sustentação — Intel operacional por pessoa (BACKLOG)
+
+**Goal:** Inteligência operacional por assignee: quem está sobrecarregado, quem resolve mais rápido, tempo médio de resolução por tipo, carga vs capacidade. Permitir ao gestor decisões de redistribuição baseadas em dados.
+**Requirements:** TBD
+**Plans:** 0 plans
+**Note:** Gap coberto: sem inteligência operacional. Fase C — independente de B, depende de A (trending histórico).
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
+
+### Phase 999.14: Sustentação — Alertas proativos (BACKLOG)
+
+**Goal:** Notificações proativas quando: breach count sobe acima de threshold, SLA compliance cai abaixo de %, ticket individual envelhece além do crítico, ou carga de um assignee dispara. O app avisa o gestor antes de virar crise.
+**Requirements:** TBD
+**Plans:** 0 plans
+**Note:** Gap coberto: sem alertas proativos. Fase D — depende de A (trending) para detecção de tendência.
