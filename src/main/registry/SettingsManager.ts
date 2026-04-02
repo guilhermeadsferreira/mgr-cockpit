@@ -71,6 +71,8 @@ export interface AppSettings {
   jiraSupportProjectKey?: string
   /** Threshold de SLA por tipo de issue (tipo → dias). Padrão: todos os tipos com 5 dias. */
   jiraSlaThresholds?: Record<string, number>
+  /** Mapeamento regex→tema para categorizar tickets de suporte por assunto. Ex: {"saldo|balance": "Divergência de Saldo"} */
+  jiraSupportCategories?: Record<string, string>
 }
 
 const SETTINGS_DIR  = join(homedir(), '.pulsecockpit')

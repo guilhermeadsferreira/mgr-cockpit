@@ -1124,7 +1124,7 @@ function registerIpcHandlers(): void {
 
   async function fetchAndCacheSustentacao(): Promise<SupportBoardSnapshot | null> {
     const settings = SettingsManager.load()
-    const { jiraSupportProjectKey, jiraBaseUrl, jiraEmail, jiraApiToken, jiraSlaThresholds } = settings
+    const { jiraSupportProjectKey, jiraBaseUrl, jiraEmail, jiraApiToken, jiraSlaThresholds, jiraSupportCategories } = settings
 
     if (!jiraSupportProjectKey || !jiraBaseUrl || !jiraEmail || !jiraApiToken) {
       return null
@@ -1155,6 +1155,7 @@ function registerIpcHandlers(): void {
       config: { baseUrl: jiraBaseUrl, email: jiraEmail, apiToken: jiraApiToken },
       projectKey: jiraSupportProjectKey,
       slaThresholds: jiraSlaThresholds,
+      categories: jiraSupportCategories,
     })
 
     try {

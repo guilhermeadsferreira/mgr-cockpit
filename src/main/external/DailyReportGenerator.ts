@@ -1065,6 +1065,17 @@ export class DailyReportGenerator {
         lines_sust.push('')
       }
 
+      // Temas mais frequentes (quando categorização disponível)
+      const topTemas = sustentacao.topTemas ?? []
+      if (topTemas.length > 0) {
+        lines_sust.push('### Temas Principais (30d)', '')
+        for (const tema of topTemas.slice(0, 8)) {
+          const exemploStr = tema.exemplos.length > 0 ? ` (ex: ${tema.exemplos.join(', ')})` : ''
+          lines_sust.push(`- **${tema.tema}**: ${tema.count} tickets${exemploStr}`)
+        }
+        lines_sust.push('')
+      }
+
       if (sustentacao.ticketsEmBreach.length > 0) {
         lines_sust.push('### Tickets em Breach de SLA', '')
         for (const ticket of sustentacao.ticketsEmBreach.slice(0, 5)) {
@@ -1144,9 +1155,15 @@ export class DailyReportGenerator {
         ]
       }
 
+      // Temas para input da IA
+      const temasText = topTemas.length > 0
+        ? 'Temas: ' + topTemas.slice(0, 8).map(t => `${t.tema} (${t.count})`).join(', ')
+        : ''
+
       sustentacaoText = [
         `Board: ${sustentacao.ticketsAbertos} abertos, ${sustentacao.ticketsEmBreach.length} em breach`,
         sustentacao.complianceRate7d !== null ? `SLA compliance 7d: ${sustentacao.complianceRate7d}%` : '',
+        temasText,
         assigneeEntries.length > 0
           ? 'Carga por pessoa: ' + assigneeEntries.map(([slug, n]) => {
               const nome = personReports.find(p => p.slug === slug)?.nome ?? slug

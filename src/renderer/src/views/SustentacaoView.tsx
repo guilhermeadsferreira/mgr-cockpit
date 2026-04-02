@@ -304,8 +304,33 @@ function IntelOperacionalSection({
         </div>
       )}
 
-      {/* Sub-bloco 3: Top tipos (abertos + fechados 30d) */}
-      {topTipos.length > 0 && (
+      {/* Sub-bloco 3: Temas (preferência) ou tipos (fallback) */}
+      {(snapshot.topTemas && snapshot.topTemas.length > 0) ? (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{
+            fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)',
+            fontFamily: 'var(--font)', marginBottom: 10,
+          }}>
+            Temas mais frequentes (abertos + fechados 30d)
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {snapshot.topTemas.map((item) => (
+              <span
+                key={item.tema}
+                title={item.exemplos.length > 0 ? `Ex: ${item.exemplos.join(', ')}` : undefined}
+                style={{
+                  padding: '4px 12px', borderRadius: 20,
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
+                  fontSize: 12.5, color: 'var(--text-secondary)', fontFamily: 'var(--font)',
+                  cursor: item.exemplos.length > 0 ? 'help' : undefined,
+                }}
+              >
+                {item.tema}: <strong style={{ color: 'var(--text-primary)' }}>{item.count}</strong>
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : topTipos.length > 0 ? (
         <div style={{ marginBottom: 24 }}>
           <div style={{
             fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)',
@@ -325,7 +350,7 @@ function IntelOperacionalSection({
             ))}
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Sub-bloco 4: Recorrentes detectados */}
       {recorrentesDetectados.length > 0 && (
