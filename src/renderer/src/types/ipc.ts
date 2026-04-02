@@ -67,6 +67,12 @@ export interface AppSettings {
   dailyReportEnabled?: boolean
   dailyReportTime?: string
   sprintReportEnabled?: boolean
+
+  // Sustentação
+  jiraSupportBoardId?: number
+  jiraSupportProjectKey?: string
+  /** Threshold de SLA por tipo de issue (tipo → dias). Padrão: todos os tipos com 5 dias. Ex: { Bug: 3, Task: 7 } */
+  jiraSlaThresholds?: Record<string, number>
 }
 
 export type PersonLevel   = 'junior' | 'pleno' | 'senior' | 'staff' | 'principal' | 'manager'
@@ -144,6 +150,37 @@ export interface ExternalDataSnapshot {
   jira: ExternalJiraSnapshot | null
   github: ExternalGitHubSnapshot | null
   insights: ExternalCrossInsight[]
+}
+
+export interface SupportTicket {
+  key: string
+  summary: string
+  type: string
+  labels: string[]
+  assignee: string | null
+  /** Dias desde criação */
+  ageDias: number
+  status: string
+  /** true se age > threshold configurado para seu tipo */
+  slaBreached: boolean
+  /** Últimos 3 comentários (body + author) */
+  recentComments: Array<{ author: string; body: string; created: string }>
+}
+
+export interface SupportBoardSnapshot {
+  atualizadoEm: string
+  /** Tickets abertos (status != Done) nos últimos 30 dias ou abertos antes disso */
+  ticketsAbertos: number
+  /** Tickets fechados nos últimos 30 dias */
+  ticketsFechadosUltimos30d: number
+  /** Top 5 tipos por frequência */
+  topTipos: Array<{ tipo: string; count: number }>
+  /** Top 5 labels por frequência */
+  topLabels: Array<{ label: string; count: number }>
+  /** Tickets com SLA estourado */
+  ticketsEmBreach: SupportTicket[]
+  /** Agrupamento por assignee: slug → contagem de tickets abertos */
+  porAssignee: Record<string, number>
 }
 
 export interface ExternalHistoricoEntry {
