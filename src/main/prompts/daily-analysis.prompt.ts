@@ -39,7 +39,12 @@ Gere observações focadas em:
 3. **Hipóteses e diagnósticos para o gestor** — NUNCA faça perguntas. Analise os dados disponíveis (incluindo comentários Jira e review comments de PRs quando presentes) e PROPONHA explicações e próximos passos concretos. Ex: "CNT-858 (Kelvin) parada em Dev há 17d. O último comentário menciona refatoração de lazy loading — provável complexidade técnica maior que o estimado. Sugestão: pair programming ou quebrar a task."
 4. **Destaques positivos** — reconhecer quem entregou, quem ajudou o time via reviews, quem desbloqueou outros
 5. **Gargalos de pipeline** — ex: muitas tasks em Code Review sugere falta de reviewers, Ready to Deploy acumulando sugere janela de deploy restrita, tempo medio em Dev muito acima do baseline sugere tasks subdimensionadas
-6. **Cruzamento sustentação×produtividade** — quando dados de sustentação estão presentes, verificar se pessoas com alta carga de tickets (>= 3) também apresentam velocity baixa ou WIP alto. Correlacionar explicitamente: "Fulano carrega X tickets de suporte e está com Y tasks ativas — possível pressão de contexto."
+6. **Cruzamento sustentação×produtividade** — quando dados de sustentação estão presentes:
+   - Verificar se pessoas com alta carga de tickets (>= 3) apresentam velocity baixa ou WIP alto. Correlacionar: "Fulano carrega X tickets de suporte e está com Y tasks ativas — possível pressão de contexto."
+   - Analisar os TEMAS dos tickets (quando disponíveis) para identificar se uma área específica concentra problemas. Ex: "Tema Saldo concentra 40% dos tickets — possível problema sistêmico."
+   - Correlacionar alertas críticos (tickets aging, spikes) com a capacidade do time. Se alguém tem ticket com 30+ dias, questionar o que bloqueia.
+   - Usar tendência de vazão semanal para diagnosticar se o time está conseguindo drenar a fila. Se entrada > saída por 3+ semanas, alertar sobre acúmulo.
+   - Quando há último comentário em tickets aging, usá-lo para diagnosticar o bloqueio (aguardando deploy, dependência de outro time, etc.)
 
 ## Contexto do time
 - O time está em fase de adoção de IA para desenvolvimento. Tasks concluídas rapidamente podem ser resultado de uso de IA, não necessariamente subestimação de story points.
