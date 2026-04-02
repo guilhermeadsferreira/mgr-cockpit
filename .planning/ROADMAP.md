@@ -180,13 +180,13 @@ Plans:
 
 **Goal:** Acumular snapshots históricos de sustentação (não sobrescrever cache), calcular taxa de SLA compliance (% tickets resolvidos no prazo), gráficos de evolução de breach count e tickets fechados ao longo do tempo. Pré-requisito para todas as outras fases de sustentação.
 **Requirements:** STRD-01, STRD-02, STRD-03, STRD-04, STRD-05
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 **Note:** Gaps cobertos: zero tendência histórica + sem compliance rate. Fase A do pacote Sustentação Intelligence.
 
 Plans:
 - [x] 999.11-01-PLAN.md — Tipos + calcularCompliance() (STRD-01, STRD-02)
 - [x] 999.11-02-PLAN.md — history.json + IPC com history[] (STRD-03)
-- [ ] 999.11-03-PLAN.md — SustentacaoView: compliance cards + deltas + mini charts (STRD-04, STRD-05)
+- [x] 999.11-03-PLAN.md — SustentacaoView: compliance cards + deltas + mini charts (STRD-04, STRD-05)
 
 ### Phase 999.12: Sustentação — Reports + cruzamento com produtividade (BACKLOG)
 
