@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-last_updated: "2026-04-02T00:09:19.678Z"
+status: Executing Phase 999.5
+last_updated: "2026-04-02T01:18:13.893Z"
 progress:
   total_phases: 9
   completed_phases: 5
-  total_plans: 17
-  completed_plans: 17
+  total_plans: 23
+  completed_plans: 18
 ---
 
 # Project State — Pulse Cockpit V2.1
@@ -18,7 +18,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-03-26)
 
 **Core value:** O contexto acumulado ao longo do ciclo deve estar acessível para o gestor na hora que importa: na tela do perfil, na pauta e no relatório de calibração.
-**Current focus:** Phase 999.7 — perfil-vivo-sensibilizado-por-daily-report
+**Current focus:** Phase 999.5 — visibilidade-board-sustentacao
 
 ## Current Status
 
@@ -63,6 +63,9 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 - [Phase 999.7-01]: Graceful degradation via try/catch — falha na persistencia nao impede geracao do relatorio
 - [Phase 999.7-02]: Sprint entregas array vazio — dados individuais nao disponiveis no snapshot
 - [Phase 999.7-02]: Deltas vs mes anterior calculados inline usando previous.commits30d e previous.prsMerged30d
+- [Phase 999.5-01]: Campos opcionais em AppSettings sem alterar DEFAULTS — settings existentes permanecem validos
+- [Phase 999.5-01]: SupportTicket e SupportBoardSnapshot inseridos entre ExternalDataSnapshot e ExternalHistoricoEntry para agrupar tipos external intelligence
+- [Phase 999.5-01]: 'sustentacao' adicionado apos 'audit' no ViewName — mantem ordem existente intacta
 
 ## Phases
 
@@ -100,6 +103,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 | 04 | 05 | 140s | 1/1 | 2 |
 | 999.7 | 01 | 2min | 2/2 | 3 |
 | 999.7 | 02 | 2min | 2/2 | 2 |
+| Phase 999.5 P01 | 67s | 2 tasks | 3 files |
 
 ## Next Action
 

@@ -89,8 +89,8 @@ Requirements para este milestone. Cada um mapeia para phases do roadmap.
 
 ### Visibilidade do Board de Sustentacao (Phase 999.5)
 
-- [ ] **SUST-01**: SupportBoardClient busca todos os tickets do projectKey configurado, calcula SLA breach por tipo (default 5 dias) e retorna SupportBoardSnapshot com topTipos, topLabels, ticketsEmBreach e porAssignee
-- [ ] **SUST-02**: AppSettings recebe jiraSupportBoardId, jiraSupportProjectKey e jiraSlaThresholds; UI de configuracao na SettingsView
+- [x] **SUST-01**: SupportBoardClient busca todos os tickets do projectKey configurado, calcula SLA breach por tipo (default 5 dias) e retorna SupportBoardSnapshot com topTipos, topLabels, ticketsEmBreach e porAssignee
+- [x] **SUST-02**: AppSettings recebe jiraSupportBoardId, jiraSupportProjectKey e jiraSlaThresholds; UI de configuracao na SettingsView
 - [ ] **SUST-03**: IPC handler sustentacao:get-data com cache de 1h em disco; sustentacao:refresh invalida cache; window.api.sustentacao exposto no preload
 - [ ] **SUST-04**: SustentacaoView como tela top-level na sidebar — exibe metricas do board, tickets em breach e estado de nao-configurado
 - [ ] **SUST-05**: Analise de IA manual (botao "Analisar") extrai padroes, oportunidades de automacao e causa raiz; persiste no metricas.md via bloco SUSTENTACAO:ANALISE para assignees com >= 3 tickets
