@@ -192,11 +192,11 @@ Plans:
 
 **Goal:** Sustentação entra nos reports (Daily/Weekly) com resumo de carga, breaches e alertas. Cruzar dados de sustentação com produtividade do time: "fulano teve velocity baixa E estava carregando 8 tickets de suporte". Análise de IA automatizada nos reports em vez de manual.
 **Requirements:** SRCP-01, SRCP-02, SRCP-03, SRCP-04, SRCP-05
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 **Note:** Gaps cobertos: sustentação é silo + IA manual e descartável (parcial). Fase B — depende de 999.11 (trending). Depende também de 999.7 (MetricsWriter) para persistência.
 
 Plans:
-- [ ] 999.12-01-PLAN.md — fetchSustentacaoForReport() + seção Sustentação no Daily + cruzamento no prompt IA (SRCP-01, SRCP-02, SRCP-03)
+- [x] 999.12-01-PLAN.md — fetchSustentacaoForReport() + seção Sustentação no Daily + cruzamento no prompt IA (SRCP-01, SRCP-02, SRCP-03)
 - [ ] 999.12-02-PLAN.md — MetricsWriter.writeSustentacaoWeekly() + seção Sustentação no Weekly (SRCP-04, SRCP-05)
 
 ### Phase 999.13: Sustentação — Intel operacional por pessoa (BACKLOG)

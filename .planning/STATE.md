@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-last_updated: "2026-04-02T16:07:26.127Z"
+status: Executing Phase 999.12
+last_updated: "2026-04-02T16:48:14.527Z"
 progress:
   total_phases: 16
   completed_phases: 8
-  total_plans: 28
-  completed_plans: 28
+  total_plans: 30
+  completed_plans: 29
 ---
 
 # Project State — Pulse Cockpit V2.1
@@ -18,7 +18,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-03-26)
 
 **Core value:** O contexto acumulado ao longo do ciclo deve estar acessível para o gestor na hora que importa: na tela do perfil, na pauta e no relatório de calibração.
-**Current focus:** Phase 999.11 — sustentacao-trending-sla-compliance
+**Current focus:** Phase 999.12 — sustentacao-reports-cruzamento-produtividade
 
 ## Current Status
 
@@ -85,6 +85,9 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 - [Phase 999.11]: Try/catch do history separado do board.json — falha no history nunca impede retorno do snapshot
 - [Phase 999.11]: MiniLineChart com SVG polyline inline — sem dependência externa de charting
 - [Phase 999.11]: Compliance cards em row separada acima dos cards existentes para hierarquia visual clara
+- [Phase 999.12]: fetchSustentacaoForReport não lê/grava history.json — responsabilidade do IPC handler que tem acesso ao workspacePath
+- [Phase 999.12]: Sustentação omitida silenciosamente no Daily Report quando snapshot null — sem seção vazia
+- [Phase 999.12]: Cruzamento porAssignee usa slug como chave, fallback para slug bruto quando pessoa não encontrada
 
 ## Phases
 
@@ -133,6 +136,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 | Phase 999.11 P01 | 85s | 2 tasks | 3 files |
 | Phase 999.11 P02 | 3min | 1 tasks | 1 files |
 | Phase 999.11 P03 | 100s | 1 tasks | 1 files |
+| Phase 999.12 P01 | 2min | 2 tasks | 3 files |
 
 ## Next Action
 
