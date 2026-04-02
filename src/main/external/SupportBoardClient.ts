@@ -1,6 +1,7 @@
 import { JiraClient, type JiraConfig } from './JiraClient'
 import { Logger } from '../logging/Logger'
 import type { SupportBoardSnapshot, SupportTicket } from '../../renderer/src/types/ipc'
+import type { AppSettings } from '../registry/SettingsManager'
 
 const log = Logger.getInstance().child('SupportBoardClient')
 
@@ -144,5 +145,31 @@ export async function fetchSupportBoardMetrics(input: SupportBoardInput): Promis
     complianceRate7d,
     complianceRate30d,
     history: [], // preenchido pelo IPC handler após ler history.json (ver Plan 02)
+  }
+}
+
+/**
+ * Busca snapshot de sustentação para uso direto nos generators (sem IPC).
+ * Retorna null quando sustentação não está configurada ou ocorre erro (graceful degradation).
+ * NÃO lê nem grava history.json — isso é responsabilidade do IPC handler.
+ */
+export async function fetchSustentacaoForReport(settings: AppSettings): Promise<SupportBoardSnapshot | null> {
+  if (!settings.jiraEnabled || !settings.jiraBaseUrl || !settings.jiraApiToken || !settings.jiraSupportProjectKey) {
+    return null
+  }
+  try {
+    const config: JiraConfig = {
+      baseUrl: settings.jiraBaseUrl,
+      email: settings.jiraEmail ?? '',
+      apiToken: settings.jiraApiToken,
+    }
+    return await fetchSupportBoardMetrics({
+      config,
+      projectKey: settings.jiraSupportProjectKey,
+      slaThresholds: settings.jiraSlaThresholds ?? {},
+    })
+  } catch (err) {
+    log.warn('fetchSustentacaoForReport: falhou (graceful)', { error: err instanceof Error ? err.message : String(err) })
+    return null
   }
 }
