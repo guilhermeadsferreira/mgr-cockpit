@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 999.11
-last_updated: "2026-04-02T15:31:03.391Z"
+last_updated: "2026-04-02T15:33:51.657Z"
 progress:
   total_phases: 16
   completed_phases: 7
   total_plans: 28
-  completed_plans: 26
+  completed_plans: 27
 ---
 
 # Project State — Pulse Cockpit V2.1
@@ -81,6 +81,8 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 - [Phase 999.9]: maisAntiga incluida no pipelineHealthText para contexto IA sobre tasks travadas
 - [Phase 999.11]: calcularCompliance retorna null (não 0%) quando não há tickets resolvidos na janela — sem dados semanticamente diferente de 0% compliance
 - [Phase 999.11]: history: [] no return do SupportBoardClient — preenchido pelo IPC handler no Plan 02 (client não tem acesso ao workspacePath)
+- [Phase 999.11]: readHistory chamada APOS gravar history.json — snapshot de hoje ja incluso nos dados retornados via .slice(-30)
+- [Phase 999.11]: Try/catch do history separado do board.json — falha no history nunca impede retorno do snapshot
 
 ## Phases
 
@@ -127,6 +129,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 | Phase 999.9 P01 | 3min | 1 tasks | 1 files |
 | Phase 999.9 P02 | 2min | 2 tasks | 2 files |
 | Phase 999.11 P01 | 85s | 2 tasks | 3 files |
+| Phase 999.11 P02 | 3min | 1 tasks | 1 files |
 
 ## Next Action
 
