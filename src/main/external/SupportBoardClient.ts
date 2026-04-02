@@ -9,12 +9,59 @@ const DEFAULT_SLA_DIAS = 5
 const BREACH_COMMENTS_MAX = 3
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
 const TOP_N = 5
+const TOP_TEMAS = 10
 const IN_OUT_SEMANAS = 8
+
+/**
+ * Compila os patterns configurados em regex (case-insensitive).
+ * Patterns inválidos são ignorados com warning no log.
+ */
+function compilarCategorias(categories: Record<string, string>): Array<{ regex: RegExp; tema: string }> {
+  const result: Array<{ regex: RegExp; tema: string }> = []
+  for (const [pattern, tema] of Object.entries(categories)) {
+    try {
+      result.push({ regex: new RegExp(pattern, 'i'), tema })
+    } catch {
+      log.warn('jiraSupportCategories: regex inválido, ignorando', { pattern, tema })
+    }
+  }
+  return result
+}
+
+/**
+ * Extrai o tema/assunto de um ticket a partir do summary.
+ * Prioridade:
+ * 1. Regex configuráveis (jiraSupportCategories)
+ * 2. Heurística de prefixo: [Tema], Tema:, Tema -, Tema |
+ * 3. Fallback: "Outros"
+ */
+function extrairTema(summary: string, compiledCategories: Array<{ regex: RegExp; tema: string }>): string {
+  // 1. Tentar regex configurados
+  for (const { regex, tema } of compiledCategories) {
+    if (regex.test(summary)) return tema
+  }
+
+  // 2. Heurística: prefixo entre colchetes [Tema]
+  const bracketMatch = summary.match(/^\[([^\]]+)\]/)
+  if (bracketMatch) return bracketMatch[1].trim()
+
+  // 3. Heurística: prefixo antes de delimitador (: - |)
+  const delimMatch = summary.match(/^([^:\-|]{2,30})\s*[:\-|]/)
+  if (delimMatch) {
+    const prefix = delimMatch[1].trim()
+    // Ignorar prefixos genéricos que são issue keys (ex: "BANKS-1234")
+    if (!/^[A-Z]+-\d+$/.test(prefix) && prefix.length > 1) return prefix
+  }
+
+  return 'Outros'
+}
 
 export interface SupportBoardInput {
   config: JiraConfig
   projectKey: string
   slaThresholds?: Record<string, number>
+  /** Mapeamento regex→tema para categorização de tickets por assunto */
+  categories?: Record<string, string>
 }
 
 function ageDias(createdAt: string): number {
@@ -133,7 +180,7 @@ function detectarRecorrentes(
 export async function fetchSupportBoardMetricsWithIssues(
   input: SupportBoardInput
 ): Promise<{ snapshot: Omit<SupportBoardSnapshot, 'alertas'>; issues: JiraIssue[] }> {
-  const { config, projectKey, slaThresholds = {} } = input
+  const { config, projectKey, slaThresholds = {}, categories = {} } = input
   const client = new JiraClient(config)
 
   // JQL sem filtro de assignee — busca todos os tickets do projeto
@@ -209,6 +256,20 @@ export async function fetchSupportBoardMetricsWithIssues(
   const topTipos = topN(tipoCounts, TOP_N).map(({ key, count }) => ({ tipo: key, count }))
   const topLabels = topN(labelCounts, TOP_N).map(({ key, count }) => ({ label: key, count }))
 
+  // Categorizar tickets por tema extraído do summary
+  const compiled = compilarCategorias(categories)
+  const temaCounts: Record<string, { count: number; exemplos: string[] }> = {}
+  for (const issue of ticketsParaContagem) {
+    const tema = extrairTema(issue.summary, compiled)
+    if (!temaCounts[tema]) temaCounts[tema] = { count: 0, exemplos: [] }
+    temaCounts[tema].count++
+    if (temaCounts[tema].exemplos.length < 3) temaCounts[tema].exemplos.push(issue.key)
+  }
+  const topTemas = Object.entries(temaCounts)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, TOP_TEMAS)
+    .map(([tema, data]) => ({ tema, count: data.count, exemplos: data.exemplos }))
+
   // Calcular compliance rates (usa JiraIssue[] completo — não disponível no snapshot)
   const complianceRate7d = calcularCompliance(issues, slaThresholds, 7)
   const complianceRate30d = calcularCompliance(issues, slaThresholds, 30)
@@ -222,6 +283,7 @@ export async function fetchSupportBoardMetricsWithIssues(
     ticketsFechadosUltimos30d: fechados30d.length,
     topTipos,
     topLabels,
+    topTemas,
     ticketsEmBreach,
     porAssignee: assigneeCounts,
     complianceRate7d,
@@ -259,7 +321,8 @@ export function calcularAlertas(
   snapshot: Omit<SupportBoardSnapshot, 'alertas'>,
   history: SustentacaoHistoryEntry[],
   issues: Array<{ created: string; type: string; labels: string[]; statusCategory: string }>,
-  slaThresholds: Record<string, number> = {}
+  slaThresholds: Record<string, number> = {},
+  jiraBaseUrl?: string
 ): SustentacaoAlerta[] {
   const alertas: SustentacaoAlerta[] = []
 
@@ -285,10 +348,23 @@ export function calcularAlertas(
   for (const ticket of snapshot.ticketsEmBreach) {
     const threshold = slaThresholds[ticket.type] ?? DEFAULT_SLA_DIAS
     if (ticket.ageDias > ALRT_SLA_MULTIPLIER * threshold) {
+      const lastComment = ticket.recentComments.length > 0
+        ? {
+            author: ticket.recentComments[0].author,
+            body: ticket.recentComments[0].body.slice(0, 150),
+            created: ticket.recentComments[0].created,
+          }
+        : null
       alertas.push({
         tipo: 'ticket_envelhecendo',
         mensagem: `${ticket.key}: ${ticket.ageDias}d aberto (limite ${threshold}d, threshold critico ${ALRT_SLA_MULTIPLIER * threshold}d)`,
         severidade: 'critico',
+        ticketKey: ticket.key,
+        summary: ticket.summary,
+        status: ticket.status,
+        assignee: ticket.assignee,
+        lastComment,
+        jiraUrl: jiraBaseUrl ? `${jiraBaseUrl}/browse/${ticket.key}` : undefined,
       })
     }
   }
@@ -321,20 +397,24 @@ export function calcularAlertas(
   const abertosRecentes = issues.filter(
     (i) => i.statusCategory !== 'done' && new Date(i.created).getTime() >= cutoffSpike
   )
-  const spikeCounts: Record<string, number> = {}
+  const spikeCounts: Record<string, { count: number; keys: string[] }> = {}
   for (const issue of abertosRecentes) {
+    const issueKey = 'key' in issue ? (issue as { key: string }).key : undefined
     for (const label of issue.labels.length > 0 ? issue.labels : ['_sem_label']) {
-      const key = `${issue.type}::${label}`
-      spikeCounts[key] = (spikeCounts[key] ?? 0) + 1
+      const k = `${issue.type}::${label}`
+      if (!spikeCounts[k]) spikeCounts[k] = { count: 0, keys: [] }
+      spikeCounts[k].count++
+      if (issueKey && spikeCounts[k].keys.length < 5) spikeCounts[k].keys.push(issueKey)
     }
   }
-  for (const [key, count] of Object.entries(spikeCounts)) {
+  for (const [key, { count, keys }] of Object.entries(spikeCounts)) {
     if (count >= ALRT_SPIKE_COUNT) {
       const [tipo, label] = key.split('::')
       const labelDesc = label === '_sem_label' ? '' : ` / ${label}`
+      const keysDesc = keys.length > 0 ? ` (${keys.join(', ')})` : ''
       alertas.push({
         tipo: 'spike_incidente',
-        mensagem: `${count} tickets "${tipo}${labelDesc}" criados nas ultimas 2h — possivel incidente`,
+        mensagem: `${count} tickets "${tipo}${labelDesc}" criados nas ultimas 2h — possivel incidente${keysDesc}`,
         severidade: 'critico',
       })
     }
@@ -362,6 +442,7 @@ export async function fetchSustentacaoForReport(settings: AppSettings): Promise<
       config,
       projectKey: settings.jiraSupportProjectKey,
       slaThresholds: settings.jiraSlaThresholds ?? {},
+      categories: settings.jiraSupportCategories,
     })
   } catch (err) {
     log.warn('fetchSustentacaoForReport: falhou (graceful)', { error: err instanceof Error ? err.message : String(err) })

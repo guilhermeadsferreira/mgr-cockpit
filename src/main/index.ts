@@ -1124,7 +1124,7 @@ function registerIpcHandlers(): void {
 
   async function fetchAndCacheSustentacao(): Promise<SupportBoardSnapshot | null> {
     const settings = SettingsManager.load()
-    const { jiraSupportProjectKey, jiraBaseUrl, jiraEmail, jiraApiToken, jiraSlaThresholds } = settings
+    const { jiraSupportProjectKey, jiraBaseUrl, jiraEmail, jiraApiToken, jiraSlaThresholds, jiraSupportCategories } = settings
 
     if (!jiraSupportProjectKey || !jiraBaseUrl || !jiraEmail || !jiraApiToken) {
       return null
@@ -1143,7 +1143,7 @@ function registerIpcHandlers(): void {
           const historyData = readHistory(historyFile).slice(-30)
           // Cache hit — alertas calculados on-the-fly sobre dados cached (sem issues[] raw)
           // Graceful: sem issues raw disponivel no cache, alertas D-07 ficam silenciosos
-          const alertasCached = calcularAlertas(cached.data, historyData, [], jiraSlaThresholds ?? {})
+          const alertasCached = calcularAlertas(cached.data, historyData, [], jiraSlaThresholds ?? {}, jiraBaseUrl)
           return { ...cached.data, history: historyData, alertas: alertasCached }
         }
       }
@@ -1155,6 +1155,7 @@ function registerIpcHandlers(): void {
       config: { baseUrl: jiraBaseUrl, email: jiraEmail, apiToken: jiraApiToken },
       projectKey: jiraSupportProjectKey,
       slaThresholds: jiraSlaThresholds,
+      categories: jiraSupportCategories,
     })
 
     try {
@@ -1198,7 +1199,7 @@ function registerIpcHandlers(): void {
 
     // Calcular alertas proativos (per D-10, D-11)
     const historyForAlerts = readHistory(join(cacheDir, 'history.json'))
-    const alertas = calcularAlertas(data, historyForAlerts, issues, jiraSlaThresholds ?? {})
+    const alertas = calcularAlertas(data, historyForAlerts, issues, jiraSlaThresholds ?? {}, jiraBaseUrl)
     const dataComAlertas = { ...data, alertas }
 
     const historyFile = join(cacheDir, 'history.json')

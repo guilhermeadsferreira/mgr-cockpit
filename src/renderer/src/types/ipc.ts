@@ -167,6 +167,14 @@ export interface SupportTicket {
   recentComments: Array<{ author: string; body: string; created: string }>
 }
 
+/** Contagem de tickets por tema/assunto extraído do summary */
+export interface TemaContagem {
+  tema: string
+  count: number
+  /** Até 3 ticket keys de exemplo para drill-down rápido */
+  exemplos: string[]
+}
+
 export interface SupportBoardSnapshot {
   atualizadoEm: string
   /** Tickets abertos (status != Done) nos últimos 30 dias ou abertos antes disso */
@@ -177,6 +185,8 @@ export interface SupportBoardSnapshot {
   topTipos: Array<{ tipo: string; count: number }>
   /** Top 5 labels por frequência */
   topLabels: Array<{ label: string; count: number }>
+  /** Top temas por frequência, extraídos do summary (abertos + fechados 30d). Opcional para backwards compat. */
+  topTemas?: TemaContagem[]
   /** Tickets com SLA estourado */
   ticketsEmBreach: SupportTicket[]
   /** Agrupamento por assignee: slug → contagem de tickets abertos */
@@ -219,6 +229,18 @@ export interface SustentacaoAlerta {
   mensagem: string
   /** Severidade visual */
   severidade: 'critico' | 'atencao'
+  /** Chave do ticket Jira associado (ex: BANKS-3668) */
+  ticketKey?: string
+  /** Resumo/título do ticket */
+  summary?: string
+  /** Status atual no Jira (ex: "Aguardando Deploy") */
+  status?: string
+  /** Assignee do ticket */
+  assignee?: string | null
+  /** Último comentário do ticket (body truncado, autor, data) */
+  lastComment?: { author: string; body: string; created: string } | null
+  /** URL direta para o ticket no Jira */
+  jiraUrl?: string
 }
 
 /** Entrada de vazão semanal: tickets abertos (in) vs resolvidos (out) na semana. */
