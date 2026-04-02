@@ -125,8 +125,8 @@ Requirements para este milestone. Cada um mapeia para phases do roadmap.
 
 - [x] **INTEL-01**: SupportBoardSnapshot estendido com `inOutSemanal: InOutSemanalEntry[]` (vazao semanal in/out, ultimas 8 semanas) calculado no SupportBoardClient a partir dos issues dos ultimos 90d
 - [x] **INTEL-02**: SupportBoardSnapshot estendido com `recorrentesDetectados: RecorrenteDetectado[]` (tipo+label com >2 ocorrencias nos ultimos 30d) — logica deterministica, sem IA; topTipos inclui tickets fechados 30d alem dos abertos
-- [ ] **INTEL-03**: SustentacaoView exibe secao "Inteligencia Operacional" com grafico in/out semanal (SVG barras inline) e curva historica de backlog (MiniLineChart com ticketsAbertos do history[])
-- [ ] **INTEL-04**: Secao "Inteligencia Operacional" exibe top tipos expandidos (abertos+fechados 30d) e lista de recorrentes com alerta visual "Candidato a raiz — Nx em 30d"; secao nao renderiza quando sem dados
+- [x] **INTEL-03**: SustentacaoView exibe secao "Inteligencia Operacional" com grafico in/out semanal (SVG barras inline) e curva historica de backlog (MiniLineChart com ticketsAbertos do history[])
+- [x] **INTEL-04**: Secao "Inteligencia Operacional" exibe top tipos expandidos (abertos+fechados 30d) e lista de recorrentes com alerta visual "Candidato a raiz — Nx em 30d"; secao nao renderiza quando sem dados
 
 ### Sustentacao Alertas Proativos (Phase 999.14)
 
@@ -223,10 +223,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SRCP-04 | Phase 999.12 | Planned |
 | SRCP-05 | Phase 999.12 | Planned |
 
-| INTEL-01 | Phase 999.13 | Planned |
-| INTEL-02 | Phase 999.13 | Planned |
-| INTEL-03 | Phase 999.13 | Planned |
-| INTEL-04 | Phase 999.13 | Planned |
+| INTEL-01 | Phase 999.13 | Complete |
+| INTEL-02 | Phase 999.13 | Complete |
+| INTEL-03 | Phase 999.13 | Complete |
+| INTEL-04 | Phase 999.13 | Complete |
 
 | ALRT-01 | Phase 999.14 | Planned |
 | ALRT-02 | Phase 999.14 | Planned |

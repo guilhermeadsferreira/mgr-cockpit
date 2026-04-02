@@ -203,7 +203,7 @@ Plans:
 
 **Goal:** Inteligência operacional da operação de sustentação: vazão semanal (in/out), curva histórica de backlog, top tipos por frequência (abertos + fechados), detecção de recorrência (candidatos a resolver na raiz). Visualização na SustentacaoView existente.
 **Requirements:** INTEL-01, INTEL-02, INTEL-03, INTEL-04
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 **Note:** Gap coberto: sem inteligência operacional. Fase C — independente de B, depende de A (trending histórico para curva de backlog).
 
 Plans:
