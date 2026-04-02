@@ -122,4 +122,4 @@ Gestor ingere artefato (transcricao, anotacao, PDF)
 | Pauta util (gestor nao descarta) | >= 80% das pautas geradas |
 
 ---
-*Last updated: 2026-04-01*
+*Last updated: 2026-04-02*
