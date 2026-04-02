@@ -147,7 +147,7 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 999.7-01-PLAN.md — MetricsWriter + integracao Daily e Weekly (MTRW-01, MTRW-02, MTRW-03, MTRW-04)
+- [x] 999.7-01-PLAN.md — MetricsWriter + integracao Daily e Weekly (MTRW-01, MTRW-02, MTRW-03, MTRW-04)
 - [ ] 999.7-02-PLAN.md — Integracao Sprint e Monthly (MTRW-05, MTRW-06)
 
 ### Phase 999.8: Visão de PRs abertas com status de revisão (BACKLOG)
