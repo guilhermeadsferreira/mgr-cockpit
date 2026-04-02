@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FolderOpen, Cpu, CheckCircle2, XCircle, User, RefreshCw, Zap, Sparkles, ChevronDown, ChevronRight, ExternalLink, Github, AlertCircle } from 'lucide-react'
+import { FolderOpen, Cpu, CheckCircle2, XCircle, User, RefreshCw, Zap, Sparkles, ChevronDown, ChevronRight, ExternalLink, Github, AlertCircle, FileText } from 'lucide-react'
 import type { AppSettings, IngestionOperation, OperationProviderConfig } from '../types/ipc'
 
 export function SettingsView() {
@@ -641,6 +641,26 @@ export function SettingsView() {
                 onChange={(e) => set('githubRepos', e.target.value.split(',').map(r => r.trim()).filter(Boolean) || undefined)}
                 placeholder="repo1, repo2, repo3"
               />
+            </Field>
+          </Section>
+
+          {/* Relatórios */}
+          <Section
+            icon={<FileText size={14} />}
+            title="Relatórios"
+            desc="Geração automática de daily report ao abrir o app (uma vez por dia)"
+          >
+            <Field label="Daily Report automático" hint="Gera o daily report no startup do app se ainda não foi gerado hoje">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={form.dailyReportEnabled ?? false}
+                  onChange={(e) => set('dailyReportEnabled', e.target.checked)}
+                />
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  {form.dailyReportEnabled ? 'Ativado' : 'Desativado'}
+                </span>
+              </label>
             </Field>
           </Section>
 

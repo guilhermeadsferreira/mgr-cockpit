@@ -473,7 +473,7 @@ export class JiraClient {
   }
 
   async getIssueComments(issueKey: string, maxComments = 3): Promise<JiraComment[]> {
-    const response = await this.request<{ comments: Array<{ id: string; author: { displayName: string }; body: string; created: string; updated: string }>; total: number }>(
+    const response = await this.request<{ comments: Array<{ id: string; author: { displayName: string }; body: unknown; created: string; updated: string }>; total: number }>(
       `/rest/api/3/issue/${issueKey}/comment`,
       {
         params: {
@@ -487,11 +487,26 @@ export class JiraClient {
     return (response.comments || []).map(c => ({
       id: c.id,
       author: c.author.displayName,
-      body: c.body.replace(/<[^>]*>/g, '').slice(0, 500),
+      body: extractCommentText(c.body).slice(0, 500),
       created: c.created,
       updated: c.updated,
     }))
   }
+}
+
+// Jira API v3 returns comment bodies as Atlassian Document Format (ADF) objects.
+// This function handles both ADF objects and plain strings.
+function extractCommentText(body: unknown): string {
+  if (typeof body === 'string') {
+    return body.replace(/<[^>]*>/g, '')
+  }
+  if (!body || typeof body !== 'object') return ''
+  const node = body as Record<string, unknown>
+  if (node.type === 'text' && typeof node.text === 'string') return node.text
+  if (Array.isArray(node.content)) {
+    return node.content.map(extractCommentText).join(' ')
+  }
+  return ''
 }
 
 export class JiraError extends Error {

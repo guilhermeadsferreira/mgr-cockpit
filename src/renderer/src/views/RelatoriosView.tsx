@@ -18,6 +18,8 @@ export function RelatoriosView() {
   const [preview, setPreview] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [successHint, setSuccessHint] = useState<string | null>(null)
+  const [progressMsg, setProgressMsg] = useState<string | null>(null)
+  const [progressPct, setProgressPct] = useState(0)
 
   async function loadReports() {
     setLoading(true)
@@ -30,6 +32,19 @@ export function RelatoriosView() {
   }
 
   useEffect(() => { loadReports() }, [])
+
+  useEffect(() => {
+    window.api.external.onProgress((data: ReportProgress) => {
+      if (data.step === 'done') {
+        setProgressMsg(null)
+        setProgressPct(0)
+      } else {
+        setProgressMsg(data.message)
+        setProgressPct(data.percent)
+      }
+    })
+    return () => window.api.external.removeProgressListener()
+  }, [])
 
   function formatDateBR(date: Date): string {
     const day = String(date.getDate()).padStart(2, '0')
@@ -64,6 +79,8 @@ export function RelatoriosView() {
       alert(`Erro ao atualizar: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setRefreshing(false)
+      setProgressMsg(null)
+      setProgressPct(0)
     }
   }
 
@@ -89,6 +106,8 @@ export function RelatoriosView() {
       alert(`Erro ao gerar weekly: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setRefreshing(false)
+      setProgressMsg(null)
+      setProgressPct(0)
     }
   }
 
@@ -114,6 +133,8 @@ export function RelatoriosView() {
       alert(`Erro ao gerar sprint: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setRefreshing(false)
+      setProgressMsg(null)
+      setProgressPct(0)
     }
   }
 
@@ -139,6 +160,8 @@ export function RelatoriosView() {
       alert(`Erro ao gerar monthly: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setRefreshing(false)
+      setProgressMsg(null)
+      setProgressPct(0)
     }
   }
 
@@ -177,6 +200,8 @@ export function RelatoriosView() {
       alert(`Erro ao regenerar: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setRefreshing(false)
+      setProgressMsg(null)
+      setProgressPct(0)
     }
   }
 
@@ -264,6 +289,41 @@ export function RelatoriosView() {
           </button>
         </div>
       </div>
+
+      {refreshing && progressMsg && (
+        <div style={{
+          margin: '0 40px',
+          padding: '10px 14px',
+          borderRadius: 6,
+          fontSize: 12.5,
+          lineHeight: 1.45,
+          color: 'var(--text-secondary)',
+          background: 'var(--surface-2)',
+          border: '1px solid var(--border-subtle)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Loader2 size={12} style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+            <span>{progressMsg}</span>
+          </div>
+          <div style={{
+            height: 3,
+            borderRadius: 2,
+            background: 'var(--border-subtle)',
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              height: '100%',
+              width: `${progressPct}%`,
+              background: 'var(--accent)',
+              borderRadius: 2,
+              transition: 'width 0.3s ease',
+            }} />
+          </div>
+        </div>
+      )}
 
       {successHint && (
         <div

@@ -7,6 +7,7 @@ import type { JiraPersonMetrics, SprintSummary } from './JiraMetrics'
 import type { GitHubPersonMetrics } from './GitHubMetrics'
 import { MetricsWriter, type SprintEntry, type MomentoAtualEntry } from './MetricsWriter'
 import { Logger } from '../logging/Logger'
+import { notifyReportProgress } from './reportProgress'
 
 const log = Logger.getInstance().child('SprintReportGenerator')
 
@@ -42,13 +43,23 @@ export class SprintReportGenerator {
       unlinkSync(filePath)
     }
 
+    const progress = (step: string, message: string, percent: number) =>
+      notifyReportProgress({ type: 'sprint', step, message, percent })
+
+    progress('init', 'Iniciando relatório sprint…', 5)
+
     const registry = new PersonRegistry(this.workspacePath)
     const people = registry.list().filter(p => p.relacao === 'liderado')
+    const eligible = people.filter(p => p.jiraEmail || p.githubUsername)
 
     const personData: PersonSprintData[] = []
 
-    for (const person of people) {
+    for (let i = 0; i < people.length; i++) {
+      const person = people[i]
       if (!person.jiraEmail && !person.githubUsername) continue
+
+      const pct = 10 + Math.round((i / eligible.length) * 60)
+      progress('person-data', `Coletando dados de ${person.nome}…`, pct)
 
       let snapshot: ExternalDataSnapshot | null = null
       try {
@@ -81,8 +92,10 @@ export class SprintReportGenerator {
       await sleep(200)
     }
 
+    progress('build', 'Montando relatório…', 75)
     const content = this.buildReport(sprint, personData)
 
+    progress('write', 'Salvando relatório…', 90)
     mkdirSync(this.relatoriosDir, { recursive: true })
     writeFileSync(filePath, content, 'utf-8')
     log.info('sprint report gerado', { sprint: sprint.name, path: filePath })
@@ -125,6 +138,7 @@ export class SprintReportGenerator {
       }
     }
 
+    progress('done', 'Relatório sprint concluído!', 100)
     return filePath
   }
 

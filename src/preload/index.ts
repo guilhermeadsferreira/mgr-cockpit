@@ -122,6 +122,8 @@ contextBridge.exposeInMainWorld('api', {
     listReports:       ()              => ipcRenderer.invoke('external:list-reports'),
     getReport:         (path: string)  => ipcRenderer.invoke('external:get-report', path),
     regenerateReport:  (name: string)  => ipcRenderer.invoke('external:regenerate-report', name),
+    onProgress:        (cb: (data: unknown) => void) => ipcRenderer.on('report:progress', (_, d) => cb(d)),
+    removeProgressListener: () => ipcRenderer.removeAllListeners('report:progress'),
   },
 
   github: {

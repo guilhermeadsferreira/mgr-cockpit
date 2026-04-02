@@ -6,6 +6,7 @@ import { ExternalDataPass, type ExternalDataSnapshot } from './ExternalDataPass'
 import { GitHubClient, GitHubConfig } from './GitHubClient'
 import { MetricsWriter, type MonthlyEntry, type MomentoAtualEntry } from './MetricsWriter'
 import { Logger } from '../logging/Logger'
+import { notifyReportProgress } from './reportProgress'
 
 const log = Logger.getInstance().child('MonthlyReportGenerator')
 
@@ -65,6 +66,10 @@ export class MonthlyReportGenerator {
     }
 
     log.info('generateMonthlyReport: iniciando', { year: targetYear, month: targetMonth })
+    const progress = (step: string, message: string, percent: number) =>
+      notifyReportProgress({ type: 'monthly', step, message, percent })
+
+    progress('init', 'Iniciando relatório monthly…', 5)
 
     const registry = new PersonRegistry(this.workspacePath)
     const people = registry.list().filter(p => p.relacao === 'liderado')
@@ -72,11 +77,16 @@ export class MonthlyReportGenerator {
 
     const monthStart = `${targetYear}-${monthStr}-01`
     const monthEnd = this.getMonthEnd(targetYear, targetMonth)
+    const eligible = people.filter(p => p.jiraEmail || p.githubUsername)
 
     const personReports: PersonMonthlyData[] = []
 
-    for (const person of people) {
+    for (let i = 0; i < people.length; i++) {
+      const person = people[i]
       if (!person.jiraEmail && !person.githubUsername) continue
+
+      const pct = 10 + Math.round((i / eligible.length) * 60)
+      progress('person-data', `Coletando dados de ${person.nome}…`, pct)
 
       let snapshot: ExternalDataSnapshot | null = null
       let monthlyGithub: MonthlyGitHubData = { commits: 0, prsMerged: 0, reviews: 0 }
@@ -121,8 +131,10 @@ export class MonthlyReportGenerator {
       await sleep(200)
     }
 
+    progress('build', 'Montando relatório…', 75)
     const content = this.buildReport(personReports, targetYear, targetMonth)
 
+    progress('write', 'Salvando relatório…', 90)
     mkdirSync(this.relatoriosDir, { recursive: true })
     writeFileSync(filePath, content, 'utf-8')
     log.info('monthly report gerado', { year: targetYear, month: targetMonth, path: filePath })
@@ -193,6 +205,7 @@ export class MonthlyReportGenerator {
       }
     }
 
+    progress('done', 'Relatório monthly concluído!', 100)
     return filePath
   }
 
