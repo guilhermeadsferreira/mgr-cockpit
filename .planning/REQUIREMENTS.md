@@ -121,6 +121,13 @@ Requirements para este milestone. Cada um mapeia para phases do roadmap.
 - [x] **SRCP-04**: MetricsWriter.writeSustentacaoWeekly() persiste SustentacaoWeeklyEntry (semana, ticketsAbertos, breachCount, complianceRate7d) em secao SUSTENTACAO_SEMANAL com retencao de 12 entradas
 - [x] **SRCP-05**: Weekly report inclui secao "Sustentacao da Semana" com cruzamento inline (pessoa com >= 3 tickets E zero SP → nota de impacto); chama writeSustentacaoWeekly() para cada pessoa com tickets no porAssignee
 
+### Sustentacao Intel Operacional (Phase 999.13)
+
+- [ ] **INTEL-01**: SupportBoardSnapshot estendido com `inOutSemanal: InOutSemanalEntry[]` (vazao semanal in/out, ultimas 8 semanas) calculado no SupportBoardClient a partir dos issues dos ultimos 90d
+- [ ] **INTEL-02**: SupportBoardSnapshot estendido com `recorrentesDetectados: RecorrenteDetectado[]` (tipo+label com >2 ocorrencias nos ultimos 30d) — logica deterministica, sem IA; topTipos inclui tickets fechados 30d alem dos abertos
+- [ ] **INTEL-03**: SustentacaoView exibe secao "Inteligencia Operacional" com grafico in/out semanal (SVG barras inline) e curva historica de backlog (MiniLineChart com ticketsAbertos do history[])
+- [ ] **INTEL-04**: Secao "Inteligencia Operacional" exibe top tipos expandidos (abertos+fechados 30d) e lista de recorrentes com alerta visual "Candidato a raiz — Nx em 30d"; secao nao renderiza quando sem dados
+
 ## v2 Requirements
 
 Nao ha v2 neste milestone — todas as tasks identificadas estao no escopo v1.
@@ -208,6 +215,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SRCP-04 | Phase 999.12 | Planned |
 | SRCP-05 | Phase 999.12 | Planned |
 
+| INTEL-01 | Phase 999.13 | Planned |
+| INTEL-02 | Phase 999.13 | Planned |
+| INTEL-03 | Phase 999.13 | Planned |
+| INTEL-04 | Phase 999.13 | Planned |
+
 **Coverage:**
 - v1 requirements: 35 total
 - Mapped to phases: 35
@@ -217,7 +229,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 - Backlog requirements (999.9): 7 total
 - Backlog requirements (999.11): 5 total
 - Backlog requirements (999.12): 5 total
+- Backlog requirements (999.13): 4 total
 
 ---
 *Requirements defined: 2026-03-31*
-*Last updated: 2026-04-02 — added SRCP-01 to SRCP-05 for Phase 999.12*
+*Last updated: 2026-04-02 — added INTEL-01 to INTEL-04 for Phase 999.13*

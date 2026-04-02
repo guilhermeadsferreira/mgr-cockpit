@@ -197,17 +197,18 @@ Plans:
 
 Plans:
 - [x] 999.12-01-PLAN.md — fetchSustentacaoForReport() + seção Sustentação no Daily + cruzamento no prompt IA (SRCP-01, SRCP-02, SRCP-03)
-- [ ] 999.12-02-PLAN.md — MetricsWriter.writeSustentacaoWeekly() + seção Sustentação no Weekly (SRCP-04, SRCP-05)
+- [x] 999.12-02-PLAN.md — MetricsWriter.writeSustentacaoWeekly() + seção Sustentação no Weekly (SRCP-04, SRCP-05)
 
-### Phase 999.13: Sustentação — Intel operacional por pessoa (BACKLOG)
+### Phase 999.13: Sustentação — Intel operacional por pessoa
 
-**Goal:** Inteligência operacional por assignee: quem está sobrecarregado, quem resolve mais rápido, tempo médio de resolução por tipo, carga vs capacidade. Permitir ao gestor decisões de redistribuição baseadas em dados.
-**Requirements:** TBD
-**Plans:** 0 plans
-**Note:** Gap coberto: sem inteligência operacional. Fase C — independente de B, depende de A (trending histórico).
+**Goal:** Inteligência operacional da operação de sustentação: vazão semanal (in/out), curva histórica de backlog, top tipos por frequência (abertos + fechados), detecção de recorrência (candidatos a resolver na raiz). Visualização na SustentacaoView existente.
+**Requirements:** INTEL-01, INTEL-02, INTEL-03, INTEL-04
+**Plans:** 2 plans
+**Note:** Gap coberto: sem inteligência operacional. Fase C — independente de B, depende de A (trending histórico para curva de backlog).
 
 Plans:
-- [ ] TBD (promote with /gsd:review-backlog when ready)
+- [ ] 999.13-01-PLAN.md — Tipos InOutSemanalEntry + RecorrenteDetectado + cálculos no SupportBoardClient (INTEL-01, INTEL-02)
+- [ ] 999.13-02-PLAN.md — Seção "Inteligência Operacional" na SustentacaoView (INTEL-03, INTEL-04)
 
 ### Phase 999.14: Sustentação — Alertas proativos (BACKLOG)
 
