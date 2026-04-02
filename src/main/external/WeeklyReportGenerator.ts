@@ -5,8 +5,11 @@ import { SettingsManager, type AppSettings } from '../registry/SettingsManager'
 import { ExternalDataPass, type ExternalDataSnapshot } from './ExternalDataPass'
 import { JiraClient, JiraConfig } from './JiraClient'
 import { GitHubClient, GitHubConfig } from './GitHubClient'
-import { MetricsWriter, type WeeklyEntry, type MomentoAtualEntry } from './MetricsWriter'
+import { MetricsWriter, type WeeklyEntry, type MomentoAtualEntry, type SustentacaoWeeklyEntry } from './MetricsWriter'
+import { fetchSustentacaoForReport } from './SupportBoardClient'
+import type { SupportBoardSnapshot } from '../../renderer/src/types/ipc'
 import { Logger } from '../logging/Logger'
+import { notifyReportProgress } from './reportProgress'
 
 const log = Logger.getInstance().child('WeeklyReportGenerator')
 
@@ -64,6 +67,10 @@ export class WeeklyReportGenerator {
     }
 
     log.info('generateWeeklyReport: iniciando', { start, end })
+    const progress = (step: string, message: string, percent: number) =>
+      notifyReportProgress({ type: 'weekly', step, message, percent })
+
+    progress('init', 'Iniciando relatório weekly…', 5)
 
     const registry = new PersonRegistry(this.workspacePath)
     const people = registry.list().filter(p => p.relacao === 'liderado')
@@ -117,8 +124,19 @@ export class WeeklyReportGenerator {
       await sleep(200)
     }
 
-    const content = this.buildReport(personReports, start, end)
+    // Fetch sustentação (graceful — null se não configurado)
+    progress('sustentacao', 'Buscando dados de sustentação…', 72)
+    let sustentacaoSnapshot: SupportBoardSnapshot | null = null
+    try {
+      sustentacaoSnapshot = await fetchSustentacaoForReport(settings)
+    } catch (err) {
+      log.warn('sustentação: falhou (graceful)', { error: err instanceof Error ? err.message : String(err) })
+    }
 
+    progress('build', 'Montando relatório…', 75)
+    const content = this.buildReport(personReports, start, end, sustentacaoSnapshot)
+
+    progress('write', 'Salvando relatório…', 90)
     mkdirSync(this.relatoriosDir, { recursive: true })
     writeFileSync(filePath, content, 'utf-8')
     log.info('weekly report gerado', { start, end, path: filePath })
@@ -156,6 +174,25 @@ export class WeeklyReportGenerator {
       }
     }
 
+    // Persistir carga de sustentação por pessoa no metricas.md
+    if (sustentacaoSnapshot) {
+      for (const [slug, count] of Object.entries(sustentacaoSnapshot.porAssignee)) {
+        if (count === 0) continue
+        try {
+          const entry: SustentacaoWeeklyEntry = {
+            semana: `${start} a ${end}`,
+            ticketsAbertos: count,
+            breachCount: sustentacaoSnapshot.ticketsEmBreach.filter(t => t.assignee === slug).length,
+            complianceRate7d: sustentacaoSnapshot.complianceRate7d,
+          }
+          metricsWriter.writeSustentacaoWeekly(slug, entry)
+        } catch (err) {
+          log.warn('falha ao persistir sustentacao semanal', { slug, error: err instanceof Error ? err.message : String(err) })
+        }
+      }
+    }
+
+    progress('done', 'Relatório weekly concluído!', 100)
     return filePath
   }
 
@@ -213,7 +250,12 @@ export class WeeklyReportGenerator {
     return `${parseInt(day, 10)} de ${MESES[monthNum - 1]} de ${year}`
   }
 
-  private buildReport(personReports: PersonWeeklyData[], start: string, end: string): string {
+  private buildReport(
+    personReports: PersonWeeklyData[],
+    start: string,
+    end: string,
+    sustentacao?: SupportBoardSnapshot | null,
+  ): string {
     const lines: string[] = []
     const formattedStart = this.formatDateLong(start)
     const formattedEnd = this.formatDateLong(end)
@@ -336,6 +378,41 @@ export class WeeklyReportGenerator {
       lines.push(`- Total bloqueios ativos: **${allBlockers.length}**`)
     }
     lines.push('')
+
+    // ── Sustentação da Semana ──────────────────────────────────
+    if (sustentacao) {
+      lines.push('## Sustentação da Semana', '')
+      lines.push(`> Abertos: **${sustentacao.ticketsAbertos}** | Breach: **${sustentacao.ticketsEmBreach.length}**${sustentacao.complianceRate7d !== null ? ` | SLA 7d: **${sustentacao.complianceRate7d}%**` : ''}`, '')
+
+      const assigneeEntries = Object.entries(sustentacao.porAssignee)
+        .filter(([, count]) => count > 0)
+        .sort((a, b) => b[1] - a[1])
+
+      if (assigneeEntries.length > 0) {
+        lines.push('### Carga por pessoa', '')
+        for (const [slug, count] of assigneeEntries) {
+          const person = personReports.find(p => p.slug === slug)
+          const nome = person?.nome ?? slug
+          const alert = count >= 5 ? ' ⚠️ alta carga' : count >= 3 ? ' 🔵 carga moderada' : ''
+          lines.push(`- **${nome}**: ${count} ticket(s)${alert}`)
+
+          // Cruzamento com produtividade: se a pessoa tem velocity baixa E alta carga
+          const snap = person?.snapshot?.jira
+          if (snap && count >= 3) {
+            const spDone = snap.storyPointsSprint ?? 0
+            if (spDone === 0) {
+              lines.push(`  > _Zero SP entregues na semana — possível impacto de ${count} tickets de suporte_`)
+            }
+          }
+        }
+        lines.push('')
+      }
+
+      if (sustentacao.topTipos.length > 0) {
+        const tiposStr = sustentacao.topTipos.slice(0, 3).map(t => `${t.tipo} (${t.count})`).join(', ')
+        lines.push(`> Top tipos: ${tiposStr}`, '')
+      }
+    }
 
     return lines.join('\n')
   }
