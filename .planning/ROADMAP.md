@@ -214,9 +214,9 @@ Plans:
 
 **Goal:** O app detecta automaticamente condições críticas na operação de sustentação e avisa o gestor antes de virar crise — via badge na sidebar e banner inline na SustentacaoView. Alertas calculados a cada refresh, somem sozinhos quando a condição melhora.
 **Requirements:** ALRT-01, ALRT-02, ALRT-03, ALRT-04, ALRT-05
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 **Note:** Gap coberto: sem alertas proativos. Fase D — depende de A (trending) para detecção de tendência. 4 condições: breach crescente, ticket envelhecendo, fila crescendo, spike de incidente.
 
 Plans:
 - [x] 999.14-01-PLAN.md — SustentacaoAlerta tipo + calcularAlertas() + IPC integration (ALRT-01, ALRT-02, ALRT-03)
-- [ ] 999.14-02-PLAN.md — Badge na Sidebar + banner inline na SustentacaoView (ALRT-04, ALRT-05)
+- [x] 999.14-02-PLAN.md — Badge na Sidebar + banner inline na SustentacaoView (ALRT-04, ALRT-05)

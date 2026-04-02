@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 999.14
-last_updated: "2026-04-02T18:47:45.975Z"
+last_updated: "2026-04-02T18:50:46.320Z"
 progress:
   total_phases: 16
-  completed_phases: 10
+  completed_phases: 11
   total_plans: 34
-  completed_plans: 33
+  completed_plans: 34
 ---
 
 # Project State — Pulse Cockpit V2.1
@@ -98,6 +98,9 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 - [Phase 999.14]: fetchSupportBoardMetricsWithIssues como variante interna — preserva assinatura publica de fetchSupportBoardMetrics (retorna alertas: [])
 - [Phase 999.14]: Cache hit usa issues=[] para calcularAlertas — D-07 silencioso em cache, D-04/D-05/D-06 funcionam normalmente
 - [Phase 999.14]: Thresholds fixos no SupportBoardClient (ALRT_BREACH_DELTA=2, ALRT_SLA_MULTIPLIER=2, ALRT_FILA_DAYS=3, ALRT_SPIKE_COUNT=3) — nao configuravel nesta fase
+- [Phase 999.14-02]: Badge numerico (nao apenas dot) — reutiliza padrao badge?: number de NavItem existente para consistencia com item Eu
+- [Phase 999.14-02]: Evento sustentacao:refreshed via CustomEvent — comunicacao leve Sidebar<->SustentacaoView sem contexto React adicional
+- [Phase 999.14-02]: Verificacao condicional snapshot.alertas defensiva — comportamento seguro contra snapshots de cache antigos sem campo alertas
 
 ## Phases
 
@@ -151,6 +154,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-26)
 | Phase 999.13 P01 | 157 | 2 tasks | 2 files |
 | Phase 999.13 P02 | 294 | 1 tasks | 2 files |
 | Phase 999.14 P01 | 4min | 2 tasks | 3 files |
+| Phase 999.14 P02 | 83 | 2 tasks | 2 files |
 
 ## Next Action
 
