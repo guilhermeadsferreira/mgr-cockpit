@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
-import { FolderOpen, Cpu, CheckCircle2, XCircle, User, RefreshCw, Zap, Sparkles, ChevronDown, ChevronRight, ExternalLink, Github, AlertCircle, FileText } from 'lucide-react'
+import { FolderOpen, Cpu, CheckCircle2, XCircle, User, RefreshCw, Zap, Sparkles, ChevronDown, ChevronRight, ExternalLink, Github, AlertCircle, FileText, Terminal, BookOpen, ShieldCheck } from 'lucide-react'
 import type { AppSettings, IngestionOperation, OperationProviderConfig } from '../types/ipc'
+import { useRouter } from '../router'
 
 export function SettingsView() {
+  const { navigate } = useRouter()
   const [form, setForm] = useState<AppSettings | null>(null)
   const [saved, setSaved] = useState(false)
   const [claudeStatus, setClaudeStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle')
@@ -664,6 +666,9 @@ export function SettingsView() {
             </Field>
           </Section>
 
+          {/* Ferramentas avançadas */}
+          <AdvancedToolsSection navigate={navigate} />
+
         </div>
       </div>
     </div>
@@ -743,6 +748,70 @@ function ProviderOverridesTable({
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function AdvancedToolsSection({ navigate }: { navigate: (view: string, params?: Record<string, string>) => void }) {
+  const [open, setOpen] = useState(false)
+
+  const tools = [
+    { id: 'logs',         label: 'Logs',          desc: 'Viewer de logs em tempo real',       icon: <Terminal size={14} /> },
+    { id: 'refinamentos', label: 'Refinamentos',  desc: 'Documentos e notas de refinamento',  icon: <BookOpen size={14} /> },
+    { id: 'audit',        label: 'Auditoria',     desc: 'Health check do sistema',            icon: <ShieldCheck size={14} /> },
+  ]
+
+  return (
+    <div style={{
+      background: 'var(--surface)', border: '1px solid var(--border)',
+      borderRadius: 6, overflow: 'hidden', marginBottom: 20,
+    }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          width: '100%', padding: '14px 20px',
+          display: 'flex', alignItems: 'center', gap: 7,
+          background: 'none', border: 'none', cursor: 'pointer',
+          textAlign: 'left',
+        }}
+      >
+        <span style={{ color: 'var(--text-secondary)' }}>
+          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+          Ferramentas avançadas
+        </span>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 4 }}>
+          Logs, Refinamentos, Auditoria
+        </span>
+      </button>
+      {open && (
+        <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {tools.map((tool) => (
+            <button
+              key={tool.id}
+              onClick={() => navigate(tool.id as never)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 12px', borderRadius: 6,
+                background: 'var(--surface-2)', border: '1px solid var(--border)',
+                cursor: 'pointer', width: '100%', textAlign: 'left',
+                transition: 'background 0.12s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-3)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface-2)' }}
+            >
+              <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
+                {tool.icon}
+              </span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{tool.label}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{tool.desc}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

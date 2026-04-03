@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Grid2X2, Inbox, Settings, Users, UserCheck, ScrollText, User, BookOpen, Terminal, BarChart3, ShieldCheck, Wrench } from 'lucide-react'
+import { Grid2X2, Inbox, Settings, ScrollText, User, BarChart3, Wrench } from 'lucide-react'
 import { useRouter, type ViewName } from '../router'
 import type { Demanda, SupportBoardSnapshot } from '../types/ipc'
 
@@ -61,17 +61,12 @@ export function Sidebar() {
   }, [])
 
   const navItems: NavItem[] = [
-    { id: 'inbox',     label: 'Inbox',    icon: <Inbox size={14} /> },
-    { id: 'dashboard', label: 'Time',     icon: <Grid2X2 size={14} /> },
-    { id: 'pares',     label: 'Pares',    icon: <Users size={14} /> },
-    { id: 'gestores',  label: 'Gestores', icon: <UserCheck size={14} /> },
-    { id: 'feed',       label: 'Reuniões',    icon: <ScrollText size={14} /> },
-    { id: 'sustentacao', label: 'Sustentação', icon: <Wrench size={14} />, badge: alertasCount > 0 ? alertasCount : undefined },
-    { id: 'eu',           label: 'Eu',           icon: <User size={14} />, badge: openDemandasCount > 0 ? openDemandasCount : undefined },
+    { id: 'dashboard',    label: 'Time',         icon: <Grid2X2 size={14} /> },
+    { id: 'inbox',        label: 'Inbox',        icon: <Inbox size={14} /> },
+    { id: 'sustentacao',  label: 'Sustentação',  icon: <Wrench size={14} />, badge: alertasCount > 0 ? alertasCount : undefined },
     { id: 'reports',      label: 'Relatórios',   icon: <BarChart3 size={14} /> },
-    { id: 'refinamentos', label: 'Refinamentos', icon: <BookOpen size={14} /> },
-    { id: 'audit',        label: 'Auditoria',     icon: <ShieldCheck size={14} /> },
-    { id: 'logs',         label: 'Logs',          icon: <Terminal size={14} /> },
+    { id: 'eu',           label: 'Eu',           icon: <User size={14} />, badge: openDemandasCount > 0 ? openDemandasCount : undefined },
+    { id: 'feed',         label: 'Histórico',    icon: <ScrollText size={14} /> },
   ]
 
   const displayName = profile.name || 'Configurar perfil'

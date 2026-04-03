@@ -28,8 +28,15 @@ const RELACAO_META: Record<string, { eyebrow: string; title: string; detectedLab
   },
 }
 
-export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
+const RELACAO_TABS: Array<{ id: string; label: string }> = [
+  { id: 'liderado', label: 'Time' },
+  { id: 'par',      label: 'Pares' },
+  { id: 'gestor',   label: 'Gestores' },
+]
+
+export function DashboardView({ relacao: relacaoProp = 'liderado' }: { relacao?: string }) {
   const { navigate } = useRouter()
+  const [relacao, setRelacao] = useState(relacaoProp)
   const [people,   setPeople]   = useState<PersonConfig[]>([])
   const [perfis,   setPerfis]   = useState<Record<string, Partial<PerfilFrontmatter>>>({})
   const [actionsMap, setActionsMap] = useState<Record<string, Action[]>>({})
@@ -157,7 +164,31 @@ export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
       }}>
         <div>
           <div style={styles.eyebrow}>{meta.eyebrow}</div>
-          <h1 style={styles.pageTitle}>{meta.title}</h1>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
+            <h1 style={styles.pageTitle}>{meta.title}</h1>
+            <div style={{ display: 'flex', gap: 2 }}>
+              {RELACAO_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setRelacao(tab.id)}
+                  style={{
+                    padding: '3px 10px',
+                    borderRadius: 4,
+                    border: 'none',
+                    background: relacao === tab.id ? 'var(--surface-3)' : 'transparent',
+                    color: relacao === tab.id ? 'var(--text-primary)' : 'var(--text-muted)',
+                    fontSize: 12,
+                    fontWeight: relacao === tab.id ? 600 : 400,
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font)',
+                    transition: 'background 0.12s, color 0.12s',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div style={styles.pageSub}>
             {loading ? '…' : `${people.length} ${people.length === 1 ? 'pessoa' : 'pessoas'}`}
           </div>

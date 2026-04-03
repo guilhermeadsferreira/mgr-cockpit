@@ -2,8 +2,6 @@ import { createContext, useContext, useState, type ReactNode } from 'react'
 
 export type ViewName =
   | 'dashboard'
-  | 'pares'
-  | 'gestores'
   | 'feed'
   | 'person'
   | 'person-form'

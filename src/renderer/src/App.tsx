@@ -62,9 +62,7 @@ function AppContent() {
   const { view } = useRouter()
 
   const content = {
-    'dashboard':    <DashboardView relacao="liderado" />,
-    'pares':        <DashboardView relacao="par" />,
-    'gestores':     <DashboardView relacao="gestor" />,
+    'dashboard':    <DashboardView />,
     'person':       <PersonView />,
     'person-form':  <PersonFormView />,
     'settings':     <SettingsView />,
@@ -76,7 +74,7 @@ function AppContent() {
     'reports':       <RelatoriosView />,
     'audit':         <AuditView />,
     'sustentacao':   <SustentacaoView />,
-  }[view] ?? <DashboardView relacao="liderado" />
+  }[view] ?? <DashboardView />
 
   return <Layout>{content}</Layout>
 }
