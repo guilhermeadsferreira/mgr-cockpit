@@ -488,8 +488,10 @@ export async function runTicketAnalysisInternal(): Promise<{
 
   for (const enriched of ticketsToAnalyze) {
     const match = allAnalyzedTickets.find((t) => t.key === enriched.key)
-    if (match) {
+    if (match?.intelligence && typeof match.intelligence.narrative === 'string') {
       enriched.intelligence = match.intelligence
+    } else if (match) {
+      log.warn('ticket retornou sem narrative válida — mantendo intelligence null', { key: enriched.key })
     }
   }
 
@@ -521,7 +523,7 @@ export async function runTicketAnalysisInternal(): Promise<{
     const summaryText = `**Resumo Executivo — ${today}**\n\n` +
       `Risco geral: ${executiveSummary.overallRisk}\n\n` +
       `**Ações prioritárias:**\n${executiveSummary.priorityActions.map((a, i) => `${i + 1}. ${a}`).join('\n')}\n\n` +
-      `**Por ticket:**\n${allAnalyzedTickets.map((t) => `- ${t.key}: ${t.intelligence.narrative}`).join('\n')}`
+      `**Por ticket:**\n${allAnalyzedTickets.map((t) => `- ${t.key}: ${t.intelligence?.narrative ?? 'Análise pendente'}`).join('\n')}`
 
     for (const [assigneeKey, count] of Object.entries(snapshot.porAssignee)) {
       if (count < 3) continue
@@ -1585,7 +1587,7 @@ function registerIpcHandlers(): void {
           snapshot.enrichedTickets = snapshot.ticketsEmBreach.map((t) => {
             const enriched = buildEnrichedTicket(t)
             const match = latest.tickets.find((lt) => lt.key === t.key)
-            if (match) enriched.intelligence = match.intelligence
+            if (match?.intelligence?.narrative) enriched.intelligence = match.intelligence
             return enriched
           })
           snapshot.executiveSummary = latest.executiveSummary

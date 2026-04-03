@@ -269,10 +269,10 @@ function AlertasBanner({ alertas }: { alertas: SustentacaoAlerta[] }) {
                         {alerta.status ? `, ${alerta.status}` : ''}
                         {alerta.assignee ? `, ${alerta.assignee}` : ''})
                       </span>
-                      {alerta.intelligence && (
+                      {alerta.intelligence?.narrative && (
                         <>
-                          <BlockerBadge category={alerta.intelligence.blocker.category} />
-                          <RiskDot level={alerta.intelligence.riskLevel} />
+                          {alerta.intelligence.blocker?.category && <BlockerBadge category={alerta.intelligence.blocker.category} />}
+                          <RiskDot level={alerta.intelligence.riskLevel ?? 'medium'} />
                         </>
                       )}
                     </div>

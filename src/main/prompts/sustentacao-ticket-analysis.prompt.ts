@@ -45,7 +45,7 @@ export function buildTicketAnalysisPrompt(
 ): string {
   const previousSection = previous
     ? `## Análise Anterior (${previous.date})
-${previous.tickets.map((t) => `- ${t.key}: ${t.intelligence.narrative.slice(0, 200)}`).join('\n')}
+${previous.tickets.filter((t) => t.intelligence?.narrative).map((t) => `- ${t.key}: ${t.intelligence.narrative.slice(0, 200)}`).join('\n')}
 `
     : '## Análise Anterior\n(primeira análise — sem histórico)\n'
 
