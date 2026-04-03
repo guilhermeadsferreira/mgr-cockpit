@@ -13,6 +13,7 @@ import LogsView               from './views/LogsView'
 import { RelatoriosView }     from './views/RelatoriosView'
 import { AuditView }          from './views/AuditView'
 import { SustentacaoView }    from './views/SustentacaoView'
+import { CalibracaoView }    from './views/CalibracaoView'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   constructor(props: { children: ReactNode }) {
@@ -62,9 +63,7 @@ function AppContent() {
   const { view } = useRouter()
 
   const content = {
-    'dashboard':    <DashboardView relacao="liderado" />,
-    'pares':        <DashboardView relacao="par" />,
-    'gestores':     <DashboardView relacao="gestor" />,
+    'dashboard':    <DashboardView />,
     'person':       <PersonView />,
     'person-form':  <PersonFormView />,
     'settings':     <SettingsView />,
@@ -76,7 +75,8 @@ function AppContent() {
     'reports':       <RelatoriosView />,
     'audit':         <AuditView />,
     'sustentacao':   <SustentacaoView />,
-  }[view] ?? <DashboardView relacao="liderado" />
+    'calibracao':    <CalibracaoView />,
+  }[view] ?? <DashboardView />
 
   return <Layout>{content}</Layout>
 }

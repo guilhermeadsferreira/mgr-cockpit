@@ -8,6 +8,7 @@ import { SprintReportGenerator } from './SprintReportGenerator'
 import { JiraClient } from './JiraClient'
 import { GitHubClient } from './GitHubClient'
 import { Logger } from '../logging/Logger'
+import { detectConvergencia } from '../brain/RiskDetector'
 
 const log = Logger.getInstance().child('Scheduler')
 const CACHE_TTL_7_DAYS_MS = 7 * 24 * 60 * 60 * 1000
@@ -84,6 +85,60 @@ export class Scheduler {
         } catch (err) {
           log.warn('daily report falhou', { error: err instanceof Error ? err.message : String(err) })
         }
+      }
+
+      // Ticket analysis automático de sustentação (após daily report)
+      if (settings.jiraSupportProjectKey && settings.claudeBinPath) {
+        try {
+          log.info('ticket analysis de sustentação: iniciando')
+          const { runTicketAnalysisInternal } = await import('../index')
+          const result = await runTicketAnalysisInternal()
+          if (result.error) {
+            log.warn('ticket analysis de sustentação: erro', { error: result.error })
+          } else {
+            log.info('ticket analysis de sustentação: concluído', {
+              tickets: result.enrichedTickets?.length ?? 0,
+            })
+          }
+        } catch (err) {
+          log.warn('ticket analysis de sustentação falhou (não crítico)', {
+            error: err instanceof Error ? err.message : String(err),
+          })
+        }
+      } else {
+        log.debug('sustentação não configurada, pulando ticket analysis')
+      }
+
+      // Brain risk detection (após ticket analysis)
+      try {
+        log.info('[Brain] Rodando risk detection...')
+        const brainResult = await detectConvergencia(this.workspacePath)
+
+        const cacheDir = join(this.workspacePath, '..', CACHE_DIR_NAME)
+        mkdirSync(cacheDir, { recursive: true })
+        writeFileSync(
+          join(cacheDir, 'brain-result.json'),
+          JSON.stringify(brainResult, null, 2),
+          'utf-8',
+        )
+
+        // Notificação nativa se há risco crítico
+        const criticos = brainResult.pessoas.filter(p => p.severidade === 'critica')
+        if (criticos.length > 0) {
+          const { Notification } = await import('electron')
+          new Notification({
+            title: 'Pulse Cockpit — Risco crítico detectado',
+            body: criticos.length === 1
+              ? `${criticos[0].nome}: ${criticos[0].sinais.map(s => s.descricao).join(' · ')}`
+              : `${criticos.length} pessoas com convergência de risco crítico no time`,
+          }).show()
+        }
+
+        log.info(`[Brain] ${brainResult.pessoas.length} pessoa(s) em risco detectada(s)`)
+      } catch (err) {
+        log.warn('[Brain] Risk detection falhou (não crítico)', {
+          error: err instanceof Error ? err.message : String(err),
+        })
       }
     }
 

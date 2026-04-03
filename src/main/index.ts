@@ -26,9 +26,13 @@ import { WeeklyReportGenerator } from './external/WeeklyReportGenerator'
 import { MonthlyReportGenerator } from './external/MonthlyReportGenerator'
 import { GitHubClient } from './external/GitHubClient'
 import { SystemAuditor } from './audit/SystemAuditor'
+import { detectConvergencia, type BrainResult } from './brain/RiskDetector'
 import { fetchSupportBoardMetricsWithIssues, calcularAlertas } from './external/SupportBoardClient'
-import type { SupportBoardSnapshot, SustentacaoHistoryEntry } from '../renderer/src/types/ipc'
+import type { SupportBoardSnapshot, SustentacaoHistoryEntry, TicketAnalysisSnapshot, EnrichedSupportTicket } from '../renderer/src/types/ipc'
 import { buildSustentacaoPrompt } from './prompts/sustentacao-analysis.prompt'
+import { buildTicketAnalysisPrompt, batchTickets } from './prompts/sustentacao-ticket-analysis.prompt'
+import { buildEnrichedTicket } from './external/TicketEnricher'
+import { AnalysisSnapshotStore } from './external/AnalysisSnapshotStore'
 import { MetricsWriter } from './external/MetricsWriter'
 import yaml from 'js-yaml'
 
@@ -259,6 +263,235 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+}
+
+// ── Sustentação — funções internas (usadas pelos handlers e pelo Scheduler) ──
+
+function readSustentacaoHistory(historyFile: string): SustentacaoHistoryEntry[] {
+  try {
+    if (!existsSync(historyFile)) return []
+    return JSON.parse(readFileSync(historyFile, 'utf-8')) as SustentacaoHistoryEntry[]
+  } catch {
+    return []
+  }
+}
+
+export async function fetchAndCacheSustentacao(): Promise<SupportBoardSnapshot | null> {
+  const settings = SettingsManager.load()
+  const { jiraSupportProjectKey, jiraBaseUrl, jiraEmail, jiraApiToken, jiraSlaThresholds, jiraSupportCategories } = settings
+
+  if (!jiraSupportProjectKey || !jiraBaseUrl || !jiraEmail || !jiraApiToken) {
+    return null
+  }
+
+  const log = Logger.getInstance().child('Sustentacao')
+  const cacheDir = join(settings.workspacePath, '..', 'cache', 'sustentacao')
+  const cacheFile = join(cacheDir, 'board.json')
+  const CACHE_TTL_MS = 60 * 60 * 1000
+
+  try {
+    if (existsSync(cacheFile)) {
+      const cached = JSON.parse(readFileSync(cacheFile, 'utf-8')) as { data: SupportBoardSnapshot; fetchedAt: number }
+      if (Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+        log.info('cache hit')
+        const historyFile = join(cacheDir, 'history.json')
+        const historyData = readSustentacaoHistory(historyFile).slice(-30)
+        const alertasCached = calcularAlertas(cached.data, historyData, [], jiraSlaThresholds ?? {}, jiraBaseUrl)
+        return { ...cached.data, history: historyData, alertas: alertasCached }
+      }
+    }
+  } catch { /* cache inválido — refetch */ }
+
+  log.info('buscando board', { projectKey: jiraSupportProjectKey })
+
+  const { snapshot: data, issues } = await fetchSupportBoardMetricsWithIssues({
+    config: { baseUrl: jiraBaseUrl, email: jiraEmail, apiToken: jiraApiToken },
+    projectKey: jiraSupportProjectKey,
+    slaThresholds: jiraSlaThresholds,
+    categories: jiraSupportCategories,
+  })
+
+  try {
+    if (!existsSync(cacheDir)) mkdirSync(cacheDir, { recursive: true })
+    writeFileSync(cacheFile, JSON.stringify({ data, fetchedAt: Date.now() }), 'utf-8')
+  } catch (err) {
+    log.warn('falha ao gravar cache', { error: err instanceof Error ? err.message : String(err) })
+  }
+
+  try {
+    const historyFile = join(cacheDir, 'history.json')
+    const dateKey = new Date().toISOString().slice(0, 10)
+    const history = readSustentacaoHistory(historyFile)
+    const filtered = history.filter((e) => e.date !== dateKey)
+    filtered.push({
+      date: dateKey,
+      fetchedAt: Date.now(),
+      ticketsAbertos: data.ticketsAbertos,
+      ticketsFechadosUltimos30d: data.ticketsFechadosUltimos30d,
+      breachCount: data.ticketsEmBreach.length,
+      complianceRate7d: data.complianceRate7d,
+      complianceRate30d: data.complianceRate30d,
+    })
+    const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000
+    const retained = filtered.filter((e) => e.fetchedAt >= cutoff)
+    writeFileSync(historyFile, JSON.stringify(retained), 'utf-8')
+  } catch (histErr) {
+    log.warn('falha ao gravar history (graceful)', {
+      error: histErr instanceof Error ? histErr.message : String(histErr),
+    })
+  }
+
+  const historyForAlerts = readSustentacaoHistory(join(cacheDir, 'history.json'))
+  const alertas = calcularAlertas(data, historyForAlerts, issues, jiraSlaThresholds ?? {}, jiraBaseUrl)
+  const dataComAlertas = { ...data, alertas }
+
+  const historyFile = join(cacheDir, 'history.json')
+  const historyData = readSustentacaoHistory(historyFile).slice(-30)
+  return { ...dataComAlertas, history: historyData }
+}
+
+export async function runTicketAnalysisInternal(): Promise<{
+  enrichedTickets?: EnrichedSupportTicket[]
+  executiveSummary?: TicketAnalysisSnapshot['executiveSummary'] | null
+  error?: string
+}> {
+  const settings = SettingsManager.load()
+  const { jiraSupportProjectKey, claudeBinPath, workspacePath } = settings
+
+  if (!jiraSupportProjectKey) return { error: 'Board de sustentação não configurado' }
+  if (!claudeBinPath) return { error: 'Claude CLI não configurado. Configure o caminho em Settings.' }
+
+  const snapshot = await fetchAndCacheSustentacao()
+  if (!snapshot) return { error: 'Dados do board indisponíveis — atualize antes de analisar' }
+
+  const ticketKeysSet = new Set<string>()
+  for (const t of snapshot.ticketsEmBreach) ticketKeysSet.add(t.key)
+  for (const a of snapshot.alertas) {
+    if (a.ticketKey) ticketKeysSet.add(a.ticketKey)
+  }
+
+  const ticketsToAnalyze = snapshot.ticketsEmBreach
+    .filter((t) => ticketKeysSet.has(t.key))
+    .sort((a, b) => b.ageDias - a.ageDias)
+    .slice(0, 15)
+    .map(buildEnrichedTicket)
+
+  if (ticketsToAnalyze.length === 0) {
+    return { enrichedTickets: [], executiveSummary: null }
+  }
+
+  const cacheDir = join(workspacePath, '..', 'cache')
+  const store = new AnalysisSnapshotStore(cacheDir)
+  const previousAnalysis = store.loadLatest()
+
+  const batches = batchTickets(ticketsToAnalyze)
+  const allTicketKeys = ticketsToAnalyze.map((t) => t.key)
+  const allAnalyzedTickets: TicketAnalysisSnapshot['tickets'] = []
+  let executiveSummary: TicketAnalysisSnapshot['executiveSummary'] | null = null
+
+  const log = Logger.getInstance().child('Sustentacao')
+
+  for (let i = 0; i < batches.length; i++) {
+    const batch = batches[i]
+    const isLastBatch = i === batches.length - 1
+    const prompt = buildTicketAnalysisPrompt(batch, previousAnalysis, isLastBatch, allTicketKeys)
+
+    log.info('ticket-analysis batch', {
+      batch: i + 1,
+      total: batches.length,
+      tickets: batch.map((t) => t.key),
+      promptLength: prompt.length,
+    })
+
+    try {
+      const result = await runClaudePrompt(claudeBinPath, prompt, 60_000)
+      if (!result.success) {
+        log.warn('ticket-analysis batch falhou', { batch: i + 1, error: result.error })
+        continue
+      }
+
+      const rawOutput = result.rawOutput ?? (typeof result.data === 'string' ? result.data : JSON.stringify(result.data))
+      const jsonMatch = rawOutput.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) {
+        log.warn('ticket-analysis JSON não encontrado no output', { batch: i + 1 })
+        continue
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]) as {
+        tickets: TicketAnalysisSnapshot['tickets']
+        executiveSummary?: TicketAnalysisSnapshot['executiveSummary']
+      }
+
+      if (parsed.tickets) {
+        allAnalyzedTickets.push(...parsed.tickets)
+      }
+
+      if (isLastBatch && parsed.executiveSummary) {
+        executiveSummary = parsed.executiveSummary
+      }
+    } catch (err) {
+      log.warn('ticket-analysis batch exception', {
+        batch: i + 1,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  for (const enriched of ticketsToAnalyze) {
+    const match = allAnalyzedTickets.find((t) => t.key === enriched.key)
+    if (match) {
+      enriched.intelligence = match.intelligence
+    }
+  }
+
+  const today = new Date().toISOString().slice(0, 10)
+  const analysisSnapshot: TicketAnalysisSnapshot = {
+    date: today,
+    fetchedAt: Date.now(),
+    tickets: allAnalyzedTickets,
+    executiveSummary: executiveSummary ?? {
+      byBlocker: {},
+      priorityActions: [],
+      overallRisk: 'medium',
+    },
+  }
+
+  store.save(analysisSnapshot)
+  store.cleanup()
+
+  log.info('ticket-analysis concluída', {
+    ticketsAnalisados: allAnalyzedTickets.length,
+    totalBatches: batches.length,
+  })
+
+  // Persistir resumo no metricas.md dos assignees relevantes
+  const metricsWriter = new MetricsWriter(workspacePath)
+  const personRegistry = new PersonRegistry(workspacePath)
+  const people = personRegistry.list()
+
+  if (executiveSummary) {
+    const summaryText = `**Resumo Executivo — ${today}**\n\n` +
+      `Risco geral: ${executiveSummary.overallRisk}\n\n` +
+      `**Ações prioritárias:**\n${executiveSummary.priorityActions.map((a, i) => `${i + 1}. ${a}`).join('\n')}\n\n` +
+      `**Por ticket:**\n${allAnalyzedTickets.map((t) => `- ${t.key}: ${t.intelligence.narrative}`).join('\n')}`
+
+    for (const [assigneeKey, count] of Object.entries(snapshot.porAssignee)) {
+      if (count < 3) continue
+      const person = people.find(
+        (p) =>
+          p.jiraEmail === assigneeKey ||
+          p.nome.toLowerCase().includes(assigneeKey.toLowerCase()) ||
+          assigneeKey.toLowerCase().includes(p.nome.split(' ')[0].toLowerCase()),
+      )
+      if (person) {
+        try {
+          metricsWriter.writeSustentacaoAnalysis(person.slug, summaryText)
+        } catch { /* graceful */ }
+      }
+    }
+  }
+
+  return { enrichedTickets: ticketsToAnalyze, executiveSummary }
 }
 
 function registerIpcHandlers(): void {
@@ -1100,6 +1333,98 @@ function registerIpcHandlers(): void {
     return insights
   })
 
+  // ── App state ───────────────────────────────────────────────
+  ipcMain.handle('app:getLastOpened', () => {
+    return SettingsManager.load().lastOpenedAt ?? null
+  })
+
+  ipcMain.handle('app:markOpened', () => {
+    const settings = SettingsManager.load()
+    const now = new Date().toISOString()
+    settings.lastOpenedAt = now
+    SettingsManager.save(settings)
+    return now
+  })
+
+  // ── Daily summary (structured) ─────────────────────────────
+  ipcMain.handle('reports:getDailySummary', () => {
+    const { workspacePath } = SettingsManager.load()
+    const reportsDir = join(workspacePath, 'relatorios')
+    if (!existsSync(reportsDir)) return null
+
+    // Find most recent Daily-*.md
+    let files: string[]
+    try {
+      files = readdirSync(reportsDir).filter(f => f.startsWith('Daily-') && f.endsWith('.md'))
+    } catch { return null }
+    if (files.length === 0) return null
+
+    // Parse date from filename: Daily-DD-MM-YYYY.md
+    const parsed = files.map(f => {
+      const m = f.match(/Daily-(\d{2})-(\d{2})-(\d{4})\.md/)
+      return m ? { file: f, sort: `${m[3]}-${m[2]}-${m[1]}` } : null
+    }).filter(Boolean) as Array<{ file: string; sort: string }>
+
+    parsed.sort((a, b) => b.sort.localeCompare(a.sort))
+    const latest = parsed[0]
+    if (!latest) return null
+
+    let content: string
+    try {
+      content = readFileSync(join(reportsDir, latest.file), 'utf-8')
+    } catch { return null }
+
+    // Extract fields via regex — null if not found
+    let sprintPercent: number | null = null
+    let prsHoje = 0
+    let ticketsEmBreach = 0
+    let slaCompliance: number | null = null
+    let sprintDiasRestantes: number | null = null
+
+    // Sprint percent: "Sprint XX% concluída"
+    const sprintMatch = content.match(/Sprint\s+(\d+)%\s+conclu[ií]da/i)
+    if (sprintMatch) sprintPercent = parseInt(sprintMatch[1], 10)
+
+    // Sprint days: "Dia X de Y"
+    const daysMatch = content.match(/Dia\s+(\d+)\s+de\s+(\d+)/)
+    if (daysMatch) sprintDiasRestantes = parseInt(daysMatch[2], 10) - parseInt(daysMatch[1], 10)
+
+    // PRs merged: count occurrences of "🔀 PR merged" or "PR merged"
+    const prMatches = content.match(/🔀\s*PR merged/g)
+    if (prMatches) prsHoje = prMatches.length
+
+    // Tickets em breach: "Breach: N" in sustentacao section
+    const breachMatch = content.match(/Breach:\s*(\d+)/i)
+    if (breachMatch) ticketsEmBreach = parseInt(breachMatch[1], 10)
+
+    // SLA compliance 7d: "SLA compliance 7d: **XX%**"
+    const slaMatch = content.match(/SLA compliance 7d:\s*\*?\*?(\d+)%/)
+    if (slaMatch) slaCompliance = parseInt(slaMatch[1], 10)
+
+    // Sprint risk
+    let sprintRisco: 'baixo' | 'medio' | 'alto' | null = null
+    if (sprintPercent !== null && sprintDiasRestantes !== null) {
+      const remaining = 100 - sprintPercent
+      if (sprintDiasRestantes <= 2 && remaining > 40) sprintRisco = 'alto'
+      else if (sprintDiasRestantes <= 3 && remaining > 30) sprintRisco = 'medio'
+      else sprintRisco = 'baixo'
+    }
+
+    // Generation date from filename
+    const dateMatch = latest.file.match(/Daily-(\d{2})-(\d{2})-(\d{4})/)
+    const geradoEm = dateMatch ? `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}` : latest.sort
+
+    return {
+      geradoEm,
+      sprintPercent,
+      sprintRisco,
+      prsHoje,
+      ticketsEmBreach,
+      slaCompliance,
+      temDadosSustentacao: content.includes('## Sustentação'),
+    }
+  })
+
   // ── System Audit ─────────────────────────────────────────────
   ipcMain.handle('audit:run', async () => {
     const { workspacePath } = SettingsManager.load()
@@ -1111,104 +1436,73 @@ function registerIpcHandlers(): void {
     }
   })
 
-  // ── Sustentacao Board ─────────────────────────────────────────
-  function readHistory(historyFile: string): SustentacaoHistoryEntry[] {
+  // ── Brain — Risk Convergence ─────────────────────────────────
+
+  ipcMain.handle('brain:detect', async () => {
+    const { workspacePath } = SettingsManager.load()
     try {
-      if (!existsSync(historyFile)) return []
-      return JSON.parse(readFileSync(historyFile, 'utf-8')) as SustentacaoHistoryEntry[]
-    } catch {
-      // history.json corrompido ou inválido — retornar vazio sem propagar erro
-      return []
+      return await detectConvergencia(workspacePath)
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
     }
-  }
+  })
 
-  async function fetchAndCacheSustentacao(): Promise<SupportBoardSnapshot | null> {
-    const settings = SettingsManager.load()
-    const { jiraSupportProjectKey, jiraBaseUrl, jiraEmail, jiraApiToken, jiraSlaThresholds, jiraSupportCategories } = settings
-
-    if (!jiraSupportProjectKey || !jiraBaseUrl || !jiraEmail || !jiraApiToken) {
+  ipcMain.handle('brain:getLatest', async () => {
+    const { workspacePath } = SettingsManager.load()
+    const cachePath = join(workspacePath, '..', 'cache', 'brain-result.json')
+    try {
+      if (!existsSync(cachePath)) return null
+      const raw = readFileSync(cachePath, 'utf-8')
+      return JSON.parse(raw) as BrainResult
+    } catch {
       return null
     }
+  })
 
-    const cacheDir = join(settings.workspacePath, '..', 'cache', 'sustentacao')
-    const cacheFile = join(cacheDir, 'board.json')
-    const CACHE_TTL_MS = 60 * 60 * 1000
-
-    try {
-      if (existsSync(cacheFile)) {
-        const cached = JSON.parse(readFileSync(cacheFile, 'utf-8')) as { data: SupportBoardSnapshot; fetchedAt: number }
-        if (Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-          Logger.getInstance().child('IPC').info('sustentacao:get-data cache hit')
-          const historyFile = join(cacheDir, 'history.json')
-          const historyData = readHistory(historyFile).slice(-30)
-          // Cache hit — alertas calculados on-the-fly sobre dados cached (sem issues[] raw)
-          // Graceful: sem issues raw disponivel no cache, alertas D-07 ficam silenciosos
-          const alertasCached = calcularAlertas(cached.data, historyData, [], jiraSlaThresholds ?? {}, jiraBaseUrl)
-          return { ...cached.data, history: historyData, alertas: alertasCached }
-        }
-      }
-    } catch { /* cache inválido — refetch */ }
-
-    Logger.getInstance().child('IPC').info('sustentacao:get-data buscando board', { projectKey: jiraSupportProjectKey })
-
-    const { snapshot: data, issues } = await fetchSupportBoardMetricsWithIssues({
-      config: { baseUrl: jiraBaseUrl, email: jiraEmail, apiToken: jiraApiToken },
-      projectKey: jiraSupportProjectKey,
-      slaThresholds: jiraSlaThresholds,
-      categories: jiraSupportCategories,
-    })
-
-    try {
-      if (!existsSync(cacheDir)) mkdirSync(cacheDir, { recursive: true })
-      writeFileSync(cacheFile, JSON.stringify({ data, fetchedAt: Date.now() }), 'utf-8')
-    } catch (err) {
-      Logger.getInstance().child('IPC').warn('sustentacao:get-data falha ao gravar cache', { error: err instanceof Error ? err.message : String(err) })
-    }
-
-    // Gravar snapshot no histórico diário (history.json)
-    try {
-      const historyFile = join(cacheDir, 'history.json')
-      const dateKey = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
-
-      const history = readHistory(historyFile)
-
-      // Deduplica: remover entrada do mesmo dia (mantém apenas a mais recente)
-      const filtered = history.filter((e) => e.date !== dateKey)
-
-      // Append entrada de hoje (usar apenas campos agregados — sem ticketsEmBreach completo)
-      filtered.push({
-        date: dateKey,
-        fetchedAt: Date.now(),
-        ticketsAbertos: data.ticketsAbertos,
-        ticketsFechadosUltimos30d: data.ticketsFechadosUltimos30d,
-        breachCount: data.ticketsEmBreach.length,
-        complianceRate7d: data.complianceRate7d,
-        complianceRate30d: data.complianceRate30d,
-      })
-
-      // Retenção: 90 dias
-      const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000
-      const retained = filtered.filter((e) => e.fetchedAt >= cutoff)
-
-      writeFileSync(historyFile, JSON.stringify(retained), 'utf-8')
-    } catch (histErr) {
-      Logger.getInstance().child('IPC').warn('sustentacao: falha ao gravar history (graceful)', {
-        error: histErr instanceof Error ? histErr.message : String(histErr),
-      })
-    }
-
-    // Calcular alertas proativos (per D-10, D-11)
-    const historyForAlerts = readHistory(join(cacheDir, 'history.json'))
-    const alertas = calcularAlertas(data, historyForAlerts, issues, jiraSlaThresholds ?? {}, jiraBaseUrl)
-    const dataComAlertas = { ...data, alertas }
-
-    const historyFile = join(cacheDir, 'history.json')
-    const historyData = readHistory(historyFile).slice(-30)
-    return { ...dataComAlertas, history: historyData }
-  }
+  // ── Sustentacao Board ─────────────────────────────────────────
 
   ipcMain.handle('sustentacao:get-data', async (): Promise<SupportBoardSnapshot | null> => {
-    return fetchAndCacheSustentacao()
+    const snapshot = await fetchAndCacheSustentacao()
+    if (!snapshot) return null
+
+    // Carregar intelligence de análise recente (mesmo dia ou dia anterior)
+    try {
+      const settings = SettingsManager.load()
+      const cacheDir = join(settings.workspacePath, '..', 'cache')
+      const store = new AnalysisSnapshotStore(cacheDir)
+      const latest = store.loadLatest()
+
+      if (latest) {
+        const today = new Date().toISOString().slice(0, 10)
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+        const isRecent = latest.date === today || latest.date === yesterday
+
+        if (isRecent) {
+          for (const alerta of snapshot.alertas) {
+            if (!alerta.ticketKey) continue
+            const match = latest.tickets.find((t) => t.key === alerta.ticketKey)
+            if (match) {
+              alerta.intelligence = match.intelligence
+            }
+          }
+
+          snapshot.enrichedTickets = snapshot.ticketsEmBreach.map((t) => {
+            const enriched = buildEnrichedTicket(t)
+            const match = latest.tickets.find((lt) => lt.key === t.key)
+            if (match) enriched.intelligence = match.intelligence
+            return enriched
+          })
+          snapshot.executiveSummary = latest.executiveSummary
+          snapshot.previousAnalysisDate = latest.date
+        }
+      }
+    } catch (err) {
+      Logger.getInstance().child('IPC').warn('sustentacao:get-data falha ao carregar intelligence (graceful)', {
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+
+    return snapshot
   })
 
   ipcMain.handle('sustentacao:refresh', async (): Promise<SupportBoardSnapshot | null> => {
@@ -1261,7 +1555,6 @@ function registerIpcHandlers(): void {
       analysisLength: analysis?.length ?? 0,
     })
 
-    // Persistir no metricas.md de cada assignee com >= 3 tickets
     const SIGNIFICANT_TICKET_THRESHOLD = 3
     const metricsWriter = new MetricsWriter(workspacePath)
     const personRegistry = new PersonRegistry(workspacePath)
@@ -1270,7 +1563,6 @@ function registerIpcHandlers(): void {
     for (const [assigneeKey, count] of Object.entries(snapshot.porAssignee)) {
       if (count < SIGNIFICANT_TICKET_THRESHOLD) continue
 
-      // Mapear assigneeKey (email ou nome do Jira) para slug da pessoa
       const person = people.find(
         (p) =>
           p.jiraEmail === assigneeKey ||
@@ -1295,6 +1587,21 @@ function registerIpcHandlers(): void {
     }
 
     return { analysis }
+  })
+
+  ipcMain.handle('sustentacao:run-ticket-analysis', async () => {
+    return runTicketAnalysisInternal()
+  })
+
+  ipcMain.handle('sustentacao:get-analysis-history', async (): Promise<string[]> => {
+    try {
+      const settings = SettingsManager.load()
+      const cacheDir = join(settings.workspacePath, '..', 'cache')
+      const store = new AnalysisSnapshotStore(cacheDir)
+      return store.listDates()
+    } catch {
+      return []
+    }
   })
 }
 

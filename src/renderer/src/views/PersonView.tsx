@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, FileText, CalendarDays, Pencil, ExternalLink, RefreshCw, Loader2, CheckSquare, Square, X, Plus, ArrowUpRight, Trash2 } from 'lucide-react'
+import { ArrowLeft, FileText, CalendarDays, CalendarCheck, Pencil, ExternalLink, RefreshCw, Loader2, CheckSquare, Square, X, Plus, ArrowUpRight, Trash2 } from 'lucide-react'
 import { useRouter } from '../router'
 import type { PersonConfig, PerfilData, ArtifactMeta, PautaMeta, AgendaResult, Action, ActionOwner, Demanda, PDIItem } from '../types/ipc'
 import { MarkdownPreview } from '../components/MarkdownPreview'
@@ -68,6 +68,8 @@ export function PersonView() {
   const [generatingAgenda, setGeneratingAgenda] = useState(false)
   const [agendaError,   setAgendaError]   = useState<string | null>(null)
   const [resetting,     setResetting]     = useState(false)
+  const [prep1on1Mode,  setPrep1on1Mode]  = useState(false)
+  const [lastPautaContent, setLastPautaContent] = useState<string | null>(null)
 
   async function handleResetData() {
     if (!person) return
@@ -126,6 +128,11 @@ export function PersonView() {
     loadActions(params.slug)
     loadGestorDemandas(params.slug)
     loadResumoRH(params.slug)
+    // Deep-link: open specific tab if passed via navigate params
+    const validTabs = ['perfil', 'artefatos', 'pautas', 'acoes', 'ciclo', 'dados-ext'] as const
+    if (params.tab && (validTabs as readonly string[]).includes(params.tab)) {
+      setActiveTab(params.tab as typeof validTabs[number])
+    }
   }, [params.slug, loadPerfil, loadPautas, loadActions, loadGestorDemandas, loadResumoRH])
 
   // Refresh on ingestion completed
@@ -136,6 +143,13 @@ export function PersonView() {
     })
     return () => window.api.ingestion.removeListeners()
   }, [params.slug, loadPerfil, loadActions])
+
+  // Load last pauta content when prep mode activates
+  useEffect(() => {
+    if (prep1on1Mode && pautas.length > 0 && lastPautaContent === null) {
+      window.api.artifacts.read(pautas[0].path).then(setLastPautaContent).catch(() => {})
+    }
+  }, [prep1on1Mode, pautas, lastPautaContent])
 
   async function handleGenerateAgenda() {
     if (!person) return
@@ -194,6 +208,18 @@ export function PersonView() {
           </button>
           <button onClick={() => navigate('person-form', { slug: person.slug })} style={styles.btnSecondary}>
             <Pencil size={12} /> Editar
+          </button>
+          <button
+            onClick={() => setPrep1on1Mode(v => !v)}
+            style={prep1on1Mode ? {
+              ...styles.btnSecondary,
+              background: 'rgba(100,120,200,0.12)',
+              color: 'rgba(100,120,200,0.9)',
+              borderColor: 'rgba(100,120,200,0.35)',
+            } : styles.btnSecondary}
+          >
+            <CalendarCheck size={12} />
+            {prep1on1Mode ? 'Sair' : 'Preparar 1:1'}
           </button>
           <button
             onClick={handleGenerateAgenda}
@@ -335,6 +361,190 @@ export function PersonView() {
 
             {/* Right content */}
             <div>
+              {prep1on1Mode ? (
+                /* ── Modo Preparar 1:1 ── */
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 22 }}>
+                  {/* Coluna esquerda */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                    {/* Delta desde último 1:1 */}
+                    {fm?.ultimo_1on1 && (
+                      <SinceLastMeetingCard
+                        ultimo1on1={fm.ultimo_1on1}
+                        artifacts={artifacts}
+                        actions={actions}
+                      />
+                    )}
+
+                    {/* Ações abertas do liderado */}
+                    <div style={{
+                      background: 'var(--surface)', border: '1px solid var(--border)',
+                      borderRadius: 6, overflow: 'hidden',
+                    }}>
+                      <div style={{
+                        padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)',
+                        fontSize: 10, fontWeight: 600, letterSpacing: '0.1em',
+                        textTransform: 'uppercase' as const, color: 'var(--text-muted)',
+                      }}>
+                        Ações do liderado · {actions.filter(a => a.status === 'open' && a.owner !== 'gestor').length}
+                      </div>
+                      <div style={{ padding: '8px 16px' }}>
+                        {(() => {
+                          const today = new Date().toISOString().slice(0, 10)
+                          const lideradoActions = actions
+                            .filter(a => a.status === 'open' && a.owner !== 'gestor')
+                            .sort((a, b) => {
+                              const aVenc = a.prazo && a.prazo < today
+                              const bVenc = b.prazo && b.prazo < today
+                              if (aVenc && !bVenc) return -1
+                              if (!aVenc && bVenc) return 1
+                              if (a.prazo && b.prazo) return a.prazo.localeCompare(b.prazo)
+                              return 0
+                            })
+                          if (lideradoActions.length === 0) {
+                            return <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0' }}>Nenhuma ação aberta</div>
+                          }
+                          return lideradoActions.map(a => {
+                            const vencida = a.prazo && a.prazo < today
+                            return (
+                              <div key={a.id} style={{
+                                display: 'flex', alignItems: 'center', gap: 8,
+                                padding: '6px 0',
+                                borderBottom: '1px solid var(--border-subtle)',
+                                fontSize: 12,
+                              }}>
+                                <Square size={12} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
+                                <span style={{ flex: 1, color: 'var(--text-primary)' }}>{a.descricao ?? a.texto}</span>
+                                {a.prazo && (
+                                  <span style={{
+                                    fontSize: 10, fontFamily: 'var(--font-mono)', flexShrink: 0,
+                                    color: vencida ? 'var(--red)' : 'var(--text-muted)',
+                                    fontWeight: vencida ? 600 : 400,
+                                  }}>
+                                    {new Date(a.prazo + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Gerar pauta + última pauta inline */}
+                    <div>
+                      <button
+                        onClick={handleGenerateAgenda}
+                        disabled={generatingAgenda || !perfil}
+                        style={{
+                          ...styles.btnPrimary,
+                          opacity: !perfil ? 0.45 : 1,
+                          cursor: !perfil ? 'not-allowed' : 'pointer',
+                          marginBottom: 14,
+                        }}
+                      >
+                        {generatingAgenda
+                          ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Gerando…</>
+                          : <><CalendarDays size={12} /> Gerar pauta</>}
+                      </button>
+
+                      {agendaError && (
+                        <div style={{
+                          marginBottom: 14, padding: '10px 14px', borderRadius: 6,
+                          background: 'var(--red-dim)', border: '1px solid rgba(184,64,64,0.3)',
+                          fontSize: 12.5, color: 'var(--red)',
+                        }}>
+                          {agendaError}
+                        </div>
+                      )}
+
+                      {pautas.length > 0 && (
+                        <div style={{
+                          background: 'var(--surface)', border: '1px solid var(--border)',
+                          borderRadius: 6, overflow: 'hidden',
+                        }}>
+                          <div style={{
+                            padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)',
+                            fontSize: 10, fontWeight: 600, letterSpacing: '0.1em',
+                            textTransform: 'uppercase' as const, color: 'var(--text-muted)',
+                          }}>
+                            Última pauta · {fmtDate(pautas[0].date)}
+                          </div>
+                          <div style={{ padding: '12px 16px' }}>
+                            {lastPautaContent
+                              ? <MarkdownPreview content={lastPautaContent} />
+                              : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Carregando…</span>}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Coluna direita */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                    {/* Dados externos */}
+                    {(person.jiraEmail || person.githubUsername) ? (
+                      <ExternalTab slug={person.slug} />
+                    ) : (
+                      <div style={{
+                        background: 'var(--surface)', border: '1px solid var(--border)',
+                        borderRadius: 6, padding: '16px',
+                        fontSize: 12, color: 'var(--text-muted)',
+                      }}>
+                        Jira/GitHub não configurados para esta pessoa.
+                      </div>
+                    )}
+
+                    {/* Minhas promessas */}
+                    {gestorDemandas.filter(d => d.status === 'open').length > 0 && (
+                      <div style={{
+                        background: 'var(--surface)', border: '1px solid var(--border)',
+                        borderRadius: 6, overflow: 'hidden',
+                      }}>
+                        <div style={{
+                          padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)',
+                          fontSize: 10, fontWeight: 600, letterSpacing: '0.1em',
+                          textTransform: 'uppercase' as const, color: 'var(--text-muted)',
+                        }}>
+                          Minhas promessas
+                        </div>
+                        <div style={{ padding: '8px 16px' }}>
+                          {gestorDemandas.filter(d => d.status === 'open').map(d => {
+                            const today = new Date().toISOString().slice(0, 10)
+                            const vencida = d.prazo && d.prazo < today
+                            return (
+                              <div key={d.id} style={{
+                                display: 'flex', alignItems: 'center', gap: 8,
+                                padding: '6px 0',
+                                borderBottom: '1px solid var(--border-subtle)',
+                                fontSize: 12,
+                              }}>
+                                <span style={{
+                                  flex: 1,
+                                  color: vencida ? 'var(--red)' : 'var(--text-primary)',
+                                  fontWeight: vencida ? 600 : 400,
+                                }}>
+                                  {d.descricao}
+                                </span>
+                                {d.prazo && (
+                                  <span style={{
+                                    fontSize: 10, fontFamily: 'var(--font-mono)', flexShrink: 0,
+                                    color: vencida ? 'var(--red)' : 'var(--text-muted)',
+                                    fontWeight: vencida ? 600 : 400,
+                                  }}>
+                                    {vencida ? 'VENCIDA' : new Date(d.prazo + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* ── Layout original com abas ── */
+                <>
               {/* Tabs */}
               <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 22 }}>
                 {([
@@ -463,6 +673,8 @@ export function PersonView() {
               )}
               {activeTab === 'ciclo'     && <CycleTab slug={person.slug} person={person} />}
               {activeTab === 'dados-ext' && <ExternalTab slug={person.slug} />}
+                </>
+              )}
             </div>
 
           </div>

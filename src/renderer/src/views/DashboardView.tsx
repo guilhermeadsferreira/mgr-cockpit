@@ -28,12 +28,165 @@ const RELACAO_META: Record<string, { eyebrow: string; title: string; detectedLab
   },
 }
 
-export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
+// ── Morning Briefing ──────────────────────────────────────────
+
+interface BriefingData {
+  lastOpenedAt: string | null
+  sprintPercent: number | null
+  sprintRisco: 'baixo' | 'medio' | 'alto' | null
+  prsHoje: number
+  ticketsEmBreach: number
+  slaCompliance: number | null
+  temDadosSustentacao: boolean
+  acoesGestorVencendoHoje: number
+  proximoLideradoSem1on1: { nome: string; dias: number } | null
+}
+
+function formatTimeSince(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime()
+  const mins = Math.floor(diff / 60_000)
+  if (mins < 60) return `há ${mins}min`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `há ${hours}h`
+  const days = Math.floor(hours / 24)
+  return `há ${days}d`
+}
+
+function MorningBriefing({ data }: { data: BriefingData }) {
+  if (!data.lastOpenedAt) return null
+
+  const desde = formatTimeSince(data.lastOpenedAt)
+
+  const linhas: Array<{ icone: string; texto: string; cor?: 'danger' | 'warning' }> = []
+
+  if (data.prsHoje > 0) {
+    linhas.push({ icone: '↗', texto: `${data.prsHoje} PR${data.prsHoje > 1 ? 's' : ''} mergeado${data.prsHoje > 1 ? 's' : ''}` })
+  }
+
+  if (data.sprintPercent !== null) {
+    const cor = data.sprintRisco === 'alto' ? 'danger' as const : data.sprintRisco === 'medio' ? 'warning' as const : undefined
+    linhas.push({
+      icone: '◎',
+      texto: `Sprint em ${data.sprintPercent}%${data.sprintRisco === 'alto' ? ' — risco alto' : data.sprintRisco === 'medio' ? ' — risco médio' : ''}`,
+      cor,
+    })
+  }
+
+  if (data.temDadosSustentacao && data.ticketsEmBreach > 0) {
+    linhas.push({
+      icone: '!',
+      texto: `${data.ticketsEmBreach} ticket${data.ticketsEmBreach > 1 ? 's' : ''} em breach de SLA`,
+      cor: 'danger',
+    })
+  }
+
+  if (data.acoesGestorVencendoHoje > 0) {
+    linhas.push({
+      icone: '→',
+      texto: `Você tem ${data.acoesGestorVencendoHoje} promessa${data.acoesGestorVencendoHoje > 1 ? 's' : ''} vencendo hoje`,
+      cor: 'warning',
+    })
+  }
+
+  if (data.proximoLideradoSem1on1) {
+    linhas.push({
+      icone: '◌',
+      texto: `${data.proximoLideradoSem1on1.nome} está há ${data.proximoLideradoSem1on1.dias}d sem 1:1`,
+      cor: data.proximoLideradoSem1on1.dias > 21 ? 'danger' : 'warning',
+    })
+  }
+
+  if (linhas.length === 0) return null
+
+  const corMap = {
+    danger:  'var(--red)',
+    warning: 'var(--yellow, #d4a843)',
+  } as const
+
+  return (
+    <div style={{
+      marginBottom: 20,
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--r)',
+      padding: '12px 16px',
+    }}>
+      <div style={{
+        fontSize: 10, fontWeight: 600,
+        letterSpacing: '0.1em', textTransform: 'uppercase',
+        color: 'var(--text-muted)', marginBottom: 8,
+      }}>
+        Desde seu último acesso · {desde}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {linhas.map((l, i) => (
+          <div key={i} style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            fontSize: 12.5, color: l.cor ? corMap[l.cor] : 'var(--text-primary)',
+          }}>
+            <span style={{
+              width: 16, textAlign: 'center', flexShrink: 0,
+              fontSize: 11, fontWeight: 600,
+              color: l.cor ? corMap[l.cor] : 'var(--text-muted)',
+            }}>
+              {l.icone}
+            </span>
+            {l.texto}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function calcUrgencyScore(
+  perfil: Partial<PerfilFrontmatter>,
+  actions: Action[],
+  frequencia1on1: number
+): number {
+  let score = 0
+
+  if (perfil.saude === 'vermelho') score += 40
+  else if (perfil.saude === 'amarelo') score += 20
+
+  if (perfil.tendencia_emocional === 'deteriorando') score += 25
+
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+  const vencidas = actions.filter(
+    (a) => a.status === 'open' && a.prazo && new Date(a.prazo) < hoje
+  ).length
+  score += Math.min(vencidas * 8, 24)
+
+  if (perfil.ultimo_1on1 && frequencia1on1 > 0) {
+    const diasSem = Math.floor(
+      (Date.now() - new Date(perfil.ultimo_1on1).getTime()) / 86_400_000
+    )
+    if (diasSem > frequencia1on1 * 2) score += 15
+    else if (diasSem > frequencia1on1) score += 8
+  }
+
+  if (perfil.alerta_estagnacao) score += 10
+  if (perfil.necessita_1on1) score += 10
+
+  return score
+}
+
+const RELACAO_TABS: Array<{ id: string; label: string }> = [
+  { id: 'liderado', label: 'Time' },
+  { id: 'par',      label: 'Pares' },
+  { id: 'gestor',   label: 'Gestores' },
+]
+
+export function DashboardView({ relacao: relacaoProp = 'liderado' }: { relacao?: string }) {
   const { navigate } = useRouter()
+  const [relacao, setRelacao] = useState(relacaoProp)
   const [people,   setPeople]   = useState<PersonConfig[]>([])
   const [perfis,   setPerfis]   = useState<Record<string, Partial<PerfilFrontmatter>>>({})
   const [actionsMap, setActionsMap] = useState<Record<string, Action[]>>({})
   const [detected, setDetected] = useState<DetectedPerson[]>([])
+  const [scores,   setScores]   = useState<Map<string, number>>(new Map())
+  const [briefing, setBriefing] = useState<BriefingData | null>(null)
   const [loading,  setLoading]  = useState(true)
   const [escalations, setEscalations] = useState<Array<{
     slug: string; nome: string;
@@ -43,6 +196,7 @@ export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
   const [crossTeamInsights, setCrossTeamInsights] = useState<Array<{
     tipo: string; descricao: string; pessoas: string[]; severidade: 'alta' | 'media' | 'baixa'
   }>>([])
+  const [brainResult, setBrainResult] = useState<BrainResult | null>(null)
 
   const meta = RELACAO_META[relacao] ?? RELACAO_META['liderado']
 
@@ -87,8 +241,20 @@ export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
         return [p.slug, actions] as const
       })),
     ])
-    setPerfis(Object.fromEntries(perfilResults))
-    setActionsMap(Object.fromEntries(actionResults))
+    const perfisMap = Object.fromEntries(perfilResults)
+    const actionsMapLocal = Object.fromEntries(actionResults)
+    setPerfis(perfisMap)
+    setActionsMap(actionsMapLocal)
+
+    // Compute urgency scores
+    const sm = new Map<string, number>()
+    for (const p of filtered) {
+      sm.set(
+        p.slug,
+        calcUrgencyScore(perfisMap[p.slug] ?? {}, actionsMapLocal[p.slug] ?? [], p.frequencia_1on1_dias ?? 7)
+      )
+    }
+    setScores(sm)
 
     // Load escalations (acoes do gestor vencidas)
     try {
@@ -103,6 +269,56 @@ export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
         setCrossTeamInsights(insights)
       } catch {
         setCrossTeamInsights([])
+      }
+
+      // Load Brain risk convergence
+      try {
+        const brain = await window.api.brain.getLatest()
+        setBrainResult(brain)
+      } catch {
+        setBrainResult(null)
+      }
+    }
+
+    // Load morning briefing data (only for liderados)
+    if (relacao === 'liderado') {
+      try {
+        const [lastOpened, dailySummary, escLocal] = await Promise.all([
+          window.api.app.getLastOpened(),
+          window.api.external.getDailySummary(),
+          window.api.actions.escalations(),
+        ])
+        // Mark opened AFTER fetching the previous timestamp
+        await window.api.app.markOpened()
+
+        // Find liderado with most overdue 1:1
+        let proximoSem1on1: { nome: string; dias: number } | null = null
+        for (const p of filtered) {
+          const fm = perfisMap[p.slug] ?? {}
+          if (fm.ultimo_1on1 && p.frequencia_1on1_dias > 0) {
+            const dias = Math.floor((Date.now() - new Date(fm.ultimo_1on1).getTime()) / 86_400_000)
+            if (dias > p.frequencia_1on1_dias && (!proximoSem1on1 || dias > proximoSem1on1.dias)) {
+              proximoSem1on1 = { nome: p.nome, dias }
+            }
+          }
+        }
+
+        const today = new Date().toISOString().slice(0, 10)
+        setBriefing({
+          lastOpenedAt: lastOpened,
+          sprintPercent: dailySummary?.sprintPercent ?? null,
+          sprintRisco: dailySummary?.sprintRisco ?? null,
+          prsHoje: dailySummary?.prsHoje ?? 0,
+          ticketsEmBreach: dailySummary?.ticketsEmBreach ?? 0,
+          slaCompliance: dailySummary?.slaCompliance ?? null,
+          temDadosSustentacao: dailySummary?.temDadosSustentacao ?? false,
+          acoesGestorVencendoHoje: (escLocal ?? []).filter(
+            (e) => e.gestorAction.criadoEm && e.gestorAction.criadoEm.slice(0, 10) <= today && e.diasPendente === 0
+          ).length,
+          proximoLideradoSem1on1: proximoSem1on1,
+        })
+      } catch {
+        // Briefing is non-critical — silently skip
       }
     }
   }, [relacao])
@@ -157,7 +373,31 @@ export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
       }}>
         <div>
           <div style={styles.eyebrow}>{meta.eyebrow}</div>
-          <h1 style={styles.pageTitle}>{meta.title}</h1>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
+            <h1 style={styles.pageTitle}>{meta.title}</h1>
+            <div style={{ display: 'flex', gap: 2 }}>
+              {RELACAO_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setRelacao(tab.id)}
+                  style={{
+                    padding: '3px 10px',
+                    borderRadius: 4,
+                    border: 'none',
+                    background: relacao === tab.id ? 'var(--surface-3)' : 'transparent',
+                    color: relacao === tab.id ? 'var(--text-primary)' : 'var(--text-muted)',
+                    fontSize: 12,
+                    fontWeight: relacao === tab.id ? 600 : 400,
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font)',
+                    transition: 'background 0.12s, color 0.12s',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div style={styles.pageSub}>
             {loading ? '…' : `${people.length} ${people.length === 1 ? 'pessoa' : 'pessoas'}`}
           </div>
@@ -205,6 +445,16 @@ export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
                     <AlertCircle size={13} />
                     {staleCount} {staleCount === 1 ? 'pessoa sem' : 'pessoas sem'} dados há 30+ dias
                   </div>
+                )}
+
+                {/* Brain — convergência de risco */}
+                {relacao === 'liderado' && brainResult && brainResult.pessoas.length > 0 && (
+                  <BrainAlertPanel result={brainResult} onNavigate={(slug) => navigate('person', { slug })} />
+                )}
+
+                {/* Morning briefing */}
+                {relacao === 'liderado' && briefing && (
+                  <MorningBriefing data={briefing} />
                 )}
 
                 {/* Urgências do dia — T-R10.1 */}
@@ -256,12 +506,20 @@ export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
                   <CrossTeamInsightsPanel insights={crossTeamInsights} />
                 )}
 
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, 1fr)',
-                  gap: 10,
-                }}>
-                  {people.map((p) => (
+                {(() => {
+                  const sorted = [...people].sort((a, b) =>
+                    (scores.get(b.slug) ?? 0) - (scores.get(a.slug) ?? 0)
+                  )
+                  const attention = sorted.filter((p) => (scores.get(p.slug) ?? 0) >= 30)
+                  const stable    = sorted.filter((p) => (scores.get(p.slug) ?? 0) < 30)
+
+                  const gridStyle = {
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: 10,
+                  } as const
+
+                  const renderCard = (p: PersonConfig) => (
                     <PersonCard
                       key={p.slug}
                       person={p}
@@ -270,8 +528,77 @@ export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
                       onViewCockpit={() => navigate('person', { slug: p.slug })}
                       onEdit={() => navigate('person-form', { slug: p.slug })}
                     />
-                  ))}
-                </div>
+                  )
+
+                  return (
+                    <>
+                      {attention.length > 0 && (
+                        <div style={{ marginBottom: 24 }}>
+                          <div style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            marginBottom: 10,
+                          }}>
+                            <AlertCircle size={12} color="var(--red)" />
+                            <span style={{
+                              fontSize: 10, fontWeight: 600,
+                              letterSpacing: '0.1em', textTransform: 'uppercase',
+                              color: 'var(--red)',
+                            }}>
+                              Atenção agora
+                            </span>
+                            <span style={{
+                              fontSize: 10, padding: '1px 6px', borderRadius: 20,
+                              background: 'rgba(184,64,64,0.15)', color: 'var(--red)',
+                              fontFamily: 'var(--font-mono)',
+                            }}>
+                              {attention.length}
+                            </span>
+                          </div>
+                          <div style={gridStyle}>
+                            {attention.map(renderCard)}
+                          </div>
+                        </div>
+                      )}
+
+                      {attention.length > 0 && stable.length > 0 && (
+                        <div style={{
+                          height: 1,
+                          background: 'var(--border-subtle)',
+                          margin: '8px 0 20px',
+                        }} />
+                      )}
+
+                      {stable.length > 0 && (
+                        <div>
+                          {attention.length > 0 && (
+                            <div style={{
+                              display: 'flex', alignItems: 'center', gap: 8,
+                              marginBottom: 10,
+                            }}>
+                              <span style={{
+                                fontSize: 10, fontWeight: 600,
+                                letterSpacing: '0.1em', textTransform: 'uppercase',
+                                color: 'var(--text-muted)',
+                              }}>
+                                Estável
+                              </span>
+                              <span style={{
+                                fontSize: 10, padding: '1px 6px', borderRadius: 20,
+                                background: 'var(--surface-2)', color: 'var(--text-muted)',
+                                fontFamily: 'var(--font-mono)',
+                              }}>
+                                {stable.length}
+                              </span>
+                            </div>
+                          )}
+                          <div style={gridStyle}>
+                            {stable.map(renderCard)}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
               </>
             ) : null}
 
@@ -316,6 +643,112 @@ export function DashboardView({ relacao = 'liderado' }: { relacao?: string }) {
             )}
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+function BrainAlertPanel({ result, onNavigate }: {
+  result: BrainResult
+  onNavigate: (slug: string) => void
+}) {
+  const severityMeta: Record<string, { color: string; label: string; bg: string; border: string }> = {
+    critica: { color: 'var(--red)', label: 'CRÍTICO', bg: 'rgba(184,64,64,0.08)', border: 'rgba(184,64,64,0.25)' },
+    alta:    { color: 'var(--yellow, #d4a843)', label: 'ALTO', bg: 'rgba(212,168,67,0.08)', border: 'rgba(212,168,67,0.25)' },
+    media:   { color: 'var(--text-muted)', label: 'MÉDIO', bg: 'rgba(100,120,160,0.08)', border: 'rgba(100,120,160,0.2)' },
+  }
+
+  return (
+    <div style={{
+      marginBottom: 20,
+      background: 'rgba(184,64,64,0.04)',
+      border: '1px solid rgba(184,64,64,0.2)',
+      borderRadius: 'var(--r)',
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        padding: '10px 16px',
+        borderBottom: '1px solid rgba(184,64,64,0.12)',
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <AlertCircle size={13} color="var(--red)" />
+        <span style={{
+          fontSize: 11, fontWeight: 600, color: 'var(--red)',
+          letterSpacing: '0.05em', textTransform: 'uppercase',
+        }}>
+          Convergência de risco
+        </span>
+        <span style={{
+          fontSize: 10, padding: '1px 6px', borderRadius: 20,
+          background: 'rgba(184,64,64,0.12)', color: 'var(--red)',
+          fontFamily: 'var(--font-mono)',
+        }}>
+          {result.pessoas.length}
+        </span>
+        {result.geradoEm && (
+          <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 'auto' }}>
+            {new Date(result.geradoEm).toLocaleDateString('pt-BR')} {new Date(result.geradoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
+      </div>
+      <div style={{ padding: '6px 16px 10px' }}>
+        {result.pessoas.map((p) => {
+          const meta = severityMeta[p.severidade] ?? severityMeta.media
+          return (
+            <div key={p.slug} style={{
+              padding: '10px 0',
+              borderBottom: '1px solid rgba(184,64,64,0.08)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    width: 7, height: 7, borderRadius: '50%',
+                    background: meta.color, flexShrink: 0,
+                  }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {p.nome}
+                  </span>
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 3,
+                    background: meta.bg, border: `1px solid ${meta.border}`,
+                    color: meta.color, letterSpacing: '0.05em',
+                  }}>
+                    {meta.label}
+                  </span>
+                </div>
+                <button
+                  onClick={() => onNavigate(p.slug)}
+                  style={{
+                    fontSize: 11, color: 'var(--accent)', background: 'none',
+                    border: 'none', cursor: 'pointer', fontFamily: 'var(--font)',
+                    padding: '2px 4px',
+                  }}
+                >
+                  Abrir perfil →
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6, marginLeft: 15 }}>
+                {p.sinais.map((s, i) => (
+                  <span key={i} style={{
+                    fontSize: 10.5, padding: '2px 8px', borderRadius: 3,
+                    background: 'var(--surface-2)', color: 'var(--text-secondary)',
+                    border: '1px solid var(--border-subtle)',
+                  }}>
+                    {s.descricao}
+                  </span>
+                ))}
+              </div>
+
+              <div style={{
+                marginTop: 6, marginLeft: 15,
+                fontSize: 11, color: 'var(--text-secondary)', fontStyle: 'italic',
+              }}>
+                → {p.recomendacao}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
