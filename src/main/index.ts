@@ -1103,6 +1103,98 @@ function registerIpcHandlers(): void {
     return insights
   })
 
+  // ── App state ───────────────────────────────────────────────
+  ipcMain.handle('app:getLastOpened', () => {
+    return SettingsManager.load().lastOpenedAt ?? null
+  })
+
+  ipcMain.handle('app:markOpened', () => {
+    const settings = SettingsManager.load()
+    const now = new Date().toISOString()
+    settings.lastOpenedAt = now
+    SettingsManager.save(settings)
+    return now
+  })
+
+  // ── Daily summary (structured) ─────────────────────────────
+  ipcMain.handle('reports:getDailySummary', () => {
+    const { workspacePath } = SettingsManager.load()
+    const reportsDir = join(workspacePath, 'relatorios')
+    if (!existsSync(reportsDir)) return null
+
+    // Find most recent Daily-*.md
+    let files: string[]
+    try {
+      files = readdirSync(reportsDir).filter(f => f.startsWith('Daily-') && f.endsWith('.md'))
+    } catch { return null }
+    if (files.length === 0) return null
+
+    // Parse date from filename: Daily-DD-MM-YYYY.md
+    const parsed = files.map(f => {
+      const m = f.match(/Daily-(\d{2})-(\d{2})-(\d{4})\.md/)
+      return m ? { file: f, sort: `${m[3]}-${m[2]}-${m[1]}` } : null
+    }).filter(Boolean) as Array<{ file: string; sort: string }>
+
+    parsed.sort((a, b) => b.sort.localeCompare(a.sort))
+    const latest = parsed[0]
+    if (!latest) return null
+
+    let content: string
+    try {
+      content = readFileSync(join(reportsDir, latest.file), 'utf-8')
+    } catch { return null }
+
+    // Extract fields via regex — null if not found
+    let sprintPercent: number | null = null
+    let prsHoje = 0
+    let ticketsEmBreach = 0
+    let slaCompliance: number | null = null
+    let sprintDiasRestantes: number | null = null
+
+    // Sprint percent: "Sprint XX% concluída"
+    const sprintMatch = content.match(/Sprint\s+(\d+)%\s+conclu[ií]da/i)
+    if (sprintMatch) sprintPercent = parseInt(sprintMatch[1], 10)
+
+    // Sprint days: "Dia X de Y"
+    const daysMatch = content.match(/Dia\s+(\d+)\s+de\s+(\d+)/)
+    if (daysMatch) sprintDiasRestantes = parseInt(daysMatch[2], 10) - parseInt(daysMatch[1], 10)
+
+    // PRs merged: count occurrences of "🔀 PR merged" or "PR merged"
+    const prMatches = content.match(/🔀\s*PR merged/g)
+    if (prMatches) prsHoje = prMatches.length
+
+    // Tickets em breach: "Breach: N" in sustentacao section
+    const breachMatch = content.match(/Breach:\s*(\d+)/i)
+    if (breachMatch) ticketsEmBreach = parseInt(breachMatch[1], 10)
+
+    // SLA compliance 7d: "SLA compliance 7d: **XX%**"
+    const slaMatch = content.match(/SLA compliance 7d:\s*\*?\*?(\d+)%/)
+    if (slaMatch) slaCompliance = parseInt(slaMatch[1], 10)
+
+    // Sprint risk
+    let sprintRisco: 'baixo' | 'medio' | 'alto' | null = null
+    if (sprintPercent !== null && sprintDiasRestantes !== null) {
+      const remaining = 100 - sprintPercent
+      if (sprintDiasRestantes <= 2 && remaining > 40) sprintRisco = 'alto'
+      else if (sprintDiasRestantes <= 3 && remaining > 30) sprintRisco = 'medio'
+      else sprintRisco = 'baixo'
+    }
+
+    // Generation date from filename
+    const dateMatch = latest.file.match(/Daily-(\d{2})-(\d{2})-(\d{4})/)
+    const geradoEm = dateMatch ? `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}` : latest.sort
+
+    return {
+      geradoEm,
+      sprintPercent,
+      sprintRisco,
+      prsHoje,
+      ticketsEmBreach,
+      slaCompliance,
+      temDadosSustentacao: content.includes('## Sustentação'),
+    }
+  })
+
   // ── System Audit ─────────────────────────────────────────────
   ipcMain.handle('audit:run', async () => {
     const { workspacePath } = SettingsManager.load()

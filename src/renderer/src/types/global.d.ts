@@ -5,6 +5,11 @@ declare global {
     api: {
       ping: () => Promise<{ ok: boolean; ts: number }>
 
+      app: {
+        getLastOpened: () => Promise<string | null>
+        markOpened:    () => Promise<string>
+      }
+
       settings: {
         load:           () => Promise<AppSettings>
         save:           (data: AppSettings) => Promise<void>
@@ -117,6 +122,7 @@ declare global {
         listReports:       () => Promise<Array<{ name: string; date: string; size: number }>>
         getReport:         (path: string) => Promise<string>
         regenerateReport:  (name: string) => Promise<string>
+        getDailySummary:   () => Promise<DailySummary | null>
         onProgress:        (cb: (data: ReportProgress) => void) => void
         removeProgressListener: () => void
       }
@@ -131,6 +137,16 @@ declare global {
         runAnalysis: () => Promise<{ analysis?: string; error?: string } | null>
       }
     }
+  }
+
+  interface DailySummary {
+    geradoEm: string
+    sprintPercent: number | null
+    sprintRisco: 'baixo' | 'medio' | 'alto' | null
+    prsHoje: number
+    ticketsEmBreach: number
+    slaCompliance: number | null
+    temDadosSustentacao: boolean
   }
 
   interface ReportProgress {

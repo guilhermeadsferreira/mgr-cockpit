@@ -66,6 +66,9 @@ export interface AppSettings {
   dailyReportTime?: string
   sprintReportEnabled?: boolean
 
+  // App state
+  lastOpenedAt?: string  // ISO 8601
+
   // Sustentação
   jiraSupportBoardId?: number
   jiraSupportProjectKey?: string

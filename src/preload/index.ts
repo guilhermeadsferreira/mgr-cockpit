@@ -4,6 +4,11 @@ contextBridge.exposeInMainWorld('api', {
   ping: () => ipcRenderer.invoke('ipc:ping'),
   getFilePath: (file: File) => webUtils.getPathForFile(file),
 
+  app: {
+    getLastOpened: () => ipcRenderer.invoke('app:getLastOpened'),
+    markOpened:    () => ipcRenderer.invoke('app:markOpened'),
+  },
+
   settings: {
     load:           ()              => ipcRenderer.invoke('settings:load'),
     save:           (data: unknown) => ipcRenderer.invoke('settings:save', data),
@@ -122,6 +127,7 @@ contextBridge.exposeInMainWorld('api', {
     listReports:       ()              => ipcRenderer.invoke('external:list-reports'),
     getReport:         (path: string)  => ipcRenderer.invoke('external:get-report', path),
     regenerateReport:  (name: string)  => ipcRenderer.invoke('external:regenerate-report', name),
+    getDailySummary:   ()              => ipcRenderer.invoke('reports:getDailySummary'),
     onProgress:        (cb: (data: unknown) => void) => ipcRenderer.on('report:progress', (_, d) => cb(d)),
     removeProgressListener: () => ipcRenderer.removeAllListeners('report:progress'),
   },
