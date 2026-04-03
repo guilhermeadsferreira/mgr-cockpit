@@ -28,6 +28,117 @@ const RELACAO_META: Record<string, { eyebrow: string; title: string; detectedLab
   },
 }
 
+// ── Morning Briefing ──────────────────────────────────────────
+
+interface BriefingData {
+  lastOpenedAt: string | null
+  sprintPercent: number | null
+  sprintRisco: 'baixo' | 'medio' | 'alto' | null
+  prsHoje: number
+  ticketsEmBreach: number
+  slaCompliance: number | null
+  temDadosSustentacao: boolean
+  acoesGestorVencendoHoje: number
+  proximoLideradoSem1on1: { nome: string; dias: number } | null
+}
+
+function formatTimeSince(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime()
+  const mins = Math.floor(diff / 60_000)
+  if (mins < 60) return `há ${mins}min`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `há ${hours}h`
+  const days = Math.floor(hours / 24)
+  return `há ${days}d`
+}
+
+function MorningBriefing({ data }: { data: BriefingData }) {
+  if (!data.lastOpenedAt) return null
+
+  const desde = formatTimeSince(data.lastOpenedAt)
+
+  const linhas: Array<{ icone: string; texto: string; cor?: 'danger' | 'warning' }> = []
+
+  if (data.prsHoje > 0) {
+    linhas.push({ icone: '↗', texto: `${data.prsHoje} PR${data.prsHoje > 1 ? 's' : ''} mergeado${data.prsHoje > 1 ? 's' : ''}` })
+  }
+
+  if (data.sprintPercent !== null) {
+    const cor = data.sprintRisco === 'alto' ? 'danger' as const : data.sprintRisco === 'medio' ? 'warning' as const : undefined
+    linhas.push({
+      icone: '◎',
+      texto: `Sprint em ${data.sprintPercent}%${data.sprintRisco === 'alto' ? ' — risco alto' : data.sprintRisco === 'medio' ? ' — risco médio' : ''}`,
+      cor,
+    })
+  }
+
+  if (data.temDadosSustentacao && data.ticketsEmBreach > 0) {
+    linhas.push({
+      icone: '!',
+      texto: `${data.ticketsEmBreach} ticket${data.ticketsEmBreach > 1 ? 's' : ''} em breach de SLA`,
+      cor: 'danger',
+    })
+  }
+
+  if (data.acoesGestorVencendoHoje > 0) {
+    linhas.push({
+      icone: '→',
+      texto: `Você tem ${data.acoesGestorVencendoHoje} promessa${data.acoesGestorVencendoHoje > 1 ? 's' : ''} vencendo hoje`,
+      cor: 'warning',
+    })
+  }
+
+  if (data.proximoLideradoSem1on1) {
+    linhas.push({
+      icone: '◌',
+      texto: `${data.proximoLideradoSem1on1.nome} está há ${data.proximoLideradoSem1on1.dias}d sem 1:1`,
+      cor: data.proximoLideradoSem1on1.dias > 21 ? 'danger' : 'warning',
+    })
+  }
+
+  if (linhas.length === 0) return null
+
+  const corMap = {
+    danger:  'var(--red)',
+    warning: 'var(--yellow, #d4a843)',
+  } as const
+
+  return (
+    <div style={{
+      marginBottom: 20,
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--r)',
+      padding: '12px 16px',
+    }}>
+      <div style={{
+        fontSize: 10, fontWeight: 600,
+        letterSpacing: '0.1em', textTransform: 'uppercase',
+        color: 'var(--text-muted)', marginBottom: 8,
+      }}>
+        Desde seu último acesso · {desde}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {linhas.map((l, i) => (
+          <div key={i} style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            fontSize: 12.5, color: l.cor ? corMap[l.cor] : 'var(--text-primary)',
+          }}>
+            <span style={{
+              width: 16, textAlign: 'center', flexShrink: 0,
+              fontSize: 11, fontWeight: 600,
+              color: l.cor ? corMap[l.cor] : 'var(--text-muted)',
+            }}>
+              {l.icone}
+            </span>
+            {l.texto}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function calcUrgencyScore(
   perfil: Partial<PerfilFrontmatter>,
   actions: Action[],
@@ -75,6 +186,7 @@ export function DashboardView({ relacao: relacaoProp = 'liderado' }: { relacao?:
   const [actionsMap, setActionsMap] = useState<Record<string, Action[]>>({})
   const [detected, setDetected] = useState<DetectedPerson[]>([])
   const [scores,   setScores]   = useState<Map<string, number>>(new Map())
+  const [briefing, setBriefing] = useState<BriefingData | null>(null)
   const [loading,  setLoading]  = useState(true)
   const [escalations, setEscalations] = useState<Array<{
     slug: string; nome: string;
@@ -156,6 +268,48 @@ export function DashboardView({ relacao: relacaoProp = 'liderado' }: { relacao?:
         setCrossTeamInsights(insights)
       } catch {
         setCrossTeamInsights([])
+      }
+    }
+
+    // Load morning briefing data (only for liderados)
+    if (relacao === 'liderado') {
+      try {
+        const [lastOpened, dailySummary, escLocal] = await Promise.all([
+          window.api.app.getLastOpened(),
+          window.api.external.getDailySummary(),
+          window.api.actions.escalations(),
+        ])
+        // Mark opened AFTER fetching the previous timestamp
+        await window.api.app.markOpened()
+
+        // Find liderado with most overdue 1:1
+        let proximoSem1on1: { nome: string; dias: number } | null = null
+        for (const p of filtered) {
+          const fm = perfisMap[p.slug] ?? {}
+          if (fm.ultimo_1on1 && p.frequencia_1on1_dias > 0) {
+            const dias = Math.floor((Date.now() - new Date(fm.ultimo_1on1).getTime()) / 86_400_000)
+            if (dias > p.frequencia_1on1_dias && (!proximoSem1on1 || dias > proximoSem1on1.dias)) {
+              proximoSem1on1 = { nome: p.nome, dias }
+            }
+          }
+        }
+
+        const today = new Date().toISOString().slice(0, 10)
+        setBriefing({
+          lastOpenedAt: lastOpened,
+          sprintPercent: dailySummary?.sprintPercent ?? null,
+          sprintRisco: dailySummary?.sprintRisco ?? null,
+          prsHoje: dailySummary?.prsHoje ?? 0,
+          ticketsEmBreach: dailySummary?.ticketsEmBreach ?? 0,
+          slaCompliance: dailySummary?.slaCompliance ?? null,
+          temDadosSustentacao: dailySummary?.temDadosSustentacao ?? false,
+          acoesGestorVencendoHoje: (escLocal ?? []).filter(
+            (e) => e.gestorAction.criadoEm && e.gestorAction.criadoEm.slice(0, 10) <= today && e.diasPendente === 0
+          ).length,
+          proximoLideradoSem1on1: proximoSem1on1,
+        })
+      } catch {
+        // Briefing is non-critical — silently skip
       }
     }
   }, [relacao])
@@ -282,6 +436,11 @@ export function DashboardView({ relacao: relacaoProp = 'liderado' }: { relacao?:
                     <AlertCircle size={13} />
                     {staleCount} {staleCount === 1 ? 'pessoa sem' : 'pessoas sem'} dados há 30+ dias
                   </div>
+                )}
+
+                {/* Morning briefing */}
+                {relacao === 'liderado' && briefing && (
+                  <MorningBriefing data={briefing} />
                 )}
 
                 {/* Urgências do dia — T-R10.1 */}
