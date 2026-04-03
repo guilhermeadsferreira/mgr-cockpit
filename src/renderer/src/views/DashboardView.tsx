@@ -28,6 +28,39 @@ const RELACAO_META: Record<string, { eyebrow: string; title: string; detectedLab
   },
 }
 
+function calcUrgencyScore(
+  perfil: Partial<PerfilFrontmatter>,
+  actions: Action[],
+  frequencia1on1: number
+): number {
+  let score = 0
+
+  if (perfil.saude === 'vermelho') score += 40
+  else if (perfil.saude === 'amarelo') score += 20
+
+  if (perfil.tendencia_emocional === 'deteriorando') score += 25
+
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+  const vencidas = actions.filter(
+    (a) => a.status === 'open' && a.prazo && new Date(a.prazo) < hoje
+  ).length
+  score += Math.min(vencidas * 8, 24)
+
+  if (perfil.ultimo_1on1 && frequencia1on1 > 0) {
+    const diasSem = Math.floor(
+      (Date.now() - new Date(perfil.ultimo_1on1).getTime()) / 86_400_000
+    )
+    if (diasSem > frequencia1on1 * 2) score += 15
+    else if (diasSem > frequencia1on1) score += 8
+  }
+
+  if (perfil.alerta_estagnacao) score += 10
+  if (perfil.necessita_1on1) score += 10
+
+  return score
+}
+
 const RELACAO_TABS: Array<{ id: string; label: string }> = [
   { id: 'liderado', label: 'Time' },
   { id: 'par',      label: 'Pares' },
@@ -41,6 +74,7 @@ export function DashboardView({ relacao: relacaoProp = 'liderado' }: { relacao?:
   const [perfis,   setPerfis]   = useState<Record<string, Partial<PerfilFrontmatter>>>({})
   const [actionsMap, setActionsMap] = useState<Record<string, Action[]>>({})
   const [detected, setDetected] = useState<DetectedPerson[]>([])
+  const [scores,   setScores]   = useState<Map<string, number>>(new Map())
   const [loading,  setLoading]  = useState(true)
   const [escalations, setEscalations] = useState<Array<{
     slug: string; nome: string;
@@ -94,8 +128,20 @@ export function DashboardView({ relacao: relacaoProp = 'liderado' }: { relacao?:
         return [p.slug, actions] as const
       })),
     ])
-    setPerfis(Object.fromEntries(perfilResults))
-    setActionsMap(Object.fromEntries(actionResults))
+    const perfisMap = Object.fromEntries(perfilResults)
+    const actionsMapLocal = Object.fromEntries(actionResults)
+    setPerfis(perfisMap)
+    setActionsMap(actionsMapLocal)
+
+    // Compute urgency scores
+    const sm = new Map<string, number>()
+    for (const p of filtered) {
+      sm.set(
+        p.slug,
+        calcUrgencyScore(perfisMap[p.slug] ?? {}, actionsMapLocal[p.slug] ?? [], p.frequencia_1on1_dias ?? 7)
+      )
+    }
+    setScores(sm)
 
     // Load escalations (acoes do gestor vencidas)
     try {
@@ -287,12 +333,20 @@ export function DashboardView({ relacao: relacaoProp = 'liderado' }: { relacao?:
                   <CrossTeamInsightsPanel insights={crossTeamInsights} />
                 )}
 
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, 1fr)',
-                  gap: 10,
-                }}>
-                  {people.map((p) => (
+                {(() => {
+                  const sorted = [...people].sort((a, b) =>
+                    (scores.get(b.slug) ?? 0) - (scores.get(a.slug) ?? 0)
+                  )
+                  const attention = sorted.filter((p) => (scores.get(p.slug) ?? 0) >= 30)
+                  const stable    = sorted.filter((p) => (scores.get(p.slug) ?? 0) < 30)
+
+                  const gridStyle = {
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: 10,
+                  } as const
+
+                  const renderCard = (p: PersonConfig) => (
                     <PersonCard
                       key={p.slug}
                       person={p}
@@ -301,8 +355,77 @@ export function DashboardView({ relacao: relacaoProp = 'liderado' }: { relacao?:
                       onViewCockpit={() => navigate('person', { slug: p.slug })}
                       onEdit={() => navigate('person-form', { slug: p.slug })}
                     />
-                  ))}
-                </div>
+                  )
+
+                  return (
+                    <>
+                      {attention.length > 0 && (
+                        <div style={{ marginBottom: 24 }}>
+                          <div style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            marginBottom: 10,
+                          }}>
+                            <AlertCircle size={12} color="var(--red)" />
+                            <span style={{
+                              fontSize: 10, fontWeight: 600,
+                              letterSpacing: '0.1em', textTransform: 'uppercase',
+                              color: 'var(--red)',
+                            }}>
+                              Atenção agora
+                            </span>
+                            <span style={{
+                              fontSize: 10, padding: '1px 6px', borderRadius: 20,
+                              background: 'rgba(184,64,64,0.15)', color: 'var(--red)',
+                              fontFamily: 'var(--font-mono)',
+                            }}>
+                              {attention.length}
+                            </span>
+                          </div>
+                          <div style={gridStyle}>
+                            {attention.map(renderCard)}
+                          </div>
+                        </div>
+                      )}
+
+                      {attention.length > 0 && stable.length > 0 && (
+                        <div style={{
+                          height: 1,
+                          background: 'var(--border-subtle)',
+                          margin: '8px 0 20px',
+                        }} />
+                      )}
+
+                      {stable.length > 0 && (
+                        <div>
+                          {attention.length > 0 && (
+                            <div style={{
+                              display: 'flex', alignItems: 'center', gap: 8,
+                              marginBottom: 10,
+                            }}>
+                              <span style={{
+                                fontSize: 10, fontWeight: 600,
+                                letterSpacing: '0.1em', textTransform: 'uppercase',
+                                color: 'var(--text-muted)',
+                              }}>
+                                Estável
+                              </span>
+                              <span style={{
+                                fontSize: 10, padding: '1px 6px', borderRadius: 20,
+                                background: 'var(--surface-2)', color: 'var(--text-muted)',
+                                fontFamily: 'var(--font-mono)',
+                              }}>
+                                {stable.length}
+                              </span>
+                            </div>
+                          )}
+                          <div style={gridStyle}>
+                            {stable.map(renderCard)}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
               </>
             ) : null}
 
