@@ -20,7 +20,7 @@
 
 ## Planejamento
 
-Planejamento vive em `docs/` no próprio repo. NÃO usar GSD (`.planning/` é legado).
+Planejamento vive em `docs/` no próprio repo.
 
 - **Auditorias:** `docs/audits/` — auditorias de produto com múltiplas dimensões
 - **Planos:** `docs/plans/` — roadmaps executáveis com tasks, critérios de aceite e dependências
@@ -33,7 +33,7 @@ Planejamento vive em `docs/` no próprio repo. NÃO usar GSD (`.planning/` é le
 
 ### Histórico
 
-- `.planning/PROJECT.md` — contexto de produto, persona, JTBD, backlog de ideias (referência)
+- `PITCH.md` — positioning do produto, features, persona
 - `tasks/done.md` — histórico de tasks técnicas (referência, não ativo)
 
 ---
@@ -64,7 +64,6 @@ O `PRD_TECH.md` é o documento vivo da implementação. Atualizar sempre que:
 | Mudança em prompt | Prompts — Estrutura |
 | Novo risco identificado | Riscos Técnicos |
 
-<!-- GSD:project-start source:PROJECT.md -->
 ## Project
 
 **Pulse Cockpit** — app desktop (Electron + React) para gestores de tecnologia. Transforma transcricoes e anotacoes em inteligencia sobre pessoas. V1 + V2 + V3 + Revisao Extensiva em producao.
@@ -75,7 +74,7 @@ O `PRD_TECH.md` é o documento vivo da implementação. Atualizar sempre que:
 
 **Principios:** Acumulacao > feature. O app encontra o gestor. IA sugere, gestor decide. Dados locais. Cirurgico, nao ambicioso. Qualidade de extracao e tudo.
 
-Para contexto completo de produto, persona, JTBD e backlog: `.planning/PROJECT.md`
+Para contexto completo de produto, persona, JTBD e backlog: `PITCH.md` e `PRD_TECH.md`
 
 ### Constraints
 
