@@ -447,29 +447,39 @@ export function DashboardView({ relacao: relacaoProp = 'liderado' }: { relacao?:
                   </div>
                 )}
 
-                {/* Brain — convergência de risco */}
-                {relacao === 'liderado' && brainResult && brainResult.pessoas.length > 0 && (
-                  <BrainAlertPanel result={brainResult} onNavigate={(slug) => navigate('person', { slug })} />
+                {/* Executive summary — 1 frase */}
+                {relacao === 'liderado' && people.length > 0 && (
+                  <ExecutiveSummary
+                    urgencias={urgencias}
+                    people={people}
+                    perfis={perfis}
+                    briefing={briefing}
+                  />
                 )}
 
-                {/* Morning briefing */}
+                {/* Visão semanal — 1:1s por dia */}
+                {relacao === 'liderado' && people.length > 0 && (
+                  <WeekView
+                    people={people}
+                    perfis={perfis}
+                    actionsMap={actionsMap}
+                    pautasMap={{}}
+                    onNavigate={(slug) => navigate('person', { slug, prep1on1: 'true' })}
+                  />
+                )}
+
+                {/* Morning briefing (delta desde último acesso) */}
                 {relacao === 'liderado' && briefing && (
                   <MorningBriefing data={briefing} />
                 )}
 
-                {/* Urgências do dia — T-R10.1 */}
-                {urgencias.length > 0 && (
-                  <UrgenciasHoje
-                    urgencias={urgencias}
-                    onNavigate={(slug) => navigate('person', { slug })}
-                  />
-                )}
-
-                {/* Risk panel — visible for all relations */}
-                <TeamRiskPanel
+                {/* Painel unificado "Quem precisa de mim" */}
+                <UnifiedRiskPanel
                   people={people}
                   perfis={perfis}
                   actionsMap={actionsMap}
+                  urgencias={urgencias}
+                  brainResult={relacao === 'liderado' ? brainResult : null}
                   onNavigate={(slug) => navigate('person', { slug })}
                 />
 
@@ -644,6 +654,420 @@ export function DashboardView({ relacao: relacaoProp = 'liderado' }: { relacao?:
           </>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Executive Summary ──────────────────────────────────────────
+
+function ExecutiveSummary({ urgencias, people, perfis, briefing }: {
+  urgencias: Array<{ slug: string; nome: string; tipo: string; label: string }>
+  people: PersonConfig[]
+  perfis: Record<string, Partial<PerfilFrontmatter>>
+  briefing: BriefingData | null
+}) {
+  const urgentCount = new Set(urgencias.filter(u => u.tipo === '1on1' || u.tipo === 'alerta').map(u => u.slug)).size
+  const actionsDueCount = urgencias.filter(u => u.tipo === 'acao').length
+  const totalPeople = people.length
+  const healthyCount = people.filter(p => (perfis[p.slug]?.saude ?? 'sem_dados') === 'verde').length
+
+  let summary: string
+  if (urgentCount > 0) {
+    summary = `${urgentCount} pessoa${urgentCount > 1 ? 's precisam' : ' precisa'} de atenção hoje`
+    if (actionsDueCount > 0) summary += `, ${actionsDueCount} ação${actionsDueCount > 1 ? 'es vencem' : ' vence'} em breve`
+    summary += '.'
+  } else if (actionsDueCount > 0) {
+    summary = `${actionsDueCount} ação${actionsDueCount > 1 ? 'es vencem' : ' vence'} em breve. Time estável no geral.`
+  } else {
+    summary = `Time estável — ${healthyCount}/${totalPeople} saudáveis.`
+  }
+
+  return (
+    <div style={{
+      marginBottom: 16,
+      padding: '10px 16px',
+      background: urgentCount > 0 ? 'rgba(184,64,64,0.06)' : 'rgba(100,180,100,0.06)',
+      border: `1px solid ${urgentCount > 0 ? 'rgba(184,64,64,0.15)' : 'rgba(100,180,100,0.15)'}`,
+      borderRadius: 'var(--r)',
+      fontSize: 13,
+      color: 'var(--text-primary)',
+      fontWeight: 500,
+    }}>
+      {summary}
+      {briefing?.lastOpenedAt && (
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+          · último acesso {formatTimeSince(briefing.lastOpenedAt)}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// ── Week View ──────────────────────────────────────────────────
+
+const DIA_SEMANA_MAP: Record<string, number> = {
+  segunda: 1, terca: 2, quarta: 3, quinta: 4, sexta: 5,
+}
+
+const DIA_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex']
+
+function getWeekDays(): Array<{ label: string; date: string; dayOfWeek: number; isToday: boolean }> {
+  const now = new Date()
+  const currentDay = now.getDay() // 0=dom, 1=seg, ..., 6=sab
+  const monday = new Date(now)
+  monday.setDate(now.getDate() - ((currentDay === 0 ? 7 : currentDay) - 1))
+
+  return [0, 1, 2, 3, 4].map((offset) => {
+    const d = new Date(monday)
+    d.setDate(monday.getDate() + offset)
+    const iso = d.toISOString().slice(0, 10)
+    return {
+      label: DIA_LABELS[offset],
+      date: iso,
+      dayOfWeek: offset + 1,
+      isToday: iso === now.toISOString().slice(0, 10),
+    }
+  })
+}
+
+function estimateNext1on1(ultimoIso: string | undefined, freqDias: number, diaSemana: string | undefined): string | null {
+  if (diaSemana && DIA_SEMANA_MAP[diaSemana]) {
+    // Se tem dia fixo, calcula o próximo dia da semana
+    const targetDay = DIA_SEMANA_MAP[diaSemana]
+    const now = new Date()
+    const currentDay = now.getDay() === 0 ? 7 : now.getDay()
+    let daysUntil = targetDay - currentDay
+    if (daysUntil < 0) daysUntil += 7
+    const next = new Date(now)
+    next.setDate(now.getDate() + daysUntil)
+    return next.toISOString().slice(0, 10)
+  }
+  if (ultimoIso && freqDias > 0) {
+    // Heurística: último 1:1 + frequência
+    const ultimo = new Date(ultimoIso)
+    const next = new Date(ultimo.getTime() + freqDias * 86_400_000)
+    // Se já passou, calcula próximo ciclo
+    const now = Date.now()
+    while (next.getTime() < now) next.setDate(next.getDate() + freqDias)
+    return next.toISOString().slice(0, 10)
+  }
+  return null
+}
+
+function WeekView({ people, perfis, actionsMap, pautasMap, onNavigate }: {
+  people: PersonConfig[]
+  perfis: Record<string, Partial<PerfilFrontmatter>>
+  actionsMap: Record<string, Action[]>
+  pautasMap: Record<string, boolean>
+  onNavigate: (slug: string) => void
+}) {
+  const weekDays = getWeekDays()
+
+  // Build per-day data
+  type DayEntry = { slug: string; nome: string; saude: string | null; estimated: boolean }
+  const dayEntries: Record<string, DayEntry[]> = {}
+  for (const day of weekDays) dayEntries[day.date] = []
+
+  for (const p of people) {
+    if (p.relacao !== 'liderado') continue
+    const fm = perfis[p.slug] ?? {}
+    const nextDate = estimateNext1on1(fm.ultimo_1on1, p.frequencia_1on1_dias ?? 14, p.dia_1on1)
+    if (!nextDate) continue
+    const matchDay = weekDays.find(d => d.date === nextDate)
+    if (matchDay) {
+      dayEntries[matchDay.date].push({
+        slug: p.slug,
+        nome: p.nome,
+        saude: fm.saude ?? null,
+        estimated: !p.dia_1on1,
+      })
+    }
+  }
+
+  // Count actions due this week
+  const weekEnd = weekDays[4].date
+  const weekStart = weekDays[0].date
+  let actionsDueThisWeek = 0
+  for (const p of people) {
+    const actions = actionsMap[p.slug] ?? []
+    actionsDueThisWeek += actions.filter(a =>
+      a.status === 'open' && a.prazo && a.prazo >= weekStart && a.prazo <= weekEnd
+    ).length
+  }
+
+  const hasAny1on1 = Object.values(dayEntries).some(d => d.length > 0)
+  if (!hasAny1on1) return null
+
+  const saudeColor = (s: string | null) =>
+    s === 'verde' ? 'var(--green)' : s === 'amarelo' ? 'var(--yellow, #d4a843)' : s === 'vermelho' ? 'var(--red)' : 'var(--surface-3)'
+
+  return (
+    <div style={{
+      marginBottom: 20,
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--r)',
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        padding: '10px 16px',
+        borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <span style={{
+          fontSize: 10, fontWeight: 600, letterSpacing: '0.1em',
+          textTransform: 'uppercase', color: 'var(--text-muted)',
+        }}>
+          Sua semana
+        </span>
+        {actionsDueThisWeek > 0 && (
+          <span style={{ fontSize: 11, color: 'var(--yellow, #d4a843)' }}>
+            {actionsDueThisWeek} ação{actionsDueThisWeek > 1 ? 'es' : ''} vencendo
+          </span>
+        )}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)' }}>
+        {weekDays.map((day) => {
+          const entries = dayEntries[day.date]
+          return (
+            <div
+              key={day.date}
+              style={{
+                padding: '10px 12px',
+                borderRight: day.dayOfWeek < 5 ? '1px solid var(--border-subtle)' : 'none',
+                background: day.isToday ? 'rgba(192,135,58,0.04)' : 'transparent',
+                minHeight: 60,
+              }}
+            >
+              <div style={{
+                fontSize: 10, fontWeight: 600,
+                color: day.isToday ? 'var(--accent)' : 'var(--text-muted)',
+                marginBottom: 6,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+              }}>
+                {day.label} {day.date.slice(8)}
+              </div>
+              {entries.length === 0 ? (
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', opacity: 0.4 }}>—</div>
+              ) : entries.map((e) => (
+                <div
+                  key={e.slug}
+                  onClick={() => onNavigate(e.slug)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '3px 0',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <span style={{
+                    width: 6, height: 6, borderRadius: '50%',
+                    background: saudeColor(e.saude),
+                    flexShrink: 0,
+                  }} />
+                  <span style={{
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {e.nome.split(' ')[0]}
+                  </span>
+                  {e.estimated && (
+                    <span style={{ fontSize: 9, color: 'var(--text-muted)', flexShrink: 0 }} title="Estimado pela frequência">~</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Unified Risk Panel ──────────────────────────────────────────
+
+type RiskItem = {
+  slug: string
+  nome: string
+  cargo: string
+  motivos: string[]
+  level: 'urgente' | 'atencao' | 'monitorar'
+}
+
+function UnifiedRiskPanel({ people, perfis, actionsMap, urgencias, brainResult, onNavigate }: {
+  people: PersonConfig[]
+  perfis: Record<string, Partial<PerfilFrontmatter>>
+  actionsMap: Record<string, Action[]>
+  urgencias: Array<{ slug: string; nome: string; tipo: string; label: string }>
+  brainResult: BrainResult | null
+  onNavigate: (slug: string) => void
+}) {
+  const today = new Date().toISOString().slice(0, 10)
+  const items: RiskItem[] = []
+  const seen = new Set<string>()
+
+  // Build risk items, deduplicating by slug (highest level wins)
+  for (const p of people) {
+    const fm = perfis[p.slug] ?? {}
+    const actions = actionsMap[p.slug] ?? []
+    const motivos: string[] = []
+
+    // From urgencias
+    const personUrgencias = urgencias.filter(u => u.slug === p.slug)
+    for (const u of personUrgencias) {
+      if (u.tipo === '1on1') motivos.push(`1:1 urgente: ${u.label}`)
+      else if (u.tipo === 'alerta') motivos.push('saúde crítica')
+      else if (u.tipo === 'acao') motivos.push(u.label)
+    }
+
+    // From perfil
+    if (fm.saude === 'vermelho' && !personUrgencias.some(u => u.tipo === 'alerta')) motivos.push('saúde vermelha')
+    if (fm.tendencia_emocional === 'deteriorando') motivos.push('tendência emocional deteriorando')
+    if (fm.alerta_estagnacao) motivos.push('estagnação detectada')
+    if (fm.dados_stale) motivos.push('sem dados há 30+ dias')
+
+    // From actions
+    const overdue = actions.filter(a => a.status === 'open' && a.prazo && a.prazo < today).length
+    if (overdue > 0 && !personUrgencias.some(u => u.tipo === 'acao')) {
+      motivos.push(`${overdue} ação${overdue > 1 ? 'es' : ''} vencida${overdue > 1 ? 's' : ''}`)
+    }
+
+    // From 1:1 frequency
+    if (fm.ultimo_1on1 && p.frequencia_1on1_dias > 0) {
+      const diasSem = Math.floor((Date.now() - new Date(fm.ultimo_1on1).getTime()) / 86_400_000)
+      if (diasSem > p.frequencia_1on1_dias * 2) motivos.push(`1:1 atrasado ${diasSem}d`)
+      else if (diasSem > p.frequencia_1on1_dias + 3) motivos.push(`1:1 atrasado ${diasSem}d`)
+    }
+
+    // From brain convergence
+    const brainPerson = brainResult?.pessoas?.find(bp => bp.slug === p.slug)
+    if (brainPerson) {
+      const brainMotivos = brainPerson.sinais
+        ?.map(s => s.descricao)
+        .filter(desc => !motivos.some(m => m.includes(desc.slice(0, 15)))) ?? []
+      motivos.push(...brainMotivos.slice(0, 2))
+    }
+
+    if (motivos.length === 0) continue
+
+    // Determine level
+    let level: 'urgente' | 'atencao' | 'monitorar' = 'monitorar'
+    if (fm.saude === 'vermelho' || fm.necessita_1on1 || personUrgencias.some(u => u.tipo === 'alerta' || u.tipo === '1on1')) {
+      level = 'urgente'
+    } else if (fm.tendencia_emocional === 'deteriorando' || overdue >= 2 || (brainPerson && brainPerson.severidade !== 'media')) {
+      level = 'atencao'
+    }
+
+    items.push({ slug: p.slug, nome: p.nome, cargo: p.cargo, motivos, level })
+    seen.add(p.slug)
+  }
+
+  if (items.length === 0) return null
+
+  // Sort: urgente first, then atencao, then monitorar. Within level: most motivos first
+  const levelOrder = { urgente: 0, atencao: 1, monitorar: 2 }
+  items.sort((a, b) => levelOrder[a.level] - levelOrder[b.level] || b.motivos.length - a.motivos.length)
+
+  const urgente = items.filter(i => i.level === 'urgente')
+  const atencao = items.filter(i => i.level === 'atencao')
+  const monitorar = items.filter(i => i.level === 'monitorar')
+
+  const levelMeta = {
+    urgente:   { color: 'var(--red)', label: 'Urgente hoje', bg: 'rgba(184,64,64,0.06)' },
+    atencao:   { color: 'var(--yellow, #d4a843)', label: 'Atenção esta semana', bg: 'rgba(212,168,67,0.04)' },
+    monitorar: { color: 'var(--text-muted)', label: 'Monitorar', bg: 'transparent' },
+  }
+
+  function renderGroup(group: RiskItem[], meta: { color: string; label: string; bg: string }) {
+    if (group.length === 0) return null
+    return (
+      <div style={{ marginBottom: 12 }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          marginBottom: 6,
+        }}>
+          <span style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: meta.color,
+            boxShadow: meta.color === 'var(--red)' ? `0 0 6px ${meta.color}` : 'none',
+          }} />
+          <span style={{
+            fontSize: 10, fontWeight: 600, letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: meta.color,
+          }}>
+            {meta.label}
+          </span>
+          <span style={{
+            fontSize: 10, fontFamily: 'var(--font-mono)',
+            color: 'var(--text-muted)', opacity: 0.6,
+          }}>
+            {group.length}
+          </span>
+        </div>
+        {group.map((item) => (
+          <div
+            key={item.slug}
+            onClick={() => onNavigate(item.slug)}
+            style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+              padding: '6px 10px',
+              borderRadius: 4,
+              background: meta.bg,
+              marginBottom: 3,
+              cursor: 'pointer',
+              transition: 'background 0.1s',
+            }}
+          >
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)' }}>
+                {item.nome}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 6 }}>
+                {item.cargo}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, flexShrink: 0, maxWidth: '55%', justifyContent: 'flex-end' }}>
+              {item.motivos.slice(0, 3).map((m, i) => (
+                <span key={i} style={{
+                  fontSize: 10, padding: '1px 7px', borderRadius: 20,
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
+                  color: 'var(--text-secondary)',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200,
+                }}>
+                  {m}
+                </span>
+              ))}
+              {item.motivos.length > 3 && (
+                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                  +{item.motivos.length - 3}
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      marginBottom: 20,
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--r)',
+      padding: '12px 16px',
+    }}>
+      <div style={{
+        fontSize: 10, fontWeight: 600, letterSpacing: '0.1em',
+        textTransform: 'uppercase', color: 'var(--text-muted)',
+        marginBottom: 10,
+      }}>
+        Quem precisa de mim
+      </div>
+      {renderGroup(urgente, levelMeta.urgente)}
+      {renderGroup(atencao, levelMeta.atencao)}
+      {renderGroup(monitorar, levelMeta.monitorar)}
     </div>
   )
 }

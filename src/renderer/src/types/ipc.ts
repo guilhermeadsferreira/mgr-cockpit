@@ -99,6 +99,7 @@ export interface PersonConfig {
   inicio_na_funcao?:     string
   inicio_na_empresa?:    string
   frequencia_1on1_dias:  number
+  dia_1on1?:             string  // 'segunda' | 'terca' | ... | 'sexta' | null
   em_processo_promocao:  boolean
   objetivo_cargo_alvo?:  string
   pdi:                   PDIItem[]

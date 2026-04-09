@@ -265,6 +265,20 @@ export function PersonFormView() {
                 min={1}
               />
             </Field>
+            <Field label="Dia da semana" hint="Dia fixo do 1:1 (para visão semanal)">
+              <select
+                style={{ ...styles.input, maxWidth: 180 }}
+                value={form.dia_1on1 ?? ''}
+                onChange={(e) => set('dia_1on1', e.target.value || undefined)}
+              >
+                <option value="">Não definido</option>
+                <option value="segunda">Segunda</option>
+                <option value="terca">Terça</option>
+                <option value="quarta">Quarta</option>
+                <option value="quinta">Quinta</option>
+                <option value="sexta">Sexta</option>
+              </select>
+            </Field>
           </FormSection>
 
           <FormSection title="Desenvolvimento">
