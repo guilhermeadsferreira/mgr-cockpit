@@ -80,6 +80,36 @@ function computeCommitsBaseline(
 
 // ── Main function ──────────────────────────────────────────────
 
+function loadSustentacaoSnapshot(workspacePath: string): {
+  porAssignee: Record<string, number>
+  breachByAssignee: Record<string, number>
+} | null {
+  const cacheFile = join(workspacePath, '..', 'cache', 'sustentacao', 'board.json')
+  if (!existsSync(cacheFile)) return null
+  try {
+    const cached = JSON.parse(readFileSync(cacheFile, 'utf-8')) as {
+      data: { porAssignee?: Record<string, number>; ticketsEmBreach?: Array<{ assignee?: string }> } | null
+      fetchedAt: number
+    }
+    if (!cached.data) return null
+    // Cache older than 24h is considered stale
+    if (Date.now() - cached.fetchedAt > 24 * 60 * 60 * 1000) return null
+
+    const breachByAssignee: Record<string, number> = {}
+    for (const ticket of cached.data.ticketsEmBreach ?? []) {
+      if (ticket.assignee) {
+        breachByAssignee[ticket.assignee] = (breachByAssignee[ticket.assignee] ?? 0) + 1
+      }
+    }
+    return {
+      porAssignee: cached.data.porAssignee ?? {},
+      breachByAssignee,
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function detectConvergencia(
   workspacePath: string,
 ): Promise<BrainResult> {
@@ -90,6 +120,14 @@ export async function detectConvergencia(
   const results: PersonRisk[] = []
   const hoje = new Date()
   hoje.setHours(0, 0, 0, 0)
+
+  // Load sustentação data once for all people
+  const sustentacao = loadSustentacaoSnapshot(workspacePath)
+  // Build jiraEmail → slug mapping for sustentação assignee matching
+  const jiraEmailToSlug = new Map<string, string>()
+  for (const p of liderados) {
+    if (p.jiraEmail) jiraEmailToSlug.set(p.jiraEmail.toLowerCase(), p.slug)
+  }
 
   for (const pessoa of liderados) {
     const sinais: RiskSignal[] = []
@@ -180,6 +218,36 @@ export async function detectConvergencia(
             peso: 10,
           })
         }
+      }
+    }
+
+    // === SINAIS DE SUSTENTAÇÃO ===
+
+    if (sustentacao && pessoa.jiraEmail) {
+      const email = pessoa.jiraEmail.toLowerCase()
+      const breachCount = sustentacao.breachByAssignee[email] ?? 0
+      const totalTickets = sustentacao.porAssignee[email] ?? 0
+
+      if (breachCount >= 3) {
+        sinais.push({
+          fonte: 'sustentacao',
+          descricao: `${breachCount} tickets em breach de SLA atribuídos`,
+          peso: 20,
+        })
+      } else if (breachCount >= 1) {
+        sinais.push({
+          fonte: 'sustentacao',
+          descricao: `${breachCount} ticket(s) em breach de SLA`,
+          peso: 10,
+        })
+      }
+
+      if (totalTickets >= 8) {
+        sinais.push({
+          fonte: 'sustentacao',
+          descricao: `Carga alta: ${totalTickets} tickets de sustentação abertos`,
+          peso: 15,
+        })
       }
     }
 

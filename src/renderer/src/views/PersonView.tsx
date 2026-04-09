@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ArrowLeft, FileText, CalendarDays, CalendarCheck, Pencil, ExternalLink, RefreshCw, Loader2, CheckSquare, Square, X, Plus, ArrowUpRight, Trash2, Sparkles } from 'lucide-react'
 import { useRouter } from '../router'
-import type { PersonConfig, PerfilData, ArtifactMeta, PautaMeta, AgendaResult, Action, ActionOwner, Demanda, PDIItem } from '../types/ipc'
+import type { PersonConfig, PerfilData, ArtifactMeta, PautaMeta, AgendaResult, Action, ActionOwner, Demanda, PDIItem, SupportBoardSnapshot } from '../types/ipc'
 import { MarkdownPreview } from '../components/MarkdownPreview'
 import { labelNivel, labelRelacao, labelSaude, labelTipo, fmtDate as fmtDateUtil } from '../lib/utils'
 import { CycleTab } from './CycleReportView'
@@ -71,6 +71,7 @@ export function PersonView() {
   const [resetting,     setResetting]     = useState(false)
   const [prep1on1Mode,  setPrep1on1Mode]  = useState(false)
   const [lastPautaContent, setLastPautaContent] = useState<string | null>(null)
+  const [sustentacaoData, setSustentacaoData] = useState<{ ticketsAbertos: number; emBreach: number; tickets: Array<{ key: string; summary: string; status: string; diasAberto: number }> } | null>(null)
 
   async function handleResetData() {
     if (!person) return
@@ -123,7 +124,30 @@ export function PersonView() {
   }, [])
 
   useEffect(() => {
-    window.api.people.get(params.slug).then(setPerson)
+    window.api.people.get(params.slug).then((p) => {
+      setPerson(p)
+      // Load sustentação data for this person if they have jiraEmail
+      if (p?.jiraEmail) {
+        window.api.sustentacao.getData().then((snapshot: SupportBoardSnapshot | null) => {
+          if (!snapshot || !p.jiraEmail) { setSustentacaoData(null); return }
+          const email = p.jiraEmail.toLowerCase()
+          const myTickets = snapshot.ticketsEmBreach
+            .filter((t) => t.assignee?.toLowerCase() === email)
+            .map((t) => ({
+              key: t.key,
+              summary: t.summary,
+              status: t.status ?? '?',
+              diasAberto: t.ageDias,
+            }))
+          const totalAbertos = snapshot.porAssignee[email] ?? snapshot.porAssignee[p.jiraEmail] ?? 0
+          setSustentacaoData({
+            ticketsAbertos: totalAbertos,
+            emBreach: myTickets.length,
+            tickets: myTickets,
+          })
+        }).catch(() => setSustentacaoData(null))
+      }
+    })
     loadPerfil(params.slug)
     loadPautas(params.slug)
     loadActions(params.slug)
@@ -134,6 +158,8 @@ export function PersonView() {
     if (params.tab && (validTabs as readonly string[]).includes(params.tab)) {
       setActiveTab(params.tab as typeof validTabs[number])
     }
+    // Activate prep mode if passed via navigate params
+    if (params.prep1on1 === 'true') setPrep1on1Mode(true)
   }, [params.slug, loadPerfil, loadPautas, loadActions, loadGestorDemandas, loadResumoRH])
 
   // Refresh on ingestion completed
@@ -377,6 +403,38 @@ export function PersonView() {
                         </div>
                       )
                     })}
+                  </div>
+                </InfoCard>
+              )}
+
+              {sustentacaoData && sustentacaoData.ticketsAbertos > 0 && (
+                <InfoCard title={`Sustentação (${sustentacaoData.ticketsAbertos})`}>
+                  <div style={{ padding: '8px 16px' }}>
+                    <div style={{ display: 'flex', gap: 16, marginBottom: sustentacaoData.emBreach > 0 ? 8 : 0 }}>
+                      <div>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{sustentacaoData.ticketsAbertos}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>abertos</div>
+                      </div>
+                      {sustentacaoData.emBreach > 0 && (
+                        <div>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--red)' }}>{sustentacaoData.emBreach}</div>
+                          <div style={{ fontSize: 10, color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>em breach</div>
+                        </div>
+                      )}
+                    </div>
+                    {sustentacaoData.tickets.slice(0, 3).map((t) => (
+                      <div key={t.key} style={{
+                        fontSize: 11.5, padding: '3px 0',
+                        borderBottom: '1px solid var(--border-subtle)',
+                        color: 'var(--text-secondary)',
+                      }}>
+                        <span style={{ fontWeight: 600, color: 'var(--red)', marginRight: 6 }}>{t.key}</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {t.summary.slice(0, 50)}
+                        </span>
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 4 }}>{t.diasAberto}d</span>
+                      </div>
+                    ))}
                   </div>
                 </InfoCard>
               )}

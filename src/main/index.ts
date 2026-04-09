@@ -224,7 +224,27 @@ export async function generateAgendaForPerson(
     const { SuggestionMemory: SuggestionMemoryClass } = await import('./registry/SuggestionMemory')
     const suggestionMemorySummary = new SuggestionMemoryClass(workspacePath).buildSummary(slug)
 
-    const prompt = buildAgendaPrompt({ configYaml: configRaw, perfilMd: perfilData.raw, today, dadosStale, pautasAnteriores, openActions: enrichedActions, insightsRecentes, sinaisTerceiros, pdiEstruturado, externalData, deltaSinceLastMeeting, pautaRatings, suggestionMemorySummary })
+    // Load sustentação context for this person
+    let sustentacaoContext = ''
+    if (person.jiraEmail) {
+      try {
+        const boardCachePath = join(workspacePath, '..', 'cache', 'sustentacao', 'board.json')
+        if (existsSync(boardCachePath)) {
+          const cached = JSON.parse(readFileSync(boardCachePath, 'utf-8')) as { data: { ticketsEmBreach?: Array<{ key: string; summary: string; assignee?: string; ageDias: number }>; porAssignee?: Record<string, number> } | null }
+          if (cached.data) {
+            const email = person.jiraEmail.toLowerCase()
+            const breachTickets = (cached.data.ticketsEmBreach ?? []).filter(t => t.assignee?.toLowerCase() === email)
+            const totalAbertos = cached.data.porAssignee?.[email] ?? cached.data.porAssignee?.[person.jiraEmail] ?? 0
+            if (breachTickets.length > 0 || totalAbertos > 5) {
+              const ticketList = breachTickets.slice(0, 5).map(t => `${t.key}: ${t.summary} (${t.ageDias}d aberto)`).join('\n')
+              sustentacaoContext = `\n## Sustentação\nEsta pessoa tem ${totalAbertos} tickets de sustentação abertos${breachTickets.length > 0 ? `, ${breachTickets.length} em breach de SLA` : ''}.\n${ticketList ? `Tickets em breach:\n${ticketList}\nConsidere perguntar sobre bloqueadores e priorização.` : ''}`
+            }
+          }
+        }
+      } catch { /* sustentação is optional context */ }
+    }
+
+    const prompt = buildAgendaPrompt({ configYaml: configRaw, perfilMd: perfilData.raw, today, dadosStale, pautasAnteriores, openActions: enrichedActions, insightsRecentes, sinaisTerceiros: sinaisTerceiros + sustentacaoContext, pdiEstruturado, externalData, deltaSinceLastMeeting, pautaRatings, suggestionMemorySummary })
     const result = await runWithProvider('agendaGeneration', settings, prompt, {
       claudeBinPath,
       claudeTimeoutMs: 90_000,
