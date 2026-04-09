@@ -18,23 +18,13 @@
 
 ---
 
-## Planejamento — GSD (source of truth)
+## Planejamento
 
-Todo o planejamento de produto e técnico vive no GSD:
+Planejamento vive em `docs/` no próprio repo. NÃO usar GSD (`.planning/` é legado).
 
-```
-.planning/
-├── PROJECT.md     ← visão de produto, persona, principios, backlog de ideias
-├── ROADMAP.md     ← phases do milestone atual
-├── REQUIREMENTS.md ← requirements com traceability
-├── STATE.md       ← estado atual do milestone
-└── phases/        ← plans e verificações por phase
-```
-
-**Antes de implementar qualquer feature:** consulte `.planning/PROJECT.md` (backlog) e `.planning/ROADMAP.md` (phases).
-
-**Para planejar:** use `/gsd:discuss-phase` → `/gsd:plan-phase` → `/gsd:execute-phase`.
-**Para ideias rápidas:** use `/gsd:add-backlog` ou edite o backlog no PROJECT.md.
+- **Auditorias:** `docs/audits/` — auditorias de produto com múltiplas dimensões
+- **Planos:** `docs/plans/` — roadmaps executáveis com tasks, critérios de aceite e dependências
+- **Decisões:** `docs/decisions/` — PDRs de decisões técnicas relevantes
 
 ### Referência técnica
 
@@ -43,8 +33,8 @@ Todo o planejamento de produto e técnico vive no GSD:
 
 ### Histórico
 
-- `tasks/done.md` — histórico de tasks técnicas concluídas (referência, não ativo)
-- pm-agent (`pm-agent/projects/pulse-cockpit/`) — arquivado, não usar para planejamento
+- `.planning/PROJECT.md` — contexto de produto, persona, JTBD, backlog de ideias (referência)
+- `tasks/done.md` — histórico de tasks técnicas (referência, não ativo)
 
 ---
 
@@ -94,43 +84,83 @@ Para contexto completo de produto, persona, JTBD e backlog: `.planning/PROJECT.m
 - **IA:** Exclusivamente Claude Code CLI (`claude -p`) — nunca SDK/API
 - **Dados:** Workspace em disco (Markdown + YAML) — sem banco de dados
 - **Schema:** Mudancas em perfil.md devem ser aditivas; nunca remover campos sem migration
-- **Sem testes:** Zero coverage — priorizar mudancas cirurgicas
-<!-- GSD:project-end -->
+- **Testes:** Cobertura parcial — 4 módulos críticos com testes (ArtifactWriter, IngestionPipeline, ProfileMigration, ActionRegistry)
 
-<!-- GSD:stack-start source:STACK.md -->
-## Technology Stack
+---
 
-Technology stack not yet documented. Will populate after codebase mapping or first phase.
-<!-- GSD:stack-end -->
+## Aprendizados de Produto (auditoria 2026-04-09)
 
-<!-- GSD:conventions-start source:CONVENTIONS.md -->
-## Conventions
+Referência completa: `docs/audits/audit-profunda-2026-04-09.md`
 
-Conventions not yet established. Will populate as patterns emerge during development.
-<!-- GSD:conventions-end -->
+### O motor de inteligência já sabe. A UI ainda não mostra.
 
-<!-- GSD:architecture-start source:ARCHITECTURE.md -->
-## Architecture
+Os prompts são sofisticados (threshold de 2 evidências para tendência emocional, formato forçado de ações, regra de convergência no ciclo, confiança explícita). Mas a UI achata essa inteligência em badges, listas flat e markdown sem hierarquia. Ao evoluir features, priorizar APRESENTAÇÃO do que já existe sobre ADIÇÃO de features novas.
 
-Architecture not yet mapped. Follow existing patterns found in the codebase.
-<!-- GSD:architecture-end -->
+### Dimensões para auditar o produto
 
-<!-- GSD:workflow-start source:GSD defaults -->
-## GSD Workflow Enforcement
+Uma auditoria de produto completa precisa cobrir no mínimo:
 
-Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
+1. **Jornadas do gestor** — fluxos ponta a ponta (6 jornadas mapeadas)
+2. **Qualidade da inteligência** — prompts, extrações, outputs, cascata narrativa
+3. **Modelo de dados e acumulação** — como o perfil cresce, quando degrada (>50 artefatos)
+4. **Arquitetura de módulos** — como módulos se conectam, silos, dados que não fluem
+5. **Pipeline e robustez** — concorrência, edge cases, tempos de processamento
+6. **Apresentação da inteligência** — a UI faz justiça ao que a IA produz?
+7. **Princípios de produto** — cada princípio está sendo honrado na prática?
 
-Use these entry points:
-- `/gsd:quick` for small fixes, doc updates, and ad-hoc tasks
-- `/gsd:debug` for investigation and bug fixing
-- `/gsd:execute-phase` for planned phase work
+### Padrões descobertos
 
-Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
-<!-- GSD:workflow-end -->
+- **Sustentação era silo completo** — dados existiam mas não alimentavam risk score nem perfil. Agora integrado (Fase 3 do roadmap).
+- **3 painéis de risco sobrepostos** (BrainAlert + TeamRisk + Urgências) geravam ruído. Unificado em 1 painel com 3 níveis.
+- **Sem feedback loop** — o gestor não podia corrigir a IA. Agora tem: rating de pautas com nota, flag "extração errada" em ações, override manual de saúde.
+- **Faltava âncora de hábito** — sem "View Esta Semana" o app não se tornava o primeiro lugar que o gestor abre. Agora tem WeekView com 1:1s por dia.
+- **Acumulação degrada após ~50 artefatos** — Conquistas, Insights e Sinais crescem indefinidamente. Histórico de Saúde comprime mas perde granularidade. Considerar archival e agregação temporal em futuras evoluções.
 
-<!-- GSD:profile-start -->
-## Developer Profile
+### Features que parecem dispensáveis mas NÃO são
 
-> Profile not yet configured. Run `/gsd:profile-user` to generate your developer profile.
-> This section is managed by `generate-claude-profile` -- do not edit manually.
-<!-- GSD:profile-end -->
+- **Relatório daily**: NÃO é report dormant — é insumo para o loop de acumulação. O gestor usa como resumo da operação do dia e colhe sinais para o perfil vivo.
+- **LogsView**: Observabilidade essencial enquanto dev=usuário e cobertura de testes é parcial.
+
+### Features que são dispensáveis
+
+- **RefinamentosView**: Armazenamento de docs sem relação com gestão de pessoas. Scope creep.
+- **AuditView**: Meta-feature que deveria estar em Settings, não na nav.
+
+### Riscos técnicos a monitorar
+
+- **Inversão temporal**: Dois artefatos simultâneos podem resultar em perfil com estado antigo. Mitigado com `appendOnlyUpdate` no ArtifactWriter.
+- **Regressão Pass 1→2**: Pass 2 pode produzir resultado pior. Mitigado com detecção de regressão (compara # ações e temas).
+- **Fuzzy dedup de pontos de atenção**: Match bidirecional de ~40 chars pode gerar falsos positivos. Monitorar.
+- **Migrações de schema**: Baseadas em regex sem rollback. Mitigado com validação pré/pós (`validateProfileStructure`).
+
+### Como o gestor realmente usa o app
+
+- Abre na segunda para ver o estado do time (Dashboard → WeekView → UnifiedRiskPanel)
+- Antes do 1:1: modo "Preparar 1:1" (1 clique) → gera pauta → entra preparado
+- Após o 1:1: arrasta transcrição → deep pass fecha o loop
+- Antes da calibração: CalibracaoView → batch generation → flag de promovibilidade
+- Daily: usa relatório daily como resumo da operação
+- Sustentação: SustentacaoView antes de reunião com VP
+
+---
+
+## Convenções técnicas
+
+### Commits
+- Branch de feature: `feat/descricao-curta` ou `fix/descricao-curta`
+- Conventional Commits em PT-BR: `tipo(escopo): descrição`
+- Nunca commitar direto em main
+
+### Código
+- TypeScript strict
+- Valores monetários em centavos (inteiros)
+- Sem console.log em produção
+- Imports respeitam camadas (main/ não importa de renderer/ exceto types/ipc.ts)
+- Testes com vitest — rodar `npx vitest run` antes de commitar mudanças em módulos críticos
+
+### Arquivos críticos (cuidado redobrado)
+- `ArtifactWriter.ts` — escreve no perfil, qualquer regressão corrompe dados
+- `IngestionPipeline.ts` — pipeline multi-pass com concorrência
+- `ProfileMigration.ts` — migração de schema, deve ser aditiva
+- `ActionRegistry.ts` — CRUD de ações com audit trail
+- Prompts em `src/main/prompts/` — a qualidade de extração é o valor central do produto
