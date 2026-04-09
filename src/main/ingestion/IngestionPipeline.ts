@@ -15,7 +15,7 @@ import { DetectedRegistry } from '../registry/DetectedRegistry'
 import { DemandaRegistry } from '../registry/DemandaRegistry'
 import { CicloRegistry } from '../registry/CicloRegistry'
 import { SettingsManager } from '../registry/SettingsManager'
-import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, copyFileSync } from 'fs'
 import { ProfileCompressor } from './ProfileCompressor'
 import { join as pathJoin, dirname, normalize } from 'path'
 import { Logger, ModuleLogger } from '../logging'
@@ -34,6 +34,7 @@ export interface QueueItem {
   error?:      string
   startedAt?:  number
   finishedAt?: number
+  truncated?:  boolean
   pessoasIdentificadas?: string[]
   naoCadastradas?:       string[]
   novasNomes?:           Record<string, string>  // slug → nome for detected people
@@ -72,6 +73,10 @@ export class IngestionPipeline {
   private savePendingQueue(): void {
     const pending = this.queue.filter((i) => i.status === 'pending')
     try {
+      // Create backup before overwriting
+      if (existsSync(this.pendingQueuePath)) {
+        copyFileSync(this.pendingQueuePath, this.pendingQueuePath + '.bak')
+      }
       writeFileSync(this.pendingQueuePath, JSON.stringify(pending, null, 2), 'utf-8')
     } catch (err) {
       this.log.error('save pending queue failed', { error: err instanceof Error ? err.message : String(err) })
@@ -83,9 +88,26 @@ export class IngestionPipeline {
    * Items with no cached AI result are discarded (unrecoverable).
    */
   restorePending(): void {
-    if (!existsSync(this.pendingQueuePath)) return
+    let raw: string | null = null
+
+    // Try primary file first, fallback to .bak if corrupted
+    for (const path of [this.pendingQueuePath, this.pendingQueuePath + '.bak']) {
+      if (!existsSync(path)) continue
+      try {
+        const content = readFileSync(path, 'utf-8')
+        JSON.parse(content) // validate JSON
+        raw = content
+        if (path.endsWith('.bak')) {
+          this.log.warn('pending-queue.json corrompido, restaurado do .bak')
+        }
+        break
+      } catch {
+        this.log.warn('falha ao ler pending queue', { path })
+      }
+    }
+
+    if (!raw) return
     try {
-      const raw   = readFileSync(this.pendingQueuePath, 'utf-8')
       const items = JSON.parse(raw) as QueueItem[]
       const valid = items.filter((i) => i.status === 'pending' && i.cachedAiResult && i.cachedText)
       if (valid.length === 0) return
@@ -257,7 +279,21 @@ export class IngestionPipeline {
         if (acao.responsavel_slug && registeredSlugs.has(acao.responsavel_slug)) {
           actionReg.createFromArtifact(acao.responsavel_slug, [acao], uniqueFileName, date, registeredSlugs)
         } else {
-          this.log.warn('ação coletiva sem dono', { responsavel: acao.responsavel, source: uniqueFileName })
+          // Ação sem dono registrado → criar como demanda do gestor para triagem
+          const titulo = aiResult.titulo ?? uniqueFileName
+          const responsavelLabel = acao.responsavel ?? 'não identificado'
+          demandaReg.save({
+            id:          `${date}-coletiva-${Math.random().toString(36).slice(2, 7)}`,
+            descricao:   acao.descricao,
+            descricaoLonga: `Responsável: ${responsavelLabel} (não cadastrado). Origem: ${titulo}`,
+            origem:      'Liderado',
+            pessoaSlug:  null,
+            prazo:       acao.prazo_iso ?? null,
+            criadoEm:    date,
+            atualizadoEm: date,
+            status:      'open',
+          })
+          this.log.info('ação coletiva sem dono → Demandas', { responsavel: responsavelLabel, source: uniqueFileName })
         }
       }
     }
@@ -1196,7 +1232,12 @@ export class IngestionPipeline {
       const teamRegistry     = registry.serializeForPrompt()
 
       // Read file content
-      let { text } = await readFile(item.filePath)
+      const readResult = await readFile(item.filePath)
+      let { text } = readResult
+      if (readResult.truncated) {
+        item.truncated = true
+        this.log.warn('artefato truncado', { filePath: item.filePath, maxChars: 50_000 })
+      }
 
       // Pass 0: Gemini preprocessing (optional)
       // Reduz tokens enviados ao Claude limpando transcrições brutas
@@ -1286,7 +1327,20 @@ export class IngestionPipeline {
           if (resultPass2.success && resultPass2.data) {
             const validation2 = validateIngestionResult(resultPass2.data)
             if (validation2.valid) {
-              aiResult = resultPass2.data as IngestionAIResult
+              // Regression detection: if Pass 2 produced fewer actions AND fewer themes, keep Pass 1
+              const p2 = resultPass2.data as IngestionAIResult
+              const p1Acoes = aiResult.acoes_comprometidas?.length ?? 0
+              const p2Acoes = p2.acoes_comprometidas?.length ?? 0
+              const p1Temas = aiResult.temas_detectados?.length ?? 0
+              const p2Temas = p2.temas_detectados?.length ?? 0
+              if (p2Acoes < p1Acoes && p2Temas < p1Temas && p1Acoes > 0) {
+                this.log.warn('pass 2 regrediu vs pass 1, mantendo pass 1', {
+                  pass1: { acoes: p1Acoes, temas: p1Temas },
+                  pass2: { acoes: p2Acoes, temas: p2Temas },
+                })
+              } else {
+                aiResult = p2
+              }
             } else {
               const details = [...validation2.missingFields.map(f => `campo ausente: ${f}`), ...validation2.typeErrors].join('; ')
               this.log.warn('schema inválido no pass 2, mantendo pass 1', { details })

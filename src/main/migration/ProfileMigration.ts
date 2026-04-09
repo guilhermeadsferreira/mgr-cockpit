@@ -13,6 +13,25 @@
  */
 export const CURRENT_SCHEMA_VERSION = 6
 
+/** Validates that a profile has parseable frontmatter and expected section markers. */
+export function validateProfileStructure(content: string): { valid: boolean; errors: string[] } {
+  const errors: string[] = []
+  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/)
+  if (!fmMatch) {
+    errors.push('frontmatter ausente ou malformado')
+    return { valid: false, errors }
+  }
+  const fm = fmMatch[1]
+  if (!/slug:/.test(fm)) errors.push('campo slug ausente no frontmatter')
+  if (!/schema_version:/.test(fm)) errors.push('campo schema_version ausente no frontmatter')
+
+  const requiredSections = ['FIM BLOCO RESUMO', 'FIM BLOCO HISTORICO']
+  for (const section of requiredSections) {
+    if (!content.includes(section)) errors.push(`seção obrigatória ausente: ${section}`)
+  }
+  return { valid: errors.length === 0, errors }
+}
+
 export function migrateProfileContent(content: string): string {
   const fmMatch = content.match(/^---\n([\s\S]*?)\n---/)
   if (!fmMatch) return content
@@ -24,6 +43,12 @@ export function migrateProfileContent(content: string): string {
   const version = versionMatch ? parseInt(versionMatch[1]) : 1
 
   if (version >= CURRENT_SCHEMA_VERSION) return content
+
+  // Pre-migration validation
+  const preMigration = validateProfileStructure(content)
+  if (!preMigration.valid) {
+    // Log but proceed — migration may fix issues
+  }
 
   // v1 → v2: drop acoes_pendentes_count — now computed from ActionRegistry
   if (version < 2) {
@@ -92,7 +117,16 @@ export function migrateProfileContent(content: string): string {
   }
 
   fm = fm.replace(/schema_version:\s*\d+/, `schema_version: ${CURRENT_SCHEMA_VERSION}`)
-  return body.replace(/^---\n[\s\S]*?\n---/, `---\n${fm}\n---`)
+  const migrated = body.replace(/^---\n[\s\S]*?\n---/, `---\n${fm}\n---`)
+
+  // Post-migration validation — if structure is broken, return original content untouched
+  const postMigration = validateProfileStructure(migrated)
+  if (!postMigration.valid) {
+    // Migration produced invalid output — preserve original to avoid corruption
+    return content
+  }
+
+  return migrated
 }
 
 /** Maps each block's unique open marker to its new unique close marker. Order matches file layout. */

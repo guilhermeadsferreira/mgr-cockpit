@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Inbox, FolderOpen, CheckCircle2, XCircle, Loader2, Clock, RefreshCw, UserPlus, PauseCircle, ArrowRight } from 'lucide-react'
+import { Inbox, FolderOpen, CheckCircle2, XCircle, Loader2, Clock, RefreshCw, UserPlus, PauseCircle, ArrowRight, AlertTriangle } from 'lucide-react'
 import { useRouter } from '../router'
 import type { QueueItem } from '../types/ipc'
 import { labelTipo } from '../lib/utils'
@@ -8,6 +8,7 @@ export function InboxView() {
   const { navigate }              = useRouter()
   const [queue, setQueue]         = useState<QueueItem[]>([])
   const [isDragging, setDragging] = useState(false)
+  const [dropError, setDropError] = useState<string | null>(null)
   const [workspacePath, setWorkspacePath] = useState<string>('')
 
   useEffect(() => {
@@ -52,11 +53,20 @@ export function InboxView() {
     async function onDrop(e: DragEvent) {
       e.preventDefault(); e.stopPropagation()
       setDragging(false)
+      setDropError(null)
       const files = Array.from(e.dataTransfer?.files ?? [])
+      const unsupported: string[] = []
       for (const file of files) {
         const filePath = window.api.getFilePath(file)
-        const supported = /\.md$/i.test(file.name)
-        if (filePath && supported) await window.api.ingestion.enqueue(filePath)
+        const supported = /\.(md|txt|pdf)$/i.test(file.name)
+        if (filePath && supported) {
+          await window.api.ingestion.enqueue(filePath)
+        } else if (filePath) {
+          unsupported.push(file.name)
+        }
+      }
+      if (unsupported.length > 0) {
+        setDropError(`Formato não suportado: ${unsupported.join(', ')}. Use .md, .txt ou .pdf`)
       }
       await refreshQueue()
     }
@@ -159,9 +169,21 @@ export function InboxView() {
               {isDragging ? 'Solte para processar' : 'Arraste arquivos aqui'}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', letterSpacing: '0.01em' }}>
-              .md · Notas de 1:1, reuniões, dailies, planning, retro
+              .md .txt .pdf · Notas de 1:1, reuniões, dailies, planning, retro
             </div>
           </div>
+
+          {dropError && (
+            <div style={{
+              padding: '10px 14px', borderRadius: 6, marginBottom: 16,
+              background: 'rgba(184,64,64,0.08)', border: '1px solid rgba(184,64,64,0.2)',
+              fontSize: 12.5, color: 'var(--red)',
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <XCircle size={13} style={{ flexShrink: 0 }} />
+              {dropError}
+            </div>
+          )}
 
           {/* Queue sections */}
           {processing.length > 0 && (
@@ -344,14 +366,24 @@ function QueueCard({ item, onRegister }: { item: QueueItem; onRegister: (slug: s
         </div>
       </div>
 
-      {/* Body: summary or error */}
-      {(item.summary || item.error) && (
+      {/* Body: summary, truncation warning, or error */}
+      {(item.summary || item.error || item.truncated) && (
         <div style={{
           padding: '10px 16px 10px 38px',
           borderBottom: ((item.naoCadastradas?.length ?? 0) > 0 || registeredPeople.length > 0)
             ? '1px solid var(--border-subtle)'
             : 'none',
         }}>
+          {item.truncated && (
+            <p style={{
+              fontSize: 11.5, color: 'var(--yellow, #d4a843)', lineHeight: 1.5,
+              margin: '0 0 6px 0',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <AlertTriangle size={11} style={{ flexShrink: 0 }} />
+              Artefato truncado — apenas os primeiros 50KB foram processados
+            </p>
+          )}
           {item.summary && (
             <p style={{
               fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6,

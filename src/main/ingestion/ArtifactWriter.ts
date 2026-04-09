@@ -140,10 +140,29 @@ export class ArtifactWriter {
     const now = new Date().toISOString()
     const today = now.slice(0, 10)
 
+    // Detect temporal inversion: if the artifact being processed is OLDER than
+    // the latest ingestion, skip overwriting resumo_evolutivo and saude to preserve
+    // the more recent state. Append-only sections (historico, acoes, etc.) still update.
+    let isOlderArtifact = false
+    if (existing) {
+      const lastIngestaoMatch = existing.match(/ultima_ingestao:\s*"(\d{4}-\d{2}-\d{2})"/)
+      if (lastIngestaoMatch && result.data_artefato < lastIngestaoMatch[1]) {
+        isOlderArtifact = true
+        log.warn('inversão temporal detectada — artefato mais antigo que última ingestão', {
+          slug,
+          data_artefato: result.data_artefato,
+          ultima_ingestao: lastIngestaoMatch[1],
+        })
+      }
+    }
+
     let updated: string
 
     if (!existing) {
       updated = this.createPerfil(slug, result, artifactFileName, now, today)
+    } else if (isOlderArtifact) {
+      // Only append to historico, acoes, saude_historico — skip resumo/frontmatter overwrite
+      updated = this.appendOnlyUpdate(existing, result, artifactFileName, today)
     } else {
       updated = this.updateExistingPerfil(existing, result, artifactFileName, now, today)
     }
@@ -308,6 +327,57 @@ ${SECTION.sinais_terceiros.close}
 
     // Auto-compress health history when exceeding 50 active entries
     updated = this.compressHealthHistory(updated)
+
+    return updated
+  }
+
+  /**
+   * Append-only update for artifacts older than the current profile state.
+   * Preserves resumo_evolutivo, frontmatter saude, and tendencia. Only appends
+   * to append-only sections (historico, acoes, atencao, conquistas, saude_historico).
+   */
+  private appendOnlyUpdate(
+    existing: string,
+    result: IngestionAIResult,
+    artifactFileName: string,
+    today: string,
+  ): string {
+    let updated = existing
+
+    // Increment total_artefatos only
+    updated = updated.replace(/total_artefatos:\s*(\d+)/, (_, n) => `total_artefatos: ${parseInt(n) + 1}`)
+
+    // Append ações
+    if (result.acoes_comprometidas.length > 0) {
+      const newLines = result.acoes_comprometidas.map((a) => {
+        const prazo = a.prazo_iso ? ` até ${a.prazo_iso}` : ''
+        return `- [ ] **${a.responsavel}:** ${a.descricao}${prazo}`
+      }).join('\n')
+      updated = this.appendToBlock(updated, 'acoes', newLines)
+    }
+
+    // Append pontos de atenção
+    if (result.pontos_de_atencao.length > 0) {
+      const newLines = result.pontos_de_atencao.map((p) => `- **${today}:** ${formatPontoAtencao(p)}`).join('\n')
+      updated = this.appendToBlock(updated, 'atencao', newLines)
+    }
+
+    // Append conquistas
+    if (result.elogios_e_conquistas.length > 0) {
+      const newLines = result.elogios_e_conquistas.map((e) => `- **${today}:** ${e}`).join('\n')
+      updated = this.appendToBlock(updated, 'conquistas', newLines)
+    }
+
+    // Append histórico de artefatos
+    const histLine = `- ${result.data_artefato} | ${result.tipo} | [${artifactFileName}](../historico/${artifactFileName})`
+    updated = this.appendToBlock(updated, 'historico', histLine)
+
+    // Append histórico de saúde
+    const sentimentosStr = serializeSentimentos(result)
+    const saudeLine = `- ${result.data_artefato} | ${result.indicador_saude} | ${result.motivo_indicador}${sentimentosStr ? ` | [${sentimentosStr}]` : ''}`
+    if (updated.includes(SECTION.saude_historico.open)) {
+      updated = this.appendToBlock(updated, 'saude_historico', saudeLine)
+    }
 
     return updated
   }

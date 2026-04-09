@@ -434,6 +434,7 @@ export interface QueueItem {
   error?:                string
   startedAt?:            number
   finishedAt?:           number
+  truncated?:            boolean
   // People detected by AI
   pessoasIdentificadas?: string[]              // all slugs mentioned in the artifact
   naoCadastradas?:       string[]              // slugs that Claude found but aren't in the registry
