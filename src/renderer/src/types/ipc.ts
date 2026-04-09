@@ -506,7 +506,9 @@ export interface CycleReportResult {
     evolucao_frente_ao_cargo:  string
     pontos_de_desenvolvimento:  string[]
     conclusao_para_calibracao: string
-    flag_promovibilidade:      'sim' | 'nao' | 'avaliar'
+    flag_promovibilidade:      'sim' | 'nao' | 'avaliar' | 'condicionado_a'
+    condicao_promocao?:        string
+    evidencias_promovibilidade?: string[]
   }
   error?: string
 }

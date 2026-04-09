@@ -132,30 +132,47 @@ function CycleResultView({ result, person }: { result: CycleReportResult; person
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* Header result card */}
+      {/* Header result card — promotability as headline */}
       <div style={{
         background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden',
       }}>
+        {/* Promotability headline */}
         <div style={{
-          padding: '12px 18px', borderBottom: '1px solid var(--border-subtle)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 18px',
+          background: `color-mix(in srgb, ${promoColor} 6%, transparent)`,
+          borderBottom: `2px solid color-mix(in srgb, ${promoColor} 25%, transparent)`,
         }}>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 2 }}>
-              Relatório gerado
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-              {person?.nome ?? 'Pessoa'}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
             <span style={{
-              fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20,
-              background: `${promoColor}18`, border: `1px solid ${promoColor}40`,
-              color: promoColor,
+              fontSize: 16, fontWeight: 700, color: promoColor,
             }}>
               {promoLabel}
             </span>
+          </div>
+          {r.condicao_promocao && (
+            <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+              {r.condicao_promocao}
+            </div>
+          )}
+          {r.evidencias_promovibilidade && r.evidencias_promovibilidade.length > 0 && (
+            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {r.evidencias_promovibilidade.slice(0, 5).map((e: string, i: number) => (
+                <div key={i} style={{ fontSize: 12, color: 'var(--text-primary)', display: 'flex', gap: 6 }}>
+                  <span style={{ color: promoColor, flexShrink: 0 }}>•</span>
+                  {e}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{
+          padding: '10px 18px', borderBottom: '1px solid var(--border-subtle)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+            {person?.nome ?? 'Pessoa'}
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {/* View toggle */}
             <div style={{
               display: 'flex', borderRadius: 6, overflow: 'hidden',

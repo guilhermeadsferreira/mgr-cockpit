@@ -1902,34 +1902,75 @@ function SinceLastMeetingCard({
   return (
     <div style={{
       background: 'var(--surface)', border: '1px solid var(--border)',
-      borderRadius: 6, padding: '10px 16px', marginBottom: 14,
-      display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+      borderRadius: 6, overflow: 'hidden', marginBottom: 14,
     }}>
-      <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', color: 'var(--text-muted)', textTransform: 'uppercase', marginRight: 4 }}>
-        Desde {fmtDate(ultimo1on1)}
-      </span>
-      {!hasActivity && !healthChanged && (
-        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Nenhuma ingestão desde o último 1:1</span>
-      )}
-      {newArtifacts.length > 0 && (
-        <span style={{ fontSize: 11.5, padding: '2px 8px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
-          {newArtifacts.length} artefato{newArtifacts.length !== 1 ? 's' : ''} novo{newArtifacts.length !== 1 ? 's' : ''}
+      {/* Header with badges */}
+      <div style={{
+        padding: '10px 16px',
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+        borderBottom: (hasActivity || healthChanged) ? '1px solid var(--border-subtle)' : 'none',
+      }}>
+        <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', color: 'var(--text-muted)', textTransform: 'uppercase', marginRight: 4 }}>
+          Desde {fmtDate(ultimo1on1)}
         </span>
-      )}
-      {closedActions.length > 0 && (
-        <span style={{ fontSize: 11.5, padding: '2px 8px', borderRadius: 12, background: 'rgba(100,180,100,0.1)', border: '1px solid rgba(100,180,100,0.3)', color: 'var(--green)' }}>
-          {closedActions.length} ação{closedActions.length !== 1 ? 'ões' : ''} concluída{closedActions.length !== 1 ? 's' : ''}
-        </span>
-      )}
-      {expiredActions.length > 0 && (
-        <span style={{ fontSize: 11.5, padding: '2px 8px', borderRadius: 12, background: 'rgba(184,64,64,0.08)', border: '1px solid rgba(184,64,64,0.3)', color: 'var(--red)' }}>
-          {expiredActions.length} ação{expiredActions.length !== 1 ? 'ões' : ''} vencida{expiredActions.length !== 1 ? 's' : ''}
-        </span>
-      )}
-      {healthChanged && (
-        <span style={{ fontSize: 11.5, padding: '2px 8px', borderRadius: 12, background: 'rgba(232,135,58,0.1)', border: '1px solid rgba(232,135,58,0.3)', color: '#e8873a' }}>
-          saúde alterada
-        </span>
+        {!hasActivity && !healthChanged && (
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Nenhuma atividade</span>
+        )}
+        {newArtifacts.length > 0 && (
+          <span style={{ fontSize: 11.5, padding: '2px 8px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
+            {newArtifacts.length} artefato{newArtifacts.length !== 1 ? 's' : ''}
+          </span>
+        )}
+        {closedActions.length > 0 && (
+          <span style={{ fontSize: 11.5, padding: '2px 8px', borderRadius: 12, background: 'rgba(100,180,100,0.1)', border: '1px solid rgba(100,180,100,0.3)', color: 'var(--green)' }}>
+            {closedActions.length} concluída{closedActions.length !== 1 ? 's' : ''}
+          </span>
+        )}
+        {expiredActions.length > 0 && (
+          <span style={{ fontSize: 11.5, padding: '2px 8px', borderRadius: 12, background: 'rgba(184,64,64,0.08)', border: '1px solid rgba(184,64,64,0.3)', color: 'var(--red)' }}>
+            {expiredActions.length} vencida{expiredActions.length !== 1 ? 's' : ''}
+          </span>
+        )}
+        {healthChanged && (
+          <span style={{ fontSize: 11.5, padding: '2px 8px', borderRadius: 12, background: 'rgba(232,135,58,0.1)', border: '1px solid rgba(232,135,58,0.3)', color: '#e8873a' }}>
+            saúde alterada
+          </span>
+        )}
+      </div>
+      {/* Detail: what specifically changed */}
+      {(hasActivity || healthChanged) && (
+        <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {newArtifacts.slice(0, 3).map((a) => (
+            <div key={a.fileName} style={{ fontSize: 11.5, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 10, flexShrink: 0 }}>{a.date?.slice(5)}</span>
+              <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-muted)', textTransform: 'uppercase', flexShrink: 0 }}>
+                {labelTipo(a.tipo)}
+              </span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {a.fileName.replace(/\.(md|txt|pdf)$/i, '').replace(/[-_]/g, ' ')}
+              </span>
+            </div>
+          ))}
+          {closedActions.slice(0, 2).map((a) => (
+            <div key={a.id} style={{ fontSize: 11.5, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <CheckSquare size={10} style={{ flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {a.descricao ?? a.texto}
+              </span>
+            </div>
+          ))}
+          {expiredActions.slice(0, 2).map((a) => (
+            <div key={a.id} style={{ fontSize: 11.5, color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <AlertTriangle size={10} style={{ flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {a.descricao ?? a.texto}
+              </span>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)', flexShrink: 0 }}>
+                {a.prazo ? `venceu ${fmtDate(a.prazo)}` : ''}
+              </span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
