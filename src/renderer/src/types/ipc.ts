@@ -387,7 +387,7 @@ export interface PerfilFrontmatter {
   nota_tendencia?:       string | null
 }
 
-export type ActionStatus   = 'open' | 'in_progress' | 'done' | 'cancelled'
+export type ActionStatus   = 'open' | 'in_progress' | 'done' | 'cancelled' | 'incorrect'
 export type ActionOwner    = 'gestor' | 'liderado' | 'terceiro'
 export type ActionPriority = 'baixa' | 'media' | 'alta'
 

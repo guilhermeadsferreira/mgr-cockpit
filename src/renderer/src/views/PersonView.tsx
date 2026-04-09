@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, FileText, CalendarDays, CalendarCheck, Pencil, ExternalLink, RefreshCw, Loader2, CheckSquare, Square, X, Plus, ArrowUpRight, Trash2, Sparkles } from 'lucide-react'
+import { ArrowLeft, FileText, CalendarDays, CalendarCheck, Pencil, ExternalLink, RefreshCw, Loader2, CheckSquare, Square, X, Plus, ArrowUpRight, Trash2, Sparkles, AlertTriangle } from 'lucide-react'
 import { useRouter } from '../router'
 import type { PersonConfig, PerfilData, ArtifactMeta, PautaMeta, AgendaResult, Action, ActionOwner, Demanda, PDIItem, SupportBoardSnapshot } from '../types/ipc'
 import { MarkdownPreview } from '../components/MarkdownPreview'
@@ -72,6 +72,8 @@ export function PersonView() {
   const [prep1on1Mode,  setPrep1on1Mode]  = useState(false)
   const [lastPautaContent, setLastPautaContent] = useState<string | null>(null)
   const [sustentacaoData, setSustentacaoData] = useState<{ ticketsAbertos: number; emBreach: number; tickets: Array<{ key: string; summary: string; status: string; diasAberto: number }> } | null>(null)
+  const [showSaudeOverride, setShowSaudeOverride] = useState(false)
+  const [saudeOverride, setSaudeOverride] = useState<string | null>(null)
 
   async function handleResetData() {
     if (!person) return
@@ -325,11 +327,56 @@ export function PersonView() {
 
               {fm && (
                 <InfoCard title="Saúde">
-                  <InfoRow
-                    label="Indicador"
-                    value={fm.saude ? labelSaude(fm.saude) : '—'}
-                    suffix={fm.ultima_confianca === 'baixa' ? (
-                      <span title="Baseado em artefato com evidência limitada (curto, ambíguo ou fragmentado)" style={{
+                  <div style={{ padding: '6px 16px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 60 }}>Indicador</span>
+                    {showSaudeOverride ? (
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        {(['verde', 'amarelo', 'vermelho'] as const).map((s) => (
+                          <button
+                            key={s}
+                            onClick={async () => {
+                              setSaudeOverride(s)
+                              setShowSaudeOverride(false)
+                              // Save override to person config
+                              if (person) {
+                                await window.api.people.save({ ...person, alerta_ativo: true, motivo_alerta: `Saúde override manual: ${s}` })
+                              }
+                            }}
+                            style={{
+                              padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                              background: s === 'verde' ? 'rgba(100,180,100,0.12)' : s === 'amarelo' ? 'rgba(212,168,67,0.12)' : 'rgba(184,64,64,0.12)',
+                              border: `1px solid ${s === 'verde' ? 'rgba(100,180,100,0.35)' : s === 'amarelo' ? 'rgba(212,168,67,0.35)' : 'rgba(184,64,64,0.35)'}`,
+                              color: s === 'verde' ? 'var(--green)' : s === 'amarelo' ? 'var(--yellow, #d4a843)' : 'var(--red)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {labelSaude(s)}
+                          </button>
+                        ))}
+                        <button onClick={() => setShowSaudeOverride(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}>
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span
+                        onClick={() => setShowSaudeOverride(true)}
+                        style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', cursor: 'pointer' }}
+                        title="Clique para alterar manualmente"
+                      >
+                        {labelSaude(saudeOverride ?? fm.saude ?? '—')}
+                        {saudeOverride && (
+                          <span style={{
+                            fontSize: 9, marginLeft: 4, padding: '1px 5px', borderRadius: 3,
+                            background: 'rgba(100,120,200,0.12)', border: '1px solid rgba(100,120,200,0.25)',
+                            color: 'rgba(100,120,200,0.9)',
+                          }}>
+                            manual
+                          </span>
+                        )}
+                      </span>
+                    )}
+                    {!showSaudeOverride && fm.ultima_confianca === 'baixa' && !saudeOverride && (
+                      <span title="Baseado em artefato com evidência limitada" style={{
                         fontSize: 9.5, fontWeight: 600, letterSpacing: '0.04em',
                         padding: '1px 5px', borderRadius: 3,
                         background: 'rgba(232,135,58,0.12)', border: '1px solid rgba(232,135,58,0.35)',
@@ -337,8 +384,8 @@ export function PersonView() {
                       }}>
                         evidência limitada
                       </span>
-                    ) : undefined}
-                  />
+                    )}
+                  </div>
                   <InfoRow label="Ações pendentes" value={String(fm.acoes_pendentes_count ?? 0)} />
                   <InfoRow label="Total artefatos" value={String(fm.total_artefatos ?? 0)} />
                   {fm.tendencia_emocional && (
@@ -1077,6 +1124,8 @@ function PautaCard({ pauta: p, slug }: { pauta: PautaMeta; slug: string }) {
   const [content,  setContent]  = useState<string | null>(null)
   const [loading,  setLoading]  = useState(false)
   const [rated,    setRated]    = useState<string | null>(null)
+  const [showNota, setShowNota] = useState(false)
+  const [nota,     setNota]     = useState('')
 
   async function toggle() {
     if (!expanded && content === null) {
@@ -1089,8 +1138,13 @@ function PautaCard({ pauta: p, slug }: { pauta: PautaMeta; slug: string }) {
   }
 
   async function handleRate(rating: 'util' | 'precisa_melhorar') {
-    await window.api.people.ratePauta(slug, p.date, rating)
+    if (rating === 'precisa_melhorar' && !showNota) {
+      setShowNota(true)
+      return
+    }
+    await window.api.people.ratePauta(slug, p.date, rating, nota || undefined)
     setRated(rating)
+    setShowNota(false)
   }
 
   return (
@@ -1175,6 +1229,46 @@ function PautaCard({ pauta: p, slug }: { pauta: PautaMeta; slug: string }) {
                 }}
               >
                 Precisa melhorar
+              </button>
+            </div>
+          )}
+          {showNota && !rated && (
+            <div style={{
+              padding: '8px 18px 12px', borderTop: '1px solid var(--border-subtle)',
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <input
+                type="text"
+                placeholder="O que pode melhorar? (opcional)"
+                value={nota}
+                onChange={(e) => setNota(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleRate('precisa_melhorar') }}
+                style={{
+                  flex: 1, padding: '6px 10px', borderRadius: 4, fontSize: 11,
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
+                  color: 'var(--text-primary)', outline: 'none', fontFamily: 'var(--font)',
+                }}
+                autoFocus
+              />
+              <button
+                onClick={() => handleRate('precisa_melhorar')}
+                style={{
+                  fontSize: 11, fontWeight: 500, padding: '5px 12px', borderRadius: 4,
+                  background: 'var(--accent)', border: 'none',
+                  color: '#09090c', cursor: 'pointer',
+                }}
+              >
+                Enviar
+              </button>
+              <button
+                onClick={() => { setShowNota(false); setNota('') }}
+                style={{
+                  fontSize: 11, padding: '5px 8px', borderRadius: 4,
+                  background: 'transparent', border: '1px solid var(--border)',
+                  color: 'var(--text-muted)', cursor: 'pointer',
+                }}
+              >
+                <X size={10} />
               </button>
             </div>
           )}
@@ -1551,16 +1645,33 @@ function ActionRow({
             <Trash2 size={13} />
           </button>
         ) : (
-          <button
-            onClick={() => onUpdateStatus(a.id, 'cancelled')}
-            title="Cancelar"
-            style={{
-              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-              color: 'var(--text-muted)', flexShrink: 0,
-            }}
-          >
-            <X size={13} />
-          </button>
+          <>
+            <button
+              onClick={() => onUpdateStatus(a.id, 'incorrect')}
+              title="Extração errada — marcar como incorreta"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 3,
+                padding: '2px 6px', borderRadius: 4, fontSize: 10,
+                background: 'none', border: '1px solid transparent',
+                color: 'var(--text-muted)', cursor: 'pointer',
+                transition: 'border-color 0.12s, color 0.12s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(184,64,64,0.3)'; e.currentTarget.style.color = 'var(--red)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)' }}
+            >
+              <AlertTriangle size={10} /> errada
+            </button>
+            <button
+              onClick={() => onUpdateStatus(a.id, 'cancelled')}
+              title="Cancelar"
+              style={{
+                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                color: 'var(--text-muted)', flexShrink: 0,
+              }}
+            >
+              <X size={13} />
+            </button>
+          </>
         )}
       </div>
     </div>
