@@ -105,6 +105,7 @@ contextBridge.exposeInMainWorld('api', {
     resetData:        ()                    => ipcRenderer.invoke('ingestion:reset-data'),
     resetPersonData: (slug: string)         => ipcRenderer.invoke('ingestion:reset-person-data', slug),
     batchReingest:    (files: string[])     => ipcRenderer.invoke('ingestion:batch-reingest', files),
+    processAsCollective: (itemId: string) => ipcRenderer.invoke('ingestion:process-as-collective', itemId),
   },
 
   logs: {

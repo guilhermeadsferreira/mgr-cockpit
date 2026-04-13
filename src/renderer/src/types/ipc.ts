@@ -12,6 +12,7 @@ export type IngestionOperation =
   | 'agendaGeneration'
   | 'cycleReport'
   | 'autoAvaliacao'
+  | 'sinalTerceiro'
 
 export interface OperationProviderConfig {
   provider: LLMProvider
@@ -440,6 +441,7 @@ export interface QueueItem {
   pessoasIdentificadas?: string[]              // all slugs mentioned in the artifact
   naoCadastradas?:       string[]              // slugs that Claude found but aren't in the registry
   novasNomes?:           Record<string, string> // slug → nome for detected people
+  pessoasMencionadas?:   Array<{ slug: string; nome: string; contexto: string }>
 }
 
 export interface IngestionEvent {

@@ -1,6 +1,7 @@
 import type { IngestionAIResult } from '../prompts/ingestion.prompt'
 import type { CerimoniaSinalResult } from '../prompts/cerimonia-sinal.prompt'
 import type { OneOnOneResult } from '../prompts/1on1-deep.prompt'
+import type { SinalTerceiroResult } from '../prompts/sinal-terceiro.prompt'
 import { ASPECTO_VALUES } from '../prompts/constants'
 
 // ─── Normalização defensiva de enums ────────────────────────────────────────
@@ -365,6 +366,58 @@ export function validateOneOnOneResult(data: unknown): ValidationResult {
         typeErrors.push(`insights_1on1[${i}].categoria inválido: "${ins.categoria}"`)
       }
     }
+  }
+
+  return {
+    valid: missingFields.length === 0 && typeErrors.length === 0,
+    missingFields,
+    typeErrors,
+  }
+}
+
+// --- SinalTerceiroResult validation ---
+
+const SINAL_TERCEIRO_CATEGORIAS = ['feedback', 'concern', 'elogio', 'decisao', 'contexto'] as const
+
+export function validateSinalTerceiroResult(data: unknown): ValidationResult {
+  const missingFields: string[] = []
+  const typeErrors: string[] = []
+
+  if (!data || typeof data !== 'object') {
+    return { valid: false, missingFields: ['(all — not an object)'], typeErrors: [] }
+  }
+
+  const obj = data as Record<string, unknown>
+  normalizeEnumFields(obj)
+
+  if (obj.relevante === undefined) {
+    missingFields.push('relevante')
+  } else if (typeof obj.relevante !== 'boolean') {
+    typeErrors.push(`relevante deve ser boolean, recebido: "${typeof obj.relevante}"`)
+  }
+
+  // If not relevant, remaining fields are optional
+  if (obj.relevante === false) {
+    return { valid: missingFields.length === 0 && typeErrors.length === 0, missingFields, typeErrors }
+  }
+
+  // relevante === true: validate required fields
+  if (!obj.resumo_sinal || typeof obj.resumo_sinal !== 'string' || (obj.resumo_sinal as string).trim().length === 0) {
+    missingFields.push('resumo_sinal')
+  }
+
+  if (!obj.categoria || !SINAL_TERCEIRO_CATEGORIAS.includes(obj.categoria as typeof SINAL_TERCEIRO_CATEGORIAS[number])) {
+    typeErrors.push(`categoria inválido: "${obj.categoria}" — esperado: ${SINAL_TERCEIRO_CATEGORIAS.join(', ')}`)
+  }
+
+  if (obj.confianca !== undefined && !['alta', 'media', 'baixa'].includes(obj.confianca as string)) {
+    typeErrors.push(`confianca inválido: "${obj.confianca}"`)
+  } else if (obj.confianca === undefined) {
+    missingFields.push('confianca')
+  }
+
+  if (obj.temas !== undefined && !Array.isArray(obj.temas)) {
+    typeErrors.push('temas deve ser array')
   }
 
   return {

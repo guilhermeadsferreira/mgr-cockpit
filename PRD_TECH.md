@@ -74,6 +74,7 @@ Main Process (Node.js)
 │   ├── ingestion.prompt.ts       ← two-pass (identify → enrich)
 │   ├── 1on1-deep.prompt.ts       ← V2: pass profundo de 1:1 (follow-up, insights, PDI, tendência)
 │   ├── cerimonia-sinal.prompt.ts ← V2: extrai sinais por pessoa em reuniões coletivas
+│   ├── sinal-terceiro.prompt.ts ← sinais indiretos de peer meetings para liderados mencionados
 │   ├── agenda.prompt.ts          ← suporta dadosStale + ações com ciclos_sem_mencao + PDI
 │   ├── agenda-gestor.prompt.ts   ← pauta com o próprio gestor (roll-up do time)
 │   ├── cycle.prompt.ts           ← orçamento de 80k chars; evidências de promovibilidade
@@ -391,6 +392,7 @@ A migração é transparente — aplicada em `PersonRegistry.getPerfil()` e pers
 | `ingestion:reset-data` | renderer → main | Limpa dados gerados preservando config |
 | `ingestion:reset-person-data` | renderer → main | Limpa dados de uma pessoa específica |
 | `ingestion:list-processados` | renderer → main | Lista arquivos em inbox/processados/ |
+| `ingestion:process-as-collective` | renderer → main | Escape hatch: processa item pending como coletivo |
 | `insights:cross-team` | renderer → main | Padrões detectados em múltiplos perfis |
 | `demandas:list` | renderer → main | Lista demandas do gestor |
 | `demandas:list-by-person` | renderer → main | Demandas do gestor por pessoa |
@@ -432,6 +434,7 @@ A migração é transparente — aplicada em `PersonRegistry.getPerfil()` e pers
 | `ingestion:started` | main → renderer | Arquivo entrou na fila |
 | `ingestion:completed` | main → renderer | Ingestão concluída |
 | `ingestion:failed` | main → renderer | Erro no processamento |
+| `ingestion:sinal-terceiro-aplicado` | main → renderer | Sinal indireto aplicado ao perfil de um liderado |
 | `update:status` | main → renderer | Status de atualização do app |
 | `log:entry` | main → renderer | Push de novo log entry em real-time |
 
@@ -512,6 +515,12 @@ spawn(claudeBin, ['-p', prompt], {
 - `origem_pauta`: baseado em quem originou o *sinal*, não quem falou. Se o liderado confessa um problema e nomeia um colega como impactado ("ficou na conta do Antônio"), usar `terceiro` com `terceiro_nome`.
 - `sugestoes_gestor` — "já anotei" NÃO suprime `gerar_acao`: reação prévia genérica do liderado não cancela a geração de ação quando o gestor depois apresenta uma sugestão concreta.
 - `sugestoes_gestor` — sugestões em lista: múltiplas sugestões em sequência geram entradas separadas (não consolidar num único registro vago).
+
+### sinal-terceiro.prompt.ts — Sinais indiretos de peer meetings
+
+**Input:** conteúdo da reunião, contexto da menção (Pass 1), perfil do liderado, fonte (nome + relação).
+**Output:** `SinalTerceiroResult` — `relevante` (boolean), `resumo_sinal`, `categoria` (feedback/concern/elogio/decisao/contexto), `temas`, `impacto_potencial`, `sugestao_devolutiva`, `confianca`.
+**Framing:** Relato de terceiro, não observação direta. Confiança default "media". Menções superficiais retornam `relevante: false`.
 
 ### cerimonia-sinal.prompt.ts — V2: refinamentos
 

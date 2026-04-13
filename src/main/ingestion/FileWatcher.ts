@@ -76,6 +76,11 @@ export class FileWatcher {
     return this.pipeline.batchReingest(filePaths)
   }
 
+  // Process a pending item as collective (escape hatch — skip registering pessoa_principal)
+  processAsCollective(itemId: string): Promise<{ success: boolean; error?: string }> {
+    return this.pipeline.processAsCollective(itemId)
+  }
+
   // Reset generated data (perfil, actions, historico) preserving config.yaml
   static resetGeneratedData(workspacePath: string): string[] {
     return IngestionPipeline.resetGeneratedData(workspacePath)

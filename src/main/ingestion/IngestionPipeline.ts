@@ -7,7 +7,8 @@ import { preprocessTranscript } from './GeminiPreprocessor'
 import { buildIngestionPrompt, type IngestionAIResult } from '../prompts/ingestion.prompt'
 import { buildCerimoniaSinalPrompt } from '../prompts/cerimonia-sinal.prompt'
 import { build1on1DeepPrompt, type OneOnOneResult } from '../prompts/1on1-deep.prompt'
-import { validateIngestionResult, validateCerimoniaSinalResult, validateOneOnOneResult } from './SchemaValidator'
+import { buildSinalTerceiroPrompt, type SinalTerceiroResult } from '../prompts/sinal-terceiro.prompt'
+import { validateIngestionResult, validateCerimoniaSinalResult, validateOneOnOneResult, validateSinalTerceiroResult } from './SchemaValidator'
 import { PersonRegistry } from '../registry/PersonRegistry'
 import { ActionRegistry } from '../registry/ActionRegistry'
 import { SuggestionMemory } from '../registry/SuggestionMemory'
@@ -38,6 +39,7 @@ export interface QueueItem {
   pessoasIdentificadas?: string[]
   naoCadastradas?:       string[]
   novasNomes?:           Record<string, string>  // slug → nome for detected people
+  pessoasMencionadas?:   Array<{ slug: string; nome: string; contexto: string }>
   // Cached data for pending items — avoids re-calling Claude on sync
   cachedAiResult?:       IngestionAIResult
   cachedText?:           string
@@ -46,6 +48,42 @@ export interface QueueItem {
 const MAX_CONCURRENT = 3
 const MAX_QUEUE_SIZE  = 100
 const MAX_CONCURRENT_1ON1 = 2
+
+const APELIDOS: Record<string, string[]> = {
+  'edu':  ['eduardo'],
+  'gabi': ['gabriela', 'gabriel'],
+  'rafa': ['rafael', 'rafaela'],
+  'fer':  ['fernando', 'fernanda'],
+  'dani': ['daniel', 'daniela'],
+  'ale':  ['alexandre', 'alessandra', 'alex'],
+  'rod':  ['rodrigo'],
+  'leo':  ['leonardo', 'leandro'],
+  'bia':  ['beatriz'],
+  'lu':   ['lucas', 'luciana', 'lucia'],
+  'mari': ['mariana', 'maria'],
+  'cris': ['cristiano', 'cristina'],
+  'thi':  ['thiago'],
+  'gui':  ['guilherme'],
+  'bru':  ['bruno', 'bruna'],
+  'vini': ['vinicius'],
+  'nath': ['nathalia', 'nathan'],
+  'vic':  ['victor', 'victoria'],
+}
+
+// Reverse map: full first name → apelido(s) it could match
+const APELIDO_REVERSE = new Map<string, string[]>()
+for (const [apelido, nomes] of Object.entries(APELIDOS)) {
+  for (const nome of nomes) {
+    const existing = APELIDO_REVERSE.get(nome) ?? []
+    existing.push(apelido)
+    APELIDO_REVERSE.set(nome, existing)
+  }
+}
+
+const NON_PERSON_WORDS = new Set([
+  'fim', 'inicio', 'pausa', 'todos', 'time', 'equipe', 'geral',
+  'empresa', 'cliente', 'projeto', 'sistema', 'produto', 'area',
+])
 
 export class IngestionPipeline {
   private queue: QueueItem[] = []
@@ -150,6 +188,33 @@ export class IngestionPipeline {
       this.log.info('auto-sync startup complete', { synced })
     }
     return synced
+  }
+
+  /**
+   * Processes a pending item as collective (escape hatch).
+   * Used when the user decides to skip registering the blocking pessoa_principal.
+   */
+  async processAsCollective(itemId: string): Promise<{ success: boolean; error?: string }> {
+    const item = this.queue.find((i) => i.id === itemId && i.status === 'pending')
+    if (!item) {
+      return { success: false, error: 'Item não encontrado ou não está pendente' }
+    }
+    if (!item.cachedAiResult || !item.cachedText) {
+      return { success: false, error: 'Dados em cache não disponíveis para reprocessamento' }
+    }
+
+    try {
+      // Clear pessoa_principal so syncItemToCollective treats it as collective
+      item.cachedAiResult.pessoa_principal = null
+      const settings = SettingsManager.load()
+      await this.syncItemToCollective(item, settings.claudeBinPath)
+      this.log.info('escape hatch: processed as collective', { fileName: item.fileName, itemId })
+      return { success: true }
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err)
+      this.log.error('escape hatch failed', { fileName: item.fileName, error })
+      return { success: false, error }
+    }
   }
 
   enqueue(filePath: string): void {
@@ -1159,7 +1224,8 @@ export class IngestionPipeline {
   /**
    * Remaps AI-generated slugs to registered people when the exact slug doesn't match
    * but the first name is unambiguous (only one registered person shares that first name).
-   * Mutates aiResult in place: pessoas_identificadas, pessoa_principal, novas_pessoas_detectadas.
+   * Also handles PT-BR nickname expansion and full-name disambiguation.
+   * Mutates aiResult in place: pessoas_identificadas, pessoa_principal, novas_pessoas_detectadas, pessoas_mencionadas_relevantes.
    */
   private fuzzyRemapSlugs(
     aiResult: IngestionAIResult,
@@ -1180,14 +1246,69 @@ export class IngestionPipeline {
       }
     }
 
+    // Build full-name → slug index for disambiguation
+    const fullNameIndex = new Map<string, string>()
+    for (const p of registeredPeople) {
+      fullNameIndex.set(p.nome.toLowerCase().trim(), p.slug)
+    }
+
+    // Collect full names from AI result for disambiguation
+    const aiFullNames = new Map<string, string>() // slug → full name
+    for (const nome of aiResult.participantes_nomes ?? []) {
+      const slug = nome.toLowerCase().trim().replace(/\s+/g, '-')
+      aiFullNames.set(slug.split('-')[0], nome.toLowerCase().trim())
+    }
+    for (const m of aiResult.pessoas_mencionadas_relevantes ?? []) {
+      aiFullNames.set(m.slug.split('-')[0], m.nome.toLowerCase().trim())
+    }
+
+    const self = this
     function resolve(slug: string): string | null {
       if (registeredSlugs.has(slug)) return null // already registered, no remap needed
+      if (NON_PERSON_WORDS.has(slug)) return null
       const firstName = slug.split('-')[0]
-      // Never remap a slug whose first name matches the manager — they are the user,
-      // not a registered team member, so any match would route to the wrong person.
+      // Never remap a slug whose first name matches the manager
       if (managerFirstName && firstName === managerFirstName) return null
-      const match = firstNameIndex.get(firstName)
-      return match ?? null // null if ambiguous or no match
+
+      // 1. Direct first-name match
+      const directMatch = firstNameIndex.get(firstName)
+      if (directMatch) return directMatch // unambiguous
+      if (directMatch === null) {
+        // Ambiguous first name — try full-name disambiguation
+        const fullName = aiFullNames.get(firstName)
+        if (fullName) {
+          const fullNameMatch = fullNameIndex.get(fullName)
+          if (fullNameMatch) {
+            self.log.info('fuzzy match (full-name disambiguation)', { from: slug, to: fullNameMatch })
+            return fullNameMatch
+          }
+        }
+        return null
+      }
+
+      // 2. Nickname expansion: check if firstName is a known apelido
+      const expandedNames = APELIDOS[firstName]
+      if (expandedNames) {
+        const candidates: string[] = []
+        for (const expanded of expandedNames) {
+          const match = firstNameIndex.get(expanded)
+          if (match) candidates.push(match)
+        }
+        if (candidates.length === 1) return candidates[0]
+      }
+
+      // 3. Reverse nickname: check if any registered person's first name has an apelido that matches
+      for (const p of registeredPeople) {
+        const regFirstName = p.slug.split('-')[0]
+        const apelidos = APELIDO_REVERSE.get(regFirstName) ?? []
+        if (apelidos.includes(firstName)) {
+          // Check uniqueness
+          const match = firstNameIndex.get(regFirstName)
+          if (match) return match
+        }
+      }
+
+      return null
     }
 
     // Remap pessoas_identificadas
@@ -1213,10 +1334,112 @@ export class IngestionPipeline {
       }
     }
 
+    // Remap pessoas_mencionadas_relevantes slugs
+    if (aiResult.pessoas_mencionadas_relevantes) {
+      for (const m of aiResult.pessoas_mencionadas_relevantes) {
+        if (registeredSlugs.has(m.slug)) continue
+        const match = resolve(m.slug)
+        if (match) {
+          this.log.info('fuzzy match (mencionado)', { from: m.slug, to: match })
+          m.slug = match
+        }
+      }
+    }
+
     // Remove remapped slugs from novas_pessoas_detectadas (they're not new)
     if (remapped.size > 0) {
       aiResult.novas_pessoas_detectadas = (aiResult.novas_pessoas_detectadas ?? [])
         .filter((p) => !remapped.has(p.slug))
+    }
+  }
+
+  /**
+   * Resolves pessoas_mencionadas_relevantes to registered people.
+   * Returns only those that match a registered person (exact or fuzzy).
+   */
+  private resolveMencionados(
+    mencionados: Array<{ slug: string; nome: string; contexto: string }>,
+    registry: PersonRegistry,
+  ): Array<{ slug: string; nome: string; contexto: string }> {
+    return mencionados.filter((m) => {
+      if (NON_PERSON_WORDS.has(m.slug)) return false
+      return !!registry.get(m.slug)
+    })
+  }
+
+  /**
+   * Runs third-party signal analysis for each mentioned person.
+   * Fire-and-forget: errors are logged but don't block the main pipeline.
+   */
+  private async runSinaisTerceiros(
+    mencionados: Array<{ slug: string; nome: string; contexto: string }>,
+    aiResult: IngestionAIResult,
+    artifactContent: string,
+    claudeBinPath: string,
+    registry: PersonRegistry,
+    fonteNome: string,
+    fonteRelacao: string,
+  ): Promise<void> {
+    const today = new Date().toISOString().slice(0, 10)
+    const settings = SettingsManager.load()
+
+    for (let i = 0; i < mencionados.length; i += MAX_CONCURRENT) {
+      const batch = mencionados.slice(i, i + MAX_CONCURRENT)
+      await Promise.all(
+        batch.map(async ({ slug, nome, contexto }) => {
+          const pessoa = registry.get(slug)
+          if (!pessoa) return
+
+          const perfilData = registry.getPerfil(slug)
+          const prompt = buildSinalTerceiroPrompt({
+            pessoaNome: pessoa.nome,
+            pessoaCargo: pessoa.cargo,
+            perfilMdRaw: perfilData?.raw ?? null,
+            fonteNome,
+            fonteRelacao,
+            artifactContent,
+            artifactData: aiResult.data_artefato,
+            contextoMencao: contexto,
+            today,
+          })
+
+          const result = await runWithProvider('sinalTerceiro', settings, prompt, {
+            claudeBinPath,
+            claudeTimeoutMs: 60_000,
+            openRouterTimeoutMs: 60_000,
+          })
+
+          if (!result.success || !result.data) {
+            this.log.warn('sinal terceiro: Claude falhou', { slug, error: result.error })
+            return
+          }
+
+          const validation = validateSinalTerceiroResult(result.data)
+          if (!validation.valid) {
+            this.log.warn('sinal terceiro: validação falhou', { slug, missing: validation.missingFields, errors: validation.typeErrors })
+            return
+          }
+
+          const sinal = result.data as SinalTerceiroResult
+          if (!sinal.relevante) {
+            this.log.info('sinal terceiro irrelevante, skip', { slug })
+            return
+          }
+
+          const release = await this.acquirePersonLock(slug)
+          try {
+            const writer = new ArtifactWriter(this.workspacePath)
+            writer.appendSinalTerceiro(slug, sinal, fonteNome, fonteRelacao, aiResult.data_artefato)
+            this.log.info('sinal terceiro aplicado', { slug, fonte: fonteNome, categoria: sinal.categoria })
+          } finally {
+            release()
+          }
+
+          this.notifyRenderer('ingestion:sinal-terceiro-aplicado', {
+            personSlug: slug, fonte: fonteNome, categoria: sinal.categoria,
+          })
+        }),
+      )
     }
   }
 
@@ -1387,7 +1610,9 @@ export class IngestionPipeline {
       item.summary             = aiResult.resumo
       item.pessoasIdentificadas = pessoasIdentificadas
       item.naoCadastradas      = [...new Set([...naoCadastradas, ...novas.map((p) => p.slug)])]
+        .filter((s) => s !== managerSlug && !NON_PERSON_WORDS.has(s))
       item.novasNomes          = novasNomeMap
+      item.pessoasMencionadas  = aiResult.pessoas_mencionadas_relevantes ?? undefined
       item.finishedAt          = Date.now()
 
       // Always cache the AI result and the original text
@@ -1429,6 +1654,20 @@ export class IngestionPipeline {
           const fallbackAcoes = capturedAiResult.acoes_comprometidas
           this.run1on1DeepPass(principal, capturedAiResult, capturedText, settings.claudeBinPath, fallbackAcoes)
             .catch((err) => this.log.warn('pass 1on1 falhou', { error: err instanceof Error ? err.message : String(err) }))
+        }
+
+        // Sinais indiretos: if pessoa_principal is par/gestor/stakeholder, route mentions to liderados
+        if (settings.claudeBinPath) {
+          const pessoaConfig = registry.get(principal)
+          const relacao = pessoaConfig?.relacao ?? 'liderado'
+          if (['par', 'gestor', 'stakeholder'].includes(relacao)) {
+            const mencionados = capturedAiResult.pessoas_mencionadas_relevantes ?? []
+            const mencionadosCadastrados = this.resolveMencionados(mencionados, registry)
+            if (mencionadosCadastrados.length > 0) {
+              this.runSinaisTerceiros(mencionadosCadastrados, capturedAiResult, capturedText, settings.claudeBinPath, registry, pessoaConfig!.nome, relacao)
+                .catch((err) => this.log.warn('sinais terceiros falhou', { error: err instanceof Error ? err.message : String(err) }))
+            }
+          }
         }
       } else if (!principal) {
         // Reunião coletiva: sem pessoa_principal → salva em _coletivo + sinais por pessoa (async)

@@ -782,6 +782,11 @@ function registerIpcHandlers(): void {
     return fileWatcher.batchReingest(filePaths)
   })
 
+  ipcMain.handle('ingestion:process-as-collective', async (_event, itemId: string) => {
+    if (!fileWatcher) return { success: false, error: 'FileWatcher não inicializado' }
+    return fileWatcher.processAsCollective(itemId)
+  })
+
   ipcMain.handle('ingestion:reset-data', () => {
     const { workspacePath } = SettingsManager.load()
     return FileWatcher.resetGeneratedData(workspacePath)

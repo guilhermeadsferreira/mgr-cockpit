@@ -64,6 +64,9 @@ Regras obrigatórias:
   - feedback/outro: a pessoa que recebeu o feedback ou é o sujeito do artefato
 - "pessoa_principal": a pessoa SOBRE QUEM este artefato é mais relevante para o gestor. Para 1:1 é sempre o liderado presente. Para reuniões com múltiplos participantes, a pessoa cujo desenvolvimento é mais central (ou null se for evento coletivo sem foco individual claro). Use o slug do time cadastrado se disponível, senão o slug de novas_pessoas_detectadas.
 - "novas_pessoas_detectadas": array de {"nome": "Nome Completo", "slug": "nome-sobrenome"} com pessoas que PARTICIPARAM do evento mas NÃO estão no time cadastrado. Mesma regra: participantes, não mencionados. Para 1:1: o liderado se não cadastrado. Gere o slug em lowercase com hifens (ex: "Antonio Silva" → "antonio-silva"). Array vazio se não houver.
+- "pessoas_mencionadas_relevantes": array de {"slug": "slug", "nome": "Nome Completo", "contexto": "resumo do que foi discutido sobre essa pessoa (1-2 frases)"}. Use APENAS quando o interlocutor NÃO é liderado direto (relacao par, gestor ou stakeholder). Nestas reuniões, liderados do time que foram DISCUTIDOS (não participantes) devem ir aqui — NÃO em "pessoas_identificadas". Exemplo: em 1:1 com par, o par é "pessoa_principal" e os liderados discutidos vão em "pessoas_mencionadas_relevantes" com contexto do que foi dito sobre cada um. Array vazio se não aplicável ou se não há menções relevantes.
+- REGRA: O gestor (${gestorLabel}) NUNCA deve ser "pessoa_principal" nem entrar em "pessoas_identificadas" — ele é o usuário do sistema, não um membro do time.
+- REGRA: Quando são duas pessoas (gestor + alguém), classificar como "1on1". A relação do interlocutor (liderado/par/gestor/stakeholder) determina o framing, não o tipo.
 - "pessoas_esperadas_ausentes": slugs de pessoas do time cadastrado que DEVERIAM estar presentes neste tipo de evento mas estavam ausentes. Use o contexto para inferir: se é planning e o owner de um item de backlog não apareceu, registre. Se é retro e um membro fixo do time não apareceu, registre. Em reuniões ad-hoc ou 1:1, use array vazio — ausência não é informativa nesses contextos. Nunca registre alguém que simplesmente não foi mencionado.
 - "titulo": título descritivo do evento (máximo 80 caracteres). Reflita o propósito real da reunião (ex: "Pós-Warroom: Incidente WAF/Sequence", "Planning Q2 — Plataforma", "1:1 com Ana Lima"). Nunca use nomes de arquivo, slugs internos ou datas isoladas.
 - "participantes_nomes": array com os nomes completos (corrigidos) de todos que participaram diretamente. Array vazio para artefatos individuais (1:1, feedback).
@@ -143,6 +146,7 @@ JSON esperado:
   "novas_pessoas_detectadas": [{"nome": "string", "slug": "string"}],
   "pessoas_esperadas_ausentes": ["slug"],
   "pessoa_principal": "slug ou null",
+  "pessoas_mencionadas_relevantes": [{"slug": "slug", "nome": "string", "contexto": "string"}],
   "resumo": "string",
   "acoes_comprometidas": [{"responsavel": "string", "descricao": "string", "prazo_iso": "YYYY-MM-DD ou null"}],
   "pontos_de_atencao": [{"texto": "string", "frequencia": "primeira_vez|recorrente"}],
@@ -165,6 +169,12 @@ JSON esperado:
 }`
 }
 
+export interface PessoaMencionada {
+  slug: string
+  nome: string
+  contexto: string
+}
+
 export interface IngestionAIResult {
   tipo: string
   data_artefato: string
@@ -174,6 +184,7 @@ export interface IngestionAIResult {
   novas_pessoas_detectadas: Array<{ nome: string; slug: string }>
   pessoas_esperadas_ausentes?: string[]
   pessoa_principal: string | null
+  pessoas_mencionadas_relevantes?: PessoaMencionada[]
   resumo: string
   acoes_comprometidas: AcaoComprometida[]
   pontos_de_atencao: PontoAtencao[]

@@ -3,6 +3,7 @@ import { join } from 'path'
 import type { IngestionAIResult } from '../prompts/ingestion.prompt'
 import type { CerimoniaSinalResult } from '../prompts/cerimonia-sinal.prompt'
 import type { OneOnOneResult } from '../prompts/1on1-deep.prompt'
+import type { SinalTerceiroResult } from '../prompts/sinal-terceiro.prompt'
 import { ActionRegistry } from '../registry/ActionRegistry'
 import { CURRENT_SCHEMA_VERSION } from '../migration/ProfileMigration'
 import { Logger } from '../logging/Logger'
@@ -1031,6 +1032,69 @@ ${SECTION.sinais_terceiros.close}
     }
 
     return result.map((r) => r.original)
+  }
+
+  /**
+   * Appends a third-party signal to a person's perfil.md.
+   * Append-only, dedup by date+fonte+slug, max 20 signals (FIFO).
+   */
+  appendSinalTerceiro(
+    slug: string,
+    sinal: SinalTerceiroResult,
+    fonteNome: string,
+    fonteRelacao: string,
+    data: string,
+  ): void {
+    const perfilPath = join(this.pessoasDir, slug, 'perfil.md')
+    if (!existsSync(perfilPath)) {
+      log.warn('appendSinalTerceiro: perfil não encontrado', { slug })
+      return
+    }
+
+    let content = readFileSync(perfilPath, 'utf-8')
+
+    // Dedup: skip if same date + fonte already present for this slug
+    const dedupKey = `[${data}] Via ${fonteNome}`
+    if (content.includes(dedupKey)) {
+      log.info('appendSinalTerceiro: dedup, skip', { slug, data, fonte: fonteNome })
+      return
+    }
+
+    // Build the signal line
+    const sugestaoLine = sinal.sugestao_devolutiva ? `\n  Sugestão: ${sinal.sugestao_devolutiva}` : ''
+    const sinalLine = `- [${data}] Via ${fonteNome} (${fonteRelacao}): ${sinal.resumo_sinal}${sugestaoLine}\n  {categoria: ${sinal.categoria}, confianca: ${sinal.confianca}}`
+
+    // Ensure section exists
+    if (!content.includes(SECTION.sinais_terceiros.open)) {
+      // Insert before ## Histórico de Artefatos if it exists, otherwise append
+      const historicoHeader = '## Histórico de Artefatos'
+      if (content.includes(historicoHeader)) {
+        content = content.replace(
+          historicoHeader,
+          `## Sinais de Terceiros\n${SECTION.sinais_terceiros.open}\n${SECTION.sinais_terceiros.close}\n\n${historicoHeader}`,
+        )
+      } else {
+        content = content.trimEnd() + `\n\n## Sinais de Terceiros\n${SECTION.sinais_terceiros.open}\n${SECTION.sinais_terceiros.close}\n`
+      }
+    }
+
+    // Enforce max 20 signals (FIFO — remove oldest)
+    const existingBlock = this.extractBlock(content, 'sinais_terceiros')
+    const existingLines = existingBlock.split('\n').filter((l) => l.startsWith('- ['))
+    if (existingLines.length >= 20) {
+      // Remove the first (oldest) signal entry — may span multiple lines
+      const firstSignalStart = existingBlock.indexOf(existingLines[0])
+      const secondSignalStart = existingLines.length > 1 ? existingBlock.indexOf(existingLines[1]) : existingBlock.length
+      const trimmed = existingBlock.slice(0, firstSignalStart) + existingBlock.slice(secondSignalStart)
+      content = this.replaceBlock(content, 'sinais_terceiros', trimmed.trim())
+    }
+
+    content = this.appendToBlock(content, 'sinais_terceiros', sinalLine)
+
+    // Atomic write
+    const tmpPath = perfilPath + '.tmp'
+    writeFileSync(tmpPath, content, 'utf-8')
+    renameSync(tmpPath, perfilPath)
   }
 
   private extractBlock(content: string, blockKey: keyof typeof SECTION): string {

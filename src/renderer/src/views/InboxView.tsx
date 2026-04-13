@@ -37,6 +37,11 @@ export function InboxView() {
     window.api.shell.open(workspacePath + '/inbox')
   }
 
+  async function handleProcessAsCollective(itemId: string) {
+    await window.api.ingestion.processAsCollective(itemId)
+    refreshQueue()
+  }
+
   useEffect(() => {
     const zone = document.getElementById('inbox-drop-zone')
     if (!zone) return
@@ -194,7 +199,7 @@ export function InboxView() {
 
           {pending.length > 0 && (
             <QueueSection title="Aguardando cadastro" count={pending.length} accent="pending">
-              {pending.map((item) => <QueueCard key={item.id} item={item} onRegister={(slug, nome) => navigate('person-form', { prefillSlug: slug, prefillNome: nome })} />)}
+              {pending.map((item) => <QueueCard key={item.id} item={item} onRegister={(slug, nome) => navigate('person-form', { prefillSlug: slug, prefillNome: nome })} onProcessAsCollective={handleProcessAsCollective} />)}
             </QueueSection>
           )}
 
@@ -279,7 +284,7 @@ function QueueSection({ title, count, accent, children }: {
 
 // ── Queue Card ─────────────────────────────────────────────────────────────────
 
-function QueueCard({ item, onRegister }: { item: QueueItem; onRegister: (slug: string, nome: string) => void }) {
+function QueueCard({ item, onRegister, onProcessAsCollective }: { item: QueueItem; onRegister: (slug: string, nome: string) => void; onProcessAsCollective?: (itemId: string) => void }) {
   const statusMeta = {
     queued:     { icon: <Clock size={12} />,    color: 'var(--text-muted)',   label: 'Na fila' },
     processing: { icon: <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />, color: 'var(--accent)', label: 'Processando' },
@@ -410,6 +415,23 @@ function QueueCard({ item, onRegister }: { item: QueueItem; onRegister: (slug: s
         </div>
       )}
 
+      {/* Escape hatch for pending items */}
+      {item.status === 'pending' && onProcessAsCollective && (
+        <div style={{ padding: '6px 16px 6px 38px' }}>
+          <button
+            onClick={() => onProcessAsCollective(item.id)}
+            style={{
+              fontSize: 11, padding: '5px 12px', borderRadius: 6,
+              background: 'var(--surface-2)', border: '1px solid var(--border)',
+              color: 'var(--text-secondary)', cursor: 'pointer',
+              transition: 'background 0.12s ease',
+            }}
+          >
+            Prosseguir sem cadastrar
+          </button>
+        </div>
+      )}
+
       {/* Footer: people */}
       {((item.naoCadastradas?.length ?? 0) > 0 || registeredPeople.length > 0) && (
         <div style={{
@@ -419,6 +441,7 @@ function QueueCard({ item, onRegister }: { item: QueueItem; onRegister: (slug: s
           {/* Unregistered — actionable */}
           {(item.naoCadastradas ?? []).map((slug) => {
             const nome = item.novasNomes?.[slug] || slug
+            const isBlockingPrincipal = item.status === 'pending' && item.personSlug === slug
             return (
               <button
                 key={slug}
@@ -426,9 +449,9 @@ function QueueCard({ item, onRegister }: { item: QueueItem; onRegister: (slug: s
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 5,
                   fontSize: 10.5, padding: '3px 8px', borderRadius: 20,
-                  background: 'rgba(192,135,58,0.08)',
-                  border: '1px solid rgba(192,135,58,0.25)',
-                  color: 'var(--accent)', cursor: 'pointer',
+                  background: isBlockingPrincipal ? 'rgba(220,60,60,0.10)' : 'rgba(192,135,58,0.08)',
+                  border: isBlockingPrincipal ? '1px solid rgba(220,60,60,0.35)' : '1px solid rgba(192,135,58,0.25)',
+                  color: isBlockingPrincipal ? 'var(--red, #dc3c3c)' : 'var(--accent)', cursor: 'pointer',
                   fontFamily: 'var(--font-mono)',
                   transition: 'background 0.12s ease',
                 }}
