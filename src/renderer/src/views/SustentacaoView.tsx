@@ -181,7 +181,7 @@ const RISK_COLORS: Record<string, string> = {
 }
 
 function BlockerBadge({ category }: { category: BlockerCategory }) {
-  const style = BLOCKER_COLORS[category]
+  const style = BLOCKER_COLORS[category] ?? BLOCKER_COLORS.desconhecido
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',
