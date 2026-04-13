@@ -268,3 +268,37 @@ select {
 /* Margem reset no primeiro/último filho */
 .md-preview > *:first-child { margin-top: 0; }
 .md-preview > *:last-child  { margin-bottom: 0; }
+
+/* ── Callout sections ─────────────────── */
+.md-preview .callout-warning {
+  border-left: 3px solid var(--amber);
+  background: var(--amber-dim);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+  margin: 8px 0;
+}
+
+.md-preview .callout-danger {
+  border-left: 3px solid var(--red);
+  background: var(--red-dim);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+  margin: 8px 0;
+}
+
+.md-preview .callout-success {
+  border-left: 3px solid var(--green);
+  background: var(--green-dim);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+  margin: 8px 0;
+}
+
+.md-preview .callout-warning h2,
+.md-preview .callout-warning h3,
+.md-preview .callout-danger h2,
+.md-preview .callout-danger h3,
+.md-preview .callout-success h2,
+.md-preview .callout-success h3 {
+  margin-top: 0;
+}
