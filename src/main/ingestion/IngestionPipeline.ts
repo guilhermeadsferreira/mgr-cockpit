@@ -1606,7 +1606,23 @@ export class IngestionPipeline {
       // Identify which people are registered vs unknown
       const pessoasIdentificadas = aiResult.pessoas_identificadas ?? []
       const naoCadastradas = pessoasIdentificadas.filter((s) => !registry.get(s))
-      const principal = aiResult.pessoa_principal  // re-read after fuzzy remap
+      let principal = aiResult.pessoa_principal  // re-read after fuzzy remap
+
+      // Heurística: reuniões coletivas (retro, planning, daily, reuniao) com 3+ participantes
+      // devem ser tratadas como coletivas mesmo que a IA tenha escolhido um pessoa_principal.
+      // Isso evita que todas as ações sejam atribuídas a uma única pessoa.
+      const COLLECTIVE_TIPOS = new Set(['retro', 'planning', 'daily', 'reuniao'])
+      const participantCount = Math.max(
+        pessoasIdentificadas.length,
+        (aiResult.participantes_nomes ?? []).length,
+      )
+      if (principal && COLLECTIVE_TIPOS.has(aiResult.tipo) && participantCount > 2) {
+        this.log.info('forçando coletivo: tipo coletivo com 3+ participantes', {
+          tipo: aiResult.tipo, participantCount, originalPrincipal: principal,
+        })
+        aiResult.pessoa_principal = null
+        principal = null
+      }
 
       // Store newly detected (unregistered) people so the user can promote them
       const novas = aiResult.novas_pessoas_detectadas ?? []
