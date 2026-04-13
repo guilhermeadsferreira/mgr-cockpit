@@ -226,6 +226,33 @@ export class PersonRegistry {
     }).filter((p) => p.content.length > 0)
   }
 
+  saveCycleReport(slug: string, fileName: string, content: string): string {
+    const ciclosDir = join(this.pessoasDir, slug, 'ciclos')
+    mkdirSync(ciclosDir, { recursive: true })
+    const filePath = join(ciclosDir, fileName)
+    writeFileSync(filePath, content, 'utf-8')
+    return filePath
+  }
+
+  getLastCycleReport(slug: string): { date: string; content: string } | null {
+    const ciclosDir = join(this.pessoasDir, slug, 'ciclos')
+    if (!existsSync(ciclosDir)) return null
+    try {
+      const files = readdirSync(ciclosDir)
+        .filter((f) => f.endsWith('.md'))
+        .sort()
+        .reverse()
+      if (files.length === 0) return null
+      const fileName = files[0]
+      const dateMatch = fileName.match(/^(\d{4}-\d{2}-\d{2})/)
+      const date = dateMatch ? dateMatch[1] : ''
+      const content = readFileSync(join(ciclosDir, fileName), 'utf-8')
+      return { date, content }
+    } catch {
+      return null
+    }
+  }
+
   savePautaRating(slug: string, date: string, rating: 'util' | 'precisa_melhorar', nota?: string): void {
     const ratingsPath = join(this.pessoasDir, slug, 'pauta_ratings.yaml')
     let ratings: Array<{ date: string; rating: string; nota?: string }> = []

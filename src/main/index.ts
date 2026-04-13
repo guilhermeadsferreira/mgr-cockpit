@@ -961,9 +961,13 @@ function registerIpcHandlers(): void {
     const externalMatchCycle = perfilData.raw.match(/## Dados Externos\n[\s\S]*?<!--[^>]*-->\n([\s\S]*?)<!--/)
     const externalData = externalMatchCycle?.[1]?.trim() || ''
 
+    // Inject previous cycle report for longitudinal comparison
+    const lastCycle = registry.getLastCycleReport(personSlug)
+    const cicloAnterior = lastCycle ? `Gerado em ${lastCycle.date}:\n${lastCycle.content.slice(0, 3000)}` : ''
+
     const { prompt, truncatedArtifacts, totalArtifacts } = buildCyclePrompt({
       configYaml: configRaw, perfilMd: perfilData.raw, artifacts, periodoInicio, periodoFim,
-      insights1on1, correlacoes, followupHistorico, tendenciaEmocional, pdiEvolucao, externalData,
+      insights1on1, correlacoes, followupHistorico, tendenciaEmocional, pdiEvolucao, externalData, cicloAnterior,
     })
 
     if (truncatedArtifacts > 0) {
@@ -985,7 +989,11 @@ function registerIpcHandlers(): void {
 
     const fileName = `${today}-${personSlug}-ciclo.md`
     const filePath = join(settings.workspacePath, 'exports', fileName)
+    mkdirSync(join(settings.workspacePath, 'exports'), { recursive: true })
     writeFileSync(filePath, markdown, 'utf-8')
+
+    // Also save per-person for longitudinal comparison in future cycles
+    registry.saveCycleReport(personSlug, fileName, markdown)
 
     return { success: true, path: filePath, markdown, result: cycleResult, truncatedArtifacts }
   })
