@@ -1469,7 +1469,7 @@ export class IngestionPipeline {
       const usePreprocessing = settings.usePreprocessing ?? settings.useGeminiPreprocessing ?? false
       if (usePreprocessing && settings.claudeBinPath) {
         this.log.debug('Pass 0: Pré-processamento Haiku ativo (modo light)')
-        const preprocessResult = await preprocessWithHaiku(settings.claudeBinPath, text, 90_000)
+        const preprocessResult = await preprocessWithHaiku(settings.claudeBinPath, text, 180_000)
         if (preprocessResult.success) {
           text = preprocessResult.cleanedText
           this.log.debug('Pass 0: transcript reduction (Haiku)', {
@@ -1481,7 +1481,7 @@ export class IngestionPipeline {
           this.log.warn('Pass 0: Haiku falhou, tentando Gemini fallback', { error: preprocessResult.error })
           // Fallback to Gemini if Google AI key is available
           if (settings.googleAiApiKey) {
-            const geminiResult = await preprocessTranscript(settings.googleAiApiKey, text, 90_000, item.fileName)
+            const geminiResult = await preprocessTranscript(settings.googleAiApiKey, text, 180_000, item.fileName)
             if (geminiResult.success) {
               text = geminiResult.cleanedText
               this.log.debug('Pass 0: transcript reduction (Gemini fallback)', {
@@ -1499,7 +1499,7 @@ export class IngestionPipeline {
       } else if (usePreprocessing && settings.googleAiApiKey) {
         // Legacy path: Gemini only (no Claude CLI available yet)
         this.log.debug('Pass 0: Pré-processamento Gemini (legacy)')
-        const preprocessResult = await preprocessTranscript(settings.googleAiApiKey, text, 90_000, item.fileName)
+        const preprocessResult = await preprocessTranscript(settings.googleAiApiKey, text, 180_000, item.fileName)
         if (preprocessResult.success) {
           text = preprocessResult.cleanedText
         } else {
