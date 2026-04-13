@@ -891,7 +891,7 @@ export function SustentacaoView() {
                         }}>
                           <BlockerBadge category={category as BlockerCategory} />
                           <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                            {keys!.join(', ')}
+                            {(Array.isArray(keys) ? keys : [String(keys)]).join(', ')}
                           </div>
                         </div>
                       ))}

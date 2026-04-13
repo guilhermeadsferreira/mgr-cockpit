@@ -27,6 +27,7 @@ declare global {
         listPautas:       (slug: string) => Promise<PautaMeta[]>
         ratePauta:        (slug: string, date: string, rating: 'util' | 'precisa_melhorar', nota?: string) => Promise<void>
         listPautaRatings: (slug: string) => Promise<Array<{ date: string; rating: string; nota?: string }>>
+        overrideSaude: (slug: string, valor: string) => Promise<boolean>
       }
 
       artifacts: {

@@ -458,18 +458,27 @@ ${SECTION.sinais_terceiros.close}
     }
 
     // saude + ultima_confianca + saude_anterior (audit trail de transições)
-    const currentSaudeMatch = /saude:\s*"(\w+)"/.exec(fm)
-    const currentSaude = currentSaudeMatch?.[1] ?? null
-    const novaSaude = result.indicador_saude
-    if (currentSaude && currentSaude !== novaSaude) {
-      // Saúde mudou — registrar saude_anterior para contexto do deep pass
-      if (/saude_anterior:/.test(fm)) {
-        fm = fm.replace(/saude_anterior:.*/, `saude_anterior: "${currentSaude}"`)
-      } else {
-        fm = fm.replace(/saude:.*/, `saude: "${novaSaude}"\nsaude_anterior: "${currentSaude}"`)
+    // If saude_override is true, only high-confidence AI results can clear the manual override
+    const hasManualOverride = /saude_override:\s*true/.test(fm)
+    const shouldUpdateSaude = !hasManualOverride || result.confianca === 'alta'
+
+    if (shouldUpdateSaude) {
+      const currentSaudeMatch = /saude:\s*"(\w+)"/.exec(fm)
+      const currentSaude = currentSaudeMatch?.[1] ?? null
+      const novaSaude = result.indicador_saude
+      if (currentSaude && currentSaude !== novaSaude) {
+        if (/saude_anterior:/.test(fm)) {
+          fm = fm.replace(/saude_anterior:.*/, `saude_anterior: "${currentSaude}"`)
+        } else {
+          fm = fm.replace(/saude:.*/, `saude: "${novaSaude}"\nsaude_anterior: "${currentSaude}"`)
+        }
+      }
+      fm = fm.replace(/saude:.*/, `saude: "${novaSaude}"`)
+      // Clear manual override when high-confidence AI result takes over
+      if (hasManualOverride) {
+        fm = fm.replace(/saude_override:.*/, `saude_override: false`)
       }
     }
-    fm = fm.replace(/saude:.*/, `saude: "${novaSaude}"`)
     const confianca = result.confianca
     if (/ultima_confianca:/.test(fm)) {
       fm = fm.replace(/ultima_confianca:.*/, `ultima_confianca: "${confianca}"`)
