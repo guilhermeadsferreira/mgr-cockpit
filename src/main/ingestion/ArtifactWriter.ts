@@ -21,6 +21,7 @@ const SECTION = {
   saude_historico:     { open: '<!-- BLOCO GERENCIADO PELA IA — append apenas (histórico de saúde) -->',           close: '<!-- FIM BLOCO SAUDE -->' },
   insights_1on1:       { open: '<!-- BLOCO GERENCIADO PELA IA — append apenas (insights 1on1) -->',                close: '<!-- FIM BLOCO INSIGHTS_1ON1 -->' },
   sinais_terceiros:    { open: '<!-- BLOCO GERENCIADO PELA IA — append apenas (sinais terceiros) -->',             close: '<!-- FIM BLOCO SINAIS_TERCEIROS -->' },
+  tendencia_historico: { open: '<!-- BLOCO GERENCIADO PELA IA — append apenas (histórico de tendência) -->',       close: '<!-- FIM BLOCO TENDENCIA_HISTORICO -->' },
 }
 
 /**
@@ -214,6 +215,7 @@ evidencia_evolucao: ${result.evidencia_evolucao ? `"${result.evidencia_evolucao}
 tendencia_emocional: null
 nota_tendencia: null
 ultimo_followup_acoes: null
+engajamento: ${result.nivel_engajamento ?? 'null'}
 ---
 
 # Perfil Vivo — ${slug}
@@ -254,7 +256,7 @@ ${SECTION.historico.close}
 
 ## Histórico de Saúde
 ${SECTION.saude_historico.open}
-- ${result.data_artefato} | ${result.indicador_saude} | ${result.motivo_indicador}${sentimentosStr ? ` | [${sentimentosStr}]` : ''}
+- ${result.data_artefato} | ${result.indicador_saude} | ${result.motivo_indicador}${sentimentosStr ? ` | [${sentimentosStr}]` : ''}${result.nivel_engajamento != null ? ` | eng:${result.nivel_engajamento}` : ''}
 ${SECTION.saude_historico.close}
 
 ## Insights de 1:1
@@ -319,7 +321,8 @@ ${SECTION.sinais_terceiros.close}
 
     // 8. Append Histórico de Saúde — adds section if not present (e.g. older perfis)
     const sentimentosStr = serializeSentimentos(result)
-    const saudeLine = `- ${result.data_artefato} | ${result.indicador_saude} | ${result.motivo_indicador}${sentimentosStr ? ` | [${sentimentosStr}]` : ''}`
+    const engStr = result.nivel_engajamento != null ? ` | eng:${result.nivel_engajamento}` : ''
+    const saudeLine = `- ${result.data_artefato} | ${result.indicador_saude} | ${result.motivo_indicador}${sentimentosStr ? ` | [${sentimentosStr}]` : ''}${engStr}`
     if (updated.includes(SECTION.saude_historico.open)) {
       updated = this.appendToBlock(updated, 'saude_historico', saudeLine)
     } else {
@@ -375,7 +378,8 @@ ${SECTION.sinais_terceiros.close}
 
     // Append histórico de saúde
     const sentimentosStr = serializeSentimentos(result)
-    const saudeLine = `- ${result.data_artefato} | ${result.indicador_saude} | ${result.motivo_indicador}${sentimentosStr ? ` | [${sentimentosStr}]` : ''}`
+    const engStr = result.nivel_engajamento != null ? ` | eng:${result.nivel_engajamento}` : ''
+    const saudeLine = `- ${result.data_artefato} | ${result.indicador_saude} | ${result.motivo_indicador}${sentimentosStr ? ` | [${sentimentosStr}]` : ''}${engStr}`
     if (updated.includes(SECTION.saude_historico.open)) {
       updated = this.appendToBlock(updated, 'saude_historico', saudeLine)
     }
@@ -503,6 +507,16 @@ ${SECTION.sinais_terceiros.close}
       fm += `\nsinal_evolucao: ${evolucao}\nevidencia_evolucao: ${evidencia}`
     }
 
+    // engajamento (nivel_engajamento 1-5)
+    const engajamento = result.nivel_engajamento
+    if (engajamento != null) {
+      if (/engajamento:/.test(fm)) {
+        fm = fm.replace(/engajamento:.*/, `engajamento: ${engajamento}`)
+      } else {
+        fm += `\nengajamento: ${engajamento}`
+      }
+    }
+
     return content.replace(/^---\n[\s\S]*?\n---/, `---\n${fm}\n---`)
   }
 
@@ -604,6 +618,25 @@ ${SECTION.sinais_terceiros.close}
       }
 
       updated = updated.replace(/^---\n[\s\S]*?\n---/, `---\n${fm}\n---`)
+
+      // 1b. Append to Histórico de Tendência (longitudinal trend)
+      if (result.tendencia_emocional) {
+        const tendenciaLine = `- ${today} | ${result.tendencia_emocional} | ${result.nota_tendencia ?? ''}`
+        if (updated.includes(SECTION.tendencia_historico.open)) {
+          updated = this.appendToBlock(updated, 'tendencia_historico', tendenciaLine)
+        } else {
+          // Insert section before "## Insights de 1:1" or append to end
+          const insightsHeader = '## Insights de 1:1'
+          if (updated.includes(insightsHeader)) {
+            updated = updated.replace(
+              insightsHeader,
+              `## Histórico de Tendência\n${SECTION.tendencia_historico.open}\n${tendenciaLine}\n${SECTION.tendencia_historico.close}\n\n${insightsHeader}`,
+            )
+          } else {
+            updated = updated.trimEnd() + `\n\n## Histórico de Tendência\n${SECTION.tendencia_historico.open}\n${tendenciaLine}\n${SECTION.tendencia_historico.close}\n`
+          }
+        }
+      }
     }
 
     // 2. Append insights de 1:1
@@ -738,7 +771,11 @@ ${SECTION.sinais_terceiros.close}
 
     // Histórico de Saúde — append ceremony signal (nota de baixa confiança quando aplicável)
     const confiancaLabel = sinal.confianca === 'baixa' ? ' (baixa confiança)' : ''
-    const saudeLine = `- ${ceremonyData} | ${sinal.indicador_saude}${confiancaLabel} | (${tipoLabel}) ${sinal.motivo_indicador}`
+    const ceriSentimentosStr = sinal.sentimentos?.length
+      ? ` | [${sinal.sentimentos.map(s => `${s.valor}/${s.aspecto}`).join(', ')}]`
+      : ''
+    const ceriEngStr = sinal.nivel_engajamento != null ? ` | eng:${sinal.nivel_engajamento}` : ''
+    const saudeLine = `- ${ceremonyData} | ${sinal.indicador_saude}${confiancaLabel} | (${tipoLabel}) ${sinal.motivo_indicador}${ceriSentimentosStr}${ceriEngStr}`
     if (updated.includes(SECTION.saude_historico.open)) {
       updated = this.appendToBlock(updated, 'saude_historico', saudeLine)
     } else {
@@ -783,6 +820,7 @@ evidencia_evolucao: ${sinal.confianca !== 'baixa' && sinal.evidencia_evolucao ? 
 tendencia_emocional: null
 nota_tendencia: null
 ultimo_followup_acoes: null
+engajamento: ${sinal.nivel_engajamento ?? 'null'}
 ---
 
 # Perfil Vivo — ${slug}
@@ -880,6 +918,16 @@ ${SECTION.sinais_terceiros.close}
         fm = fm.replace(/evidencia_evolucao:.*/, `evidencia_evolucao: ${evidencia}`)
       } else {
         fm += `\nsinal_evolucao: true\nevidencia_evolucao: ${evidencia}`
+      }
+    }
+
+    // engajamento (nivel_engajamento 1-5)
+    const engajamento = sinal.nivel_engajamento
+    if (engajamento != null) {
+      if (/engajamento:/.test(fm)) {
+        fm = fm.replace(/engajamento:.*/, `engajamento: ${engajamento}`)
+      } else {
+        fm += `\nengajamento: ${engajamento}`
       }
     }
 
@@ -1060,9 +1108,11 @@ ${SECTION.sinais_terceiros.close}
       return
     }
 
-    // Build the signal line
+    // Build the signal line — enriched with impacto_potencial and temas
     const sugestaoLine = sinal.sugestao_devolutiva ? `\n  Sugestão: ${sinal.sugestao_devolutiva}` : ''
-    const sinalLine = `- [${data}] Via ${fonteNome} (${fonteRelacao}): ${sinal.resumo_sinal}${sugestaoLine}\n  {categoria: ${sinal.categoria}, confianca: ${sinal.confianca}}`
+    const impactoLine = sinal.impacto_potencial ? `\n  Impacto: ${sinal.impacto_potencial}` : ''
+    const temasLine = sinal.temas?.length ? ` | temas: ${sinal.temas.join(', ')}` : ''
+    const sinalLine = `- [${data}] Via ${fonteNome} (${fonteRelacao}): ${sinal.resumo_sinal}${sugestaoLine}${impactoLine}\n  {categoria: ${sinal.categoria}, confianca: ${sinal.confianca}${temasLine}}`
 
     // Ensure section exists
     if (!content.includes(SECTION.sinais_terceiros.open)) {
@@ -1078,10 +1128,10 @@ ${SECTION.sinais_terceiros.close}
       }
     }
 
-    // Enforce max 20 signals (FIFO — remove oldest)
+    // Enforce max 50 signals (FIFO — remove oldest)
     const existingBlock = this.extractBlock(content, 'sinais_terceiros')
     const existingLines = existingBlock.split('\n').filter((l) => l.startsWith('- ['))
-    if (existingLines.length >= 20) {
+    if (existingLines.length >= 50) {
       // Remove the first (oldest) signal entry — may span multiple lines
       const firstSignalStart = existingBlock.indexOf(existingLines[0])
       const secondSignalStart = existingLines.length > 1 ? existingBlock.indexOf(existingLines[1]) : existingBlock.length
@@ -1090,6 +1140,22 @@ ${SECTION.sinais_terceiros.close}
     }
 
     content = this.appendToBlock(content, 'sinais_terceiros', sinalLine)
+
+    // Side effect: critical third-party signal triggers necessita_1on1
+    if (sinal.impacto_potencial && sinal.confianca !== 'baixa') {
+      const fmMatch = content.match(/^---\n([\s\S]*?)\n---/)
+      if (fmMatch && !/necessita_1on1:\s*true/.test(fmMatch[1])) {
+        let fm = fmMatch[1]
+        const motivo = `"Sinal de terceiro via ${fonteNome}: ${sinal.impacto_potencial.slice(0, 80)}"`
+        if (/necessita_1on1:/.test(fm)) {
+          fm = fm.replace(/necessita_1on1:.*/, `necessita_1on1: true`)
+          fm = fm.replace(/motivo_1on1:.*/, `motivo_1on1: ${motivo}`)
+        } else {
+          fm += `\nnecessita_1on1: true\nmotivo_1on1: ${motivo}`
+        }
+        content = content.replace(/^---\n[\s\S]*?\n---/, `---\n${fm}\n---`)
+      }
+    }
 
     // Atomic write
     const tmpPath = perfilPath + '.tmp'

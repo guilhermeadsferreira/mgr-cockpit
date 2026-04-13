@@ -1643,6 +1643,9 @@ export class IngestionPipeline {
         await this.syncItemToPerson(item, principal, is1on1)
         this.log.info('done', { fileName: item.fileName, slug: principal, elapsed: item.startedAt ? Date.now() - item.startedAt : undefined })
 
+        // Persist absence signals for registered people expected but not present
+        this.persistAbsenceSignals(capturedAiResult, registry)
+
         // ExternalDataPass: fetch Jira/GitHub metrics (fire-and-forget, graceful degradation)
         new ExternalDataPass(this.workspacePath)
           .run(principal)
@@ -1673,6 +1676,9 @@ export class IngestionPipeline {
         // Reunião coletiva: sem pessoa_principal → salva em _coletivo + sinais por pessoa (async)
         this.syncItemToCollective(item, settings.claudeBinPath)
         this.log.info('done (coletivo)', { fileName: item.fileName })
+
+        // Persist absence signals for registered people expected but not present
+        this.persistAbsenceSignals(capturedAiResult, registry)
       } else {
         // pessoa_principal identificada mas não cadastrada → pending
         item.status = 'pending'
@@ -1722,6 +1728,42 @@ export class IngestionPipeline {
     const wins = BrowserWindow.getAllWindows()
     for (const win of wins) {
       if (!win.isDestroyed()) win.webContents.send(channel, payload)
+    }
+  }
+
+  /**
+   * Persists absence signals for registered people expected but not present in an artifact.
+   * Appends to sinais_terceiros of each absent person's perfil.md.
+   */
+  private persistAbsenceSignals(aiResult: IngestionAIResult, registry: PersonRegistry): void {
+    const ausentes = aiResult.pessoas_esperadas_ausentes ?? []
+    if (ausentes.length === 0) return
+
+    const tipo = aiResult.tipo
+    const tipoMap: Record<string, string> = { '1on1': '1:1', reuniao: 'Reunião', daily: 'Daily', planning: 'Planning', retro: 'Retro', feedback: 'Feedback', outro: 'Evento' }
+    const titulo = aiResult.titulo ?? 'reunião'
+    const data = aiResult.data_artefato
+    const writer = new ArtifactWriter(this.workspacePath)
+
+    for (const slug of ausentes) {
+      if (!registry.get(slug)) continue
+
+      const sinalForAbsence: SinalTerceiroResult = {
+        relevante: true,
+        resumo_sinal: `Ausente em ${tipoMap[tipo] ?? tipo}: ${titulo}`,
+        categoria: 'comportamento',
+        temas: ['presença', 'engajamento'],
+        impacto_potencial: null,
+        sugestao_devolutiva: null,
+        confianca: 'baixa',
+      }
+
+      try {
+        writer.appendSinalTerceiro(slug, sinalForAbsence, 'sistema', 'detecção automática', data)
+        this.log.info('ausência registrada como sinal', { slug, tipo, data })
+      } catch (err) {
+        this.log.warn('falha ao registrar ausência', { slug, error: err instanceof Error ? err.message : String(err) })
+      }
     }
   }
 }
