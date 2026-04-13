@@ -52,7 +52,7 @@ class Logger {
   private static instance: Logger
 
   private level: LogLevel = 'info'
-  private logDir: string
+  private _logDir: string | null = null
   private currentStream: WriteStream | null = null
   private currentDate: string = ''
   private buffer: LogEntry[] = []
@@ -60,9 +60,14 @@ class Logger {
   private retentionDays = 7
   private mainWindowGetter: (() => Electron.BrowserWindow | null) | null = null
 
-  private constructor() {
-    this.logDir = join(app.getPath('userData'), 'logs')
+  private get logDir(): string {
+    if (!this._logDir) {
+      this._logDir = join(app.getPath('userData'), 'logs')
+    }
+    return this._logDir
   }
+
+  private constructor() {}
 
   static getInstance(): Logger {
     if (!Logger.instance) {
