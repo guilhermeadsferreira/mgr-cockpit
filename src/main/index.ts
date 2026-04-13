@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join } from 'path'
-import { writeFileSync, readFileSync, mkdirSync, readdirSync, unlinkSync, copyFileSync, existsSync } from 'fs'
+import { writeFileSync, readFileSync, mkdirSync, readdirSync, unlinkSync, copyFileSync, existsSync, renameSync } from 'fs'
 import { SettingsManager } from './registry/SettingsManager'
 import { PersonRegistry } from './registry/PersonRegistry'
 import { DetectedRegistry } from './registry/DetectedRegistry'
@@ -668,6 +668,59 @@ function registerIpcHandlers(): void {
     getRegistry().delete(slug)
   })
 
+  ipcMain.handle('people:override-saude', (_event, slug: string, novoValor: string) => {
+    const { workspacePath } = SettingsManager.load()
+    const perfilPath = join(workspacePath, 'pessoas', slug, 'perfil.md')
+    if (!existsSync(perfilPath)) return false
+
+    const bakPath = perfilPath + '.bak'
+    const tmpPath = perfilPath + '.tmp'
+    copyFileSync(perfilPath, bakPath)
+
+    let content = readFileSync(perfilPath, 'utf-8')
+    const now = new Date().toISOString()
+    const today = now.slice(0, 10)
+
+    // Update frontmatter
+    const fmMatch = content.match(/^---\n([\s\S]*?)\n---/)
+    if (fmMatch) {
+      let fm = fmMatch[1]
+      fm = fm.replace(/ultima_atualizacao:.*/, `ultima_atualizacao: "${now}"`)
+      // Preserve current AI saude as saude_anterior
+      const currentSaude = /saude:\s*"(\w+)"/.exec(fm)?.[1]
+      if (currentSaude && currentSaude !== novoValor) {
+        if (/saude_anterior:/.test(fm)) {
+          fm = fm.replace(/saude_anterior:.*/, `saude_anterior: "${currentSaude}"`)
+        } else {
+          fm = fm.replace(/saude:.*/, `saude: "${currentSaude}"\nsaude_anterior: "${currentSaude}"`)
+        }
+      }
+      fm = fm.replace(/saude:\s*"[^"]*"/, `saude: "${novoValor}"`)
+      // Set override flag — next high-confidence ingestion can clear it
+      if (/saude_override:/.test(fm)) {
+        fm = fm.replace(/saude_override:.*/, `saude_override: true`)
+      } else {
+        fm += `\nsaude_override: true`
+      }
+      content = content.replace(/^---\n[\s\S]*?\n---/, `---\n${fm}\n---`)
+    }
+
+    // Append to saude_historico
+    const SAUDE_OPEN = '<!-- BLOCO GERENCIADO PELA IA — append apenas (histórico de saúde) -->'
+    const SAUDE_CLOSE = '<!-- FIM BLOCO SAUDE -->'
+    const saudeLine = `- ${today} | ${novoValor} | Override manual do gestor`
+    if (content.includes(SAUDE_OPEN)) {
+      const escapedOpen = SAUDE_OPEN.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const escapedClose = SAUDE_CLOSE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const re = new RegExp(`(${escapedOpen}\n)([\\s\\S]*?)(${escapedClose})`)
+      content = content.replace(re, `$1$2${saudeLine}\n$3`)
+    }
+
+    writeFileSync(tmpPath, content, 'utf-8')
+    renameSync(tmpPath, perfilPath)
+    return true
+  })
+
   // ── Artifacts ─────────────────────────────────────────────
   ipcMain.handle('artifacts:list', (_event, slug: string) => {
     return getRegistry().listArtifacts(slug)
@@ -908,9 +961,13 @@ function registerIpcHandlers(): void {
     const externalMatchCycle = perfilData.raw.match(/## Dados Externos\n[\s\S]*?<!--[^>]*-->\n([\s\S]*?)<!--/)
     const externalData = externalMatchCycle?.[1]?.trim() || ''
 
+    // Inject previous cycle report for longitudinal comparison
+    const lastCycle = registry.getLastCycleReport(personSlug)
+    const cicloAnterior = lastCycle ? `Gerado em ${lastCycle.date}:\n${lastCycle.content.slice(0, 3000)}` : ''
+
     const { prompt, truncatedArtifacts, totalArtifacts } = buildCyclePrompt({
       configYaml: configRaw, perfilMd: perfilData.raw, artifacts, periodoInicio, periodoFim,
-      insights1on1, correlacoes, followupHistorico, tendenciaEmocional, pdiEvolucao, externalData,
+      insights1on1, correlacoes, followupHistorico, tendenciaEmocional, pdiEvolucao, externalData, cicloAnterior,
     })
 
     if (truncatedArtifacts > 0) {
@@ -932,7 +989,11 @@ function registerIpcHandlers(): void {
 
     const fileName = `${today}-${personSlug}-ciclo.md`
     const filePath = join(settings.workspacePath, 'exports', fileName)
+    mkdirSync(join(settings.workspacePath, 'exports'), { recursive: true })
     writeFileSync(filePath, markdown, 'utf-8')
+
+    // Also save per-person for longitudinal comparison in future cycles
+    registry.saveCycleReport(personSlug, fileName, markdown)
 
     return { success: true, path: filePath, markdown, result: cycleResult, truncatedArtifacts }
   })

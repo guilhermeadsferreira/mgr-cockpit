@@ -5,6 +5,8 @@ import { ExternalDataPass, type ExternalDataSnapshot } from './ExternalDataPass'
 import type { JiraSprint } from './JiraClient'
 import type { JiraPersonMetrics, SprintSummary } from './JiraMetrics'
 import type { GitHubPersonMetrics } from './GitHubMetrics'
+import { GitHubClient } from './GitHubClient'
+import { SettingsManager } from '../registry/SettingsManager'
 import { MetricsWriter, type SprintEntry, type MomentoAtualEntry } from './MetricsWriter'
 import { Logger } from '../logging/Logger'
 import { notifyReportProgress } from './reportProgress'
@@ -17,6 +19,8 @@ interface PersonSprintData {
   snapshot: ExternalDataSnapshot | null
   previousCommits30d?: number
   previousPrsMerged30d?: number
+  sprintCommits?: number
+  sprintPRs?: number
 }
 
 export class SprintReportGenerator {
@@ -81,12 +85,34 @@ export class SprintReportGenerator {
         }
       }
 
+      // Sprint-scoped GitHub data (commits + PRs within sprint dates)
+      let sprintCommits: number | undefined
+      let sprintPRs: number | undefined
+      if (person.githubUsername && sprint.startDate) {
+        try {
+          const settings = SettingsManager.load()
+          if (settings.githubToken && settings.githubRepos?.length) {
+            const ghClient = new GitHubClient(settings.githubToken, settings.githubRepos)
+            const [commits, prs] = await Promise.all([
+              ghClient.getCommitsByUser(person.githubUsername, sprint.startDate),
+              ghClient.getPRsByUser(person.githubUsername, sprint.startDate),
+            ])
+            sprintCommits = commits.length
+            sprintPRs = prs.length
+          }
+        } catch (err) {
+          log.warn('falha ao buscar GitHub sprint-scoped', { slug: person.slug, error: err instanceof Error ? err.message : String(err) })
+        }
+      }
+
       personData.push({
         nome: person.nome,
         slug: person.slug,
         snapshot,
         previousCommits30d,
         previousPrsMerged30d,
+        sprintCommits,
+        sprintPRs,
       })
 
       await sleep(200)
@@ -176,13 +202,13 @@ export class SprintReportGenerator {
       const issuesDone = sprintData?.issuesConcluidas ?? 0
       const sp = sprintData?.comprometido ?? 0
       const spDelivered = sprintData?.entregue ?? 0
-      const prs = github?.prsMerged30d ?? 0
-      const commits = github?.commits30d ?? 0
+      const prs = person.sprintPRs ?? github?.prsMerged30d ?? 0
+      const commits = person.sprintCommits ?? github?.commits30d ?? 0
 
       let status = '🟢'
       if (jira && jira.blockersAtivos.length > 0) status = '🟡 blocker'
       else if (jira?.workloadScore === 'alto') status = '🟡 overload'
-      else if (github && github.commits30d === 0 && issues > 0) status = '🔴 baixa atividade'
+      else if (commits === 0 && issues > 0) status = '🔴 baixa atividade'
 
       totalComprometido += sp
       totalEntregue += spDelivered

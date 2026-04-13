@@ -335,11 +335,11 @@ export function PersonView() {
                           <button
                             key={s}
                             onClick={async () => {
-                              setSaudeOverride(s)
                               setShowSaudeOverride(false)
-                              // Save override to person config
                               if (person) {
-                                await window.api.people.save({ ...person, alerta_ativo: true, motivo_alerta: `Saúde override manual: ${s}` })
+                                await window.api.people.overrideSaude(person.slug, s)
+                                setSaudeOverride(s)
+                                await loadPerfil(person.slug)
                               }
                             }}
                             style={{
@@ -363,8 +363,8 @@ export function PersonView() {
                         style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', cursor: 'pointer' }}
                         title="Clique para alterar manualmente"
                       >
-                        {labelSaude(saudeOverride ?? fm.saude ?? '—')}
-                        {saudeOverride && (
+                        {labelSaude(fm.saude ?? '—')}
+                        {(saudeOverride || fm.saude_override) && (
                           <span style={{
                             fontSize: 9, marginLeft: 4, padding: '1px 5px', borderRadius: 3,
                             background: 'rgba(100,120,200,0.12)', border: '1px solid rgba(100,120,200,0.25)',
@@ -375,7 +375,7 @@ export function PersonView() {
                         )}
                       </span>
                     )}
-                    {!showSaudeOverride && fm.ultima_confianca === 'baixa' && !saudeOverride && (
+                    {!showSaudeOverride && fm.ultima_confianca === 'baixa' && !saudeOverride && !fm.saude_override && (
                       <span title="Baseado em artefato com evidência limitada" style={{
                         fontSize: 9.5, fontWeight: 600, letterSpacing: '0.04em',
                         padding: '1px 5px', borderRadius: 3,

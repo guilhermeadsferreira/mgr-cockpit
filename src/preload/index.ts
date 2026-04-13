@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('api', {
     ratePauta:        (slug: string, date: string, rating: 'util' | 'precisa_melhorar', nota?: string) => ipcRenderer.invoke('people:rate-pauta', slug, date, rating, nota),
     listPautaRatings: (slug: string) => ipcRenderer.invoke('people:list-pauta-ratings', slug),
     lastResumoRH: (slug: string) => ipcRenderer.invoke('people:last-resumo-rh', slug),
+    overrideSaude: (slug: string, valor: string) => ipcRenderer.invoke('people:override-saude', slug, valor),
   },
 
   artifacts: {

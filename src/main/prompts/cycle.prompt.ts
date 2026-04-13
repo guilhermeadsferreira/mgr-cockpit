@@ -15,6 +15,8 @@ export interface CyclePromptParams {
   pdiEvolucao?:           string
   // V3 enrichments
   externalData?:          string
+  // Longitudinal comparison
+  cicloAnterior?:         string
 }
 
 export interface CyclePromptBuildResult {
@@ -25,7 +27,7 @@ export interface CyclePromptBuildResult {
 
 export function buildCyclePrompt(params: CyclePromptParams): CyclePromptBuildResult {
   const { configYaml, perfilMd, artifacts, periodoInicio, periodoFim,
-    insights1on1 = '', correlacoes = '', followupHistorico = '', tendenciaEmocional = '', pdiEvolucao = '', externalData = '' } = params
+    insights1on1 = '', correlacoes = '', followupHistorico = '', tendenciaEmocional = '', pdiEvolucao = '', externalData = '', cicloAnterior = '' } = params
 
   // Budget artifacts from most recent → oldest, stop when limit is reached.
   // Most recent artifacts are most relevant for calibration; perfil.md covers older history.
@@ -60,7 +62,7 @@ ${perfilMd}
 
 ## Artefatos do período (do mais antigo ao mais recente)
 ${artifactsText}
-${insights1on1 ? `\n## Insights de 1:1 do período\n${insights1on1}\n` : ''}${correlacoes ? `\n## Correlações de terceiros confirmadas\n${correlacoes}\n` : ''}${followupHistorico ? `\n## Histórico de follow-up de ações\n${followupHistorico}\n` : ''}${tendenciaEmocional ? `\n## Tendência emocional no período\n${tendenciaEmocional}\n` : ''}${pdiEvolucao ? `\n## Evolução do PDI\n${pdiEvolucao}\n` : ''}${externalData ? `\n## Dados Externos (métricas objetivas do período)\n${externalData}\n` : ''}
+${insights1on1 ? `\n## Insights de 1:1 do período\n${insights1on1}\n` : ''}${correlacoes ? `\n## Correlações de terceiros confirmadas\n${correlacoes}\n` : ''}${followupHistorico ? `\n## Histórico de follow-up de ações\n${followupHistorico}\n` : ''}${tendenciaEmocional ? `\n## Tendência emocional no período\n${tendenciaEmocional}\n` : ''}${pdiEvolucao ? `\n## Evolução do PDI\n${pdiEvolucao}\n` : ''}${externalData ? `\n## Dados Externos (métricas objetivas do período)\n${externalData}\n` : ''}${cicloAnterior ? `\n## Relatório de Ciclo Anterior (para comparação longitudinal)\n${cicloAnterior}\n\nUse o ciclo anterior para identificar evolução, regressão ou estagnação. Na conclusão, mencione explicitamente o que mudou desde o último ciclo.\n` : ''}
 ## Sua tarefa
 
 Sintetize o ciclo completo desta pessoa com base nos artefatos e no perfil acumulado. Retorne APENAS um JSON válido (sem texto antes ou depois):
@@ -79,9 +81,10 @@ Sintetize o ciclo completo desta pessoa com base nos artefatos e no perfil acumu
 }
 
 Regras:
+- RASTREABILIDADE: cada bullet em "entregas_e_conquistas", "padroes_de_comportamento", "pontos_de_desenvolvimento" e "evidencias_promovibilidade" DEVE incluir ao menos uma tag de fonte entre colchetes no final. Tags válidas: [artefato: YYYY-MM-DD] (artefato específico), [fonte: insight_1on1] (insights de 1:1), [fonte: sinal_terceiro] (correlações de terceiros), [fonte: dados_externos] (Jira/GitHub), [fonte: pdi] (evolução do PDI), [fonte: follow_up] (histórico de ações). Se um bullet cruza 2+ fontes, inclua todas as tags. Exemplo: "Liderou migração do auth, reduzindo incidents em 40% [artefato: 2026-02-15] [fonte: dados_externos]"
 - "linha_do_tempo": entre 5 e 10 eventos-chave do período em ordem cronológica. Mínimo de 5 itens — se o período for rico, inclua até 10. Inclua entregas, marcos, mudanças, incidentes relevantes e momentos de virada (feedbacks recebidos, reconhecimentos, bloqueios superados).
-- "entregas_e_conquistas": resultados concretos, com contexto (o que foi feito, quando, qual o impacto).
-- "padroes_de_comportamento": padrões positivos e negativos observados ao longo do ciclo, com evidências. Use insights de 1:1 como fonte quando disponíveis — cite datas.
+- "entregas_e_conquistas": resultados concretos, com contexto (o que foi feito, quando, qual o impacto). Incluir tag de fonte.
+- "padroes_de_comportamento": padrões positivos e negativos observados ao longo do ciclo, com evidências. Use insights de 1:1 como fonte quando disponíveis — cite datas. Incluir tag de fonte.
 - "evolucao_frente_ao_cargo": parágrafo narrativo (3–5 frases) descrevendo a evolução da pessoa frente ao seu nível e cargo esperado. OBRIGATÓRIO: ancore em expectativas do nível (use o campo "cargo" do perfil como referência). Exemplo: "Para um Sênior, espera-se autonomia técnica e influência no time — neste ciclo demonstrou X e Y, mas ainda depende de Z para atingir plenamente o nível esperado." Cite evidências concretas e conecte com evolução do PDI quando disponível.
 - "pontos_de_desenvolvimento": áreas concretas de desenvolvimento identificadas, priorizadas por múltiplas fontes (artefatos + sinais de terceiros + insights de 1:1). Convergência de fontes = 2+ fontes independentes (artefatos distintos, feedback de pessoas diferentes, ou dados externos + artefato) apontando o mesmo padrão — é a evidência mais forte.
 - "conclusao_para_calibracao": parágrafo conclusivo (3–5 frases) pronto para ser lido no fórum. Deve incluir recomendação clara: acima das expectativas / dentro das expectativas / abaixo das expectativas. Na accountability, mencione proporção de ações cumpridas vs abandonadas quando dados de follow-up estiverem disponíveis. Dados externos (Jira, GitHub) como commits e PRs podem ser usados como CONTEXTO para tendências de volume — nunca como evidência primária de impacto ou qualidade. Ex: "velocity consistente ao longo do ciclo" é aceitável; "fez 47 commits portanto está acima das expectativas" não é.
