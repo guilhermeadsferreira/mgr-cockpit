@@ -135,12 +135,12 @@ ${pautasSection}${deltaSection}${ratingsSection}${memorySection}${acoesSection}$
 Com base no perfil acumulado, nas ações em aberto, nos insights de 1:1, sinais de terceiros e PDI, gere uma pauta completa e estruturada para o próximo 1:1. Retorne APENAS um JSON válido (sem texto antes ou depois):
 
 {
-  "follow_ups": ["string"],
-  "temas": ["string"],
-  "perguntas_sugeridas": ["string"],
-  "alertas": ["string"],
-  "outros_alertas": ["string"],
-  "reconhecimentos": ["string"]
+  "follow_ups": [{ "text": "string", "fonte": "acao_vencida|acao_gestor|insight_1on1|sinal_terceiro|pdi|dados_externos|tema_recorrente|delta" }],
+  "temas": [{ "text": "string", "fonte": "..." }],
+  "perguntas_sugeridas": [{ "text": "string", "fonte": "..." }],
+  "alertas": [{ "text": "string", "fonte": "..." }],
+  "outros_alertas": [{ "text": "string", "fonte": "..." }],
+  "reconhecimentos": [{ "text": "string", "fonte": "..." }]
 }
 
 Regras:
@@ -150,16 +150,32 @@ Regras:
 - "perguntas_sugeridas": 4 a 6 perguntas abertas, específicas e contextualizadas para esta pessoa. Sinais de terceiros não explorados devem gerar perguntas de validação (ex: "O Antonio mencionou X — como você vê isso?"). Insights de PDI conectam com perguntas de desenvolvimento. NUNCA use perguntas genéricas — baseie-se no perfil real. Use dados externos quantitativos (Jira, GitHub) para gerar perguntas com números concretos — ex: "Você tem ${openActions.length} ações abertas e 5 issues no Jira — como está gerenciando o workload?".
 - "alertas": máximo 3 alertas, priorizados por impacto e urgência (bloqueios, conflitos, risco de desengajamento, deadlines críticos, ações com risco de abandono, blockers do Jira). Selecione os 3 mais críticos. Array vazio se não houver urgências.
 - "outros_alertas": alertas relevantes que não couberam nos 3 principais — sem limite. Omitir (ou array vazio) se não há excedentes.
-- "reconhecimentos": conquistas que merecem ser mencionadas explicitamente na conversa. Priorize os últimos 14 dias; se não houver conquistas nesse período, use os últimos 30 dias; se não houver em 30 dias, retorne array vazio. Reconhecimento oportuno fortalece o vínculo.`
+- "reconhecimentos": conquistas que merecem ser mencionadas explicitamente na conversa. Priorize os últimos 14 dias; se não houver conquistas nesse período, use os últimos 30 dias; se não houver em 30 dias, retorne array vazio. Reconhecimento oportuno fortalece o vínculo.
+- Cada item DEVE incluir campo "fonte" indicando a origem principal da sugestão. Valores válidos: acao_vencida, acao_gestor, insight_1on1, sinal_terceiro, pdi, dados_externos, tema_recorrente, delta. Use o mais específico possível. Se não há fonte clara, use "tema_recorrente".`
 }
 
+export type AgendaFonte = 'acao_vencida' | 'acao_gestor' | 'insight_1on1' | 'sinal_terceiro' | 'pdi' | 'dados_externos' | 'tema_recorrente' | 'delta'
+
+export interface AgendaItemWithFonte {
+  text: string
+  fonte: AgendaFonte
+}
+
+export type AgendaItem = string | AgendaItemWithFonte
+
 export interface AgendaAIResult {
-  follow_ups:          string[]
-  temas:               string[]
-  perguntas_sugeridas: string[]
-  alertas:             string[]
-  outros_alertas?:     string[]
-  reconhecimentos:     string[]
+  follow_ups:          AgendaItem[]
+  temas:               AgendaItem[]
+  perguntas_sugeridas: AgendaItem[]
+  alertas:             AgendaItem[]
+  outros_alertas?:     AgendaItem[]
+  reconhecimentos:     AgendaItem[]
+}
+
+function itemText(item: AgendaItem): string {
+  if (typeof item === 'string') return item
+  const tag = item.fonte || 'tema_recorrente'
+  return `[${tag}] ${item.text}`
 }
 
 export function renderAgendaMarkdown(nome: string, date: string, result: AgendaAIResult): string {
@@ -172,37 +188,37 @@ export function renderAgendaMarkdown(nome: string, date: string, result: AgendaA
 
   if (result.alertas.length > 0) {
     lines.push(`## ⚠️ Alertas`)
-    result.alertas.forEach(a => lines.push(`- ${a}`))
+    result.alertas.forEach(a => lines.push(`- ${itemText(a)}`))
     lines.push(``)
   }
 
   if (result.outros_alertas && result.outros_alertas.length > 0) {
     lines.push(`### Outros alertas`)
-    result.outros_alertas.forEach(a => lines.push(`- ${a}`))
+    result.outros_alertas.forEach(a => lines.push(`- ${itemText(a)}`))
     lines.push(``)
   }
 
   if (result.reconhecimentos && result.reconhecimentos.length > 0) {
-    lines.push(`## Reconhecimentos`)
-    result.reconhecimentos.forEach(r => lines.push(`- ${r}`))
+    lines.push(`## ✅ Reconhecimentos`)
+    result.reconhecimentos.forEach(r => lines.push(`- ${itemText(r)}`))
     lines.push(``)
   }
 
   if (result.follow_ups.length > 0) {
     lines.push(`## Follow-ups`)
-    result.follow_ups.forEach(f => lines.push(`- [ ] ${f}`))
+    result.follow_ups.forEach(f => lines.push(`- [ ] ${itemText(f)}`))
     lines.push(``)
   }
 
   if (result.temas.length > 0) {
     lines.push(`## Temas`)
-    result.temas.forEach(t => lines.push(`- ${t}`))
+    result.temas.forEach(t => lines.push(`- ${itemText(t)}`))
     lines.push(``)
   }
 
   if (result.perguntas_sugeridas.length > 0) {
     lines.push(`## Perguntas sugeridas`)
-    result.perguntas_sugeridas.forEach(p => lines.push(`- ${p}`))
+    result.perguntas_sugeridas.forEach(p => lines.push(`- ${itemText(p)}`))
     lines.push(``)
   }
 
