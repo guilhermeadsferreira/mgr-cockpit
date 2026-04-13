@@ -1717,7 +1717,7 @@ export class IngestionPipeline {
         this.log.info('done (coletivo)', { fileName: item.fileName })
 
         // Persist absence signals for registered people expected but not present
-        this.persistAbsenceSignals(capturedAiResult, registry)
+        this.persistAbsenceSignals(aiResult, registry)
       } else {
         // pessoa_principal identificada mas não cadastrada → pending
         item.status = 'pending'
