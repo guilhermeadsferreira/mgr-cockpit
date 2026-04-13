@@ -4,6 +4,7 @@ import { readFile } from './FileReader'
 import { ArtifactWriter } from './ArtifactWriter'
 import { runClaudePrompt, runWithProvider } from './ClaudeRunner'
 import { preprocessTranscript } from './GeminiPreprocessor'
+import { preprocessWithHaiku } from './HaikuPreprocessor'
 import { buildIngestionPrompt, type IngestionAIResult } from '../prompts/ingestion.prompt'
 import { buildCerimoniaSinalPrompt } from '../prompts/cerimonia-sinal.prompt'
 import { build1on1DeepPrompt, type OneOnOneResult } from '../prompts/1on1-deep.prompt'
@@ -1462,25 +1463,47 @@ export class IngestionPipeline {
         this.log.warn('artefato truncado', { filePath: item.filePath, maxChars: 50_000 })
       }
 
-      // Pass 0: Gemini preprocessing (optional)
-      // Reduz tokens enviados ao Claude limpando transcrições brutas
-      const geminiActive = !!(settings.useGeminiPreprocessing && settings.googleAiApiKey)
-      if (geminiActive) {
-        this.log.debug('Pass 0: Pré-processamento Gemini ativo')
-        const preprocessResult = await preprocessTranscript(settings.googleAiApiKey!, text, 90_000, item.fileName)
+      // Pass 0: Transcript preprocessing (optional)
+      // Reduces tokens sent to Claude by cleaning raw transcriptions.
+      // Priority: Haiku (via Claude CLI, no extra key) → Gemini (fallback if key present)
+      const usePreprocessing = settings.usePreprocessing ?? settings.useGeminiPreprocessing ?? false
+      if (usePreprocessing && settings.claudeBinPath) {
+        this.log.debug('Pass 0: Pré-processamento Haiku ativo (modo light)')
+        const preprocessResult = await preprocessWithHaiku(settings.claudeBinPath, text, 90_000)
         if (preprocessResult.success) {
           text = preprocessResult.cleanedText
-          this.log.debug('Pass 0: transcript reduction', {
+          this.log.debug('Pass 0: transcript reduction (Haiku)', {
             originalLength: preprocessResult.originalLength,
             cleanedLength: preprocessResult.cleanedLength,
             economy: preprocessResult.reductionPercent.toFixed(1) + '%',
           })
         } else {
-          const isTimeout = preprocessResult.error?.includes('Timeout')
-          const hint = isTimeout
-            ? 'Tente novamente ou desative o pré-processamento nas Settings.'
-            : 'Verifique sua API key e créditos em aistudio.google.com, ou desative o pré-processamento nas Settings.'
-          throw new Error(`Pré-processamento Gemini falhou: ${preprocessResult.error}. ${hint}`)
+          this.log.warn('Pass 0: Haiku falhou, tentando Gemini fallback', { error: preprocessResult.error })
+          // Fallback to Gemini if Google AI key is available
+          if (settings.googleAiApiKey) {
+            const geminiResult = await preprocessTranscript(settings.googleAiApiKey, text, 90_000, item.fileName)
+            if (geminiResult.success) {
+              text = geminiResult.cleanedText
+              this.log.debug('Pass 0: transcript reduction (Gemini fallback)', {
+                originalLength: geminiResult.originalLength,
+                cleanedLength: geminiResult.cleanedLength,
+                economy: geminiResult.reductionPercent.toFixed(1) + '%',
+              })
+            } else {
+              this.log.warn('Pass 0: Gemini fallback tambem falhou — prosseguindo com texto bruto', { error: geminiResult.error })
+            }
+          } else {
+            this.log.warn('Pass 0: sem Gemini fallback — prosseguindo com texto bruto')
+          }
+        }
+      } else if (usePreprocessing && settings.googleAiApiKey) {
+        // Legacy path: Gemini only (no Claude CLI available yet)
+        this.log.debug('Pass 0: Pré-processamento Gemini (legacy)')
+        const preprocessResult = await preprocessTranscript(settings.googleAiApiKey, text, 90_000, item.fileName)
+        if (preprocessResult.success) {
+          text = preprocessResult.cleanedText
+        } else {
+          this.log.warn('Pass 0: Gemini falhou — prosseguindo com texto bruto', { error: preprocessResult.error })
         }
       }
 

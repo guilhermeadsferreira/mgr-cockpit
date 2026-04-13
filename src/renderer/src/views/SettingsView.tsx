@@ -235,39 +235,38 @@ export function SettingsView() {
             </Field>
           </Section>
 
-          {/* Pré-processamento Gemini */}
+          {/* Pré-processamento de transcrições */}
           <Section
             icon={<Sparkles size={14} />}
-            title="Pré-processamento Gemini"
-            desc="Limpa transcrições antes de enviar ao Claude — reduz consumo de tokens em ~60%"
+            title="Pré-processamento de transcrições"
+            desc="Limpa ruído de transcrições automáticas antes da análise — reduz tokens em ~40-60%"
           >
             <Field
-              label="Google AI API Key"
-              hint={<>Obtenha em <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style={{ color: 'var(--accent)' }}>aistudio.google.com/app/apikey</a> — armazenada localmente</>}
+              label="Ativar pré-processamento"
+              hint="Usa Claude Haiku (via CLI) para remover preenchedores, sons e ruído técnico. Sem custo adicional."
+            >
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={form.usePreprocessing ?? form.useGeminiPreprocessing ?? false}
+                  onChange={(e) => { set('usePreprocessing', e.target.checked); set('useGeminiPreprocessing', e.target.checked) }}
+                />
+                <span style={{ fontSize: 12, color: 'var(--text-primary)' }}>
+                  Limpar transcrições antes de analisar (Haiku)
+                </span>
+              </label>
+            </Field>
+            <Field
+              label="Google AI API Key (fallback)"
+              hint={<>Opcional. Se Haiku falhar, usa Gemini Flash como fallback. Obtenha em <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style={{ color: 'var(--accent)' }}>aistudio.google.com</a></>}
             >
               <input
                 style={styles.input}
                 type="password"
                 value={form.googleAiApiKey ?? ''}
                 onChange={(e) => set('googleAiApiKey', e.target.value || undefined)}
-                placeholder="AIza..."
+                placeholder="AIza... (opcional)"
               />
-            </Field>
-            <Field
-              label="Ativar pré-processamento"
-              hint={!form.googleAiApiKey ? 'Configure a API Key acima para ativar' : 'Remove ruído, preenchedores e estrutura o conteúdo antes da análise pelo Claude'}
-            >
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: form.googleAiApiKey ? 'pointer' : 'default' }}>
-                <input
-                  type="checkbox"
-                  checked={form.useGeminiPreprocessing ?? false}
-                  disabled={!form.googleAiApiKey}
-                  onChange={(e) => set('useGeminiPreprocessing', e.target.checked)}
-                />
-                <span style={{ fontSize: 12, color: form.googleAiApiKey ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                  Usar Gemini Flash para pré-processar transcrições
-                </span>
-              </label>
             </Field>
           </Section>
 

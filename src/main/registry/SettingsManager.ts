@@ -39,8 +39,10 @@ export interface AppSettings {
   openRouterModel?: string
   /** API key do Google AI (Gemini) para pré-processamento de transcrições. Armazenada em plaintext. */
   googleAiApiKey?: string
-  /** Ativar pré-processamento Gemini (limpa transcrições antes de enviar ao modelo). Só tem efeito se googleAiApiKey presente. */
+  /** @deprecated Use usePreprocessing. Mantido para backward compat. */
   useGeminiPreprocessing?: boolean
+  /** Ativar pré-processamento de transcrições (Haiku por padrão, Gemini como fallback se googleAiApiKey presente). */
+  usePreprocessing?: boolean
   /** Provider padrão global. Todas as operações sem override usam este. */
   defaultProvider?: LLMProvider
   /** Override de provider por operação. Operações sem override herdam defaultProvider. */
