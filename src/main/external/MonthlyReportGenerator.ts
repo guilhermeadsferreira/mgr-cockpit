@@ -5,6 +5,8 @@ import { SettingsManager, type AppSettings } from '../registry/SettingsManager'
 import { ExternalDataPass, type ExternalDataSnapshot } from './ExternalDataPass'
 import { GitHubClient, GitHubConfig } from './GitHubClient'
 import { MetricsWriter, type MonthlyEntry, type MomentoAtualEntry } from './MetricsWriter'
+import { fetchSustentacaoForReport } from './SupportBoardClient'
+import type { SupportBoardSnapshot } from '../../renderer/src/types/ipc'
 import { Logger } from '../logging/Logger'
 import { notifyReportProgress } from './reportProgress'
 
@@ -131,8 +133,19 @@ export class MonthlyReportGenerator {
       await sleep(200)
     }
 
+    // Fetch sustentação (graceful — null se não configurado)
+    progress('sustentacao', 'Buscando dados de sustentação…', 72)
+    let sustentacaoSnapshot: SupportBoardSnapshot | null = null
+    if (settings.jiraSupportBoardId && settings.jiraBaseUrl && settings.jiraApiToken) {
+      try {
+        sustentacaoSnapshot = await fetchSustentacaoForReport(settings)
+      } catch (err) {
+        log.warn('sustentação fetch falhou no monthly', { error: err instanceof Error ? err.message : String(err) })
+      }
+    }
+
     progress('build', 'Montando relatório…', 75)
-    const content = this.buildReport(personReports, targetYear, targetMonth)
+    const content = this.buildReport(personReports, targetYear, targetMonth, sustentacaoSnapshot)
 
     progress('write', 'Salvando relatório…', 90)
     mkdirSync(this.relatoriosDir, { recursive: true })
@@ -249,7 +262,7 @@ export class MonthlyReportGenerator {
     }
   }
 
-  private buildReport(personReports: PersonMonthlyData[], year: number, month: number): string {
+  private buildReport(personReports: PersonMonthlyData[], year: number, month: number, sustentacao?: SupportBoardSnapshot | null): string {
     const lines: string[] = []
     const monthName = MESES[month - 1]
 
@@ -334,6 +347,38 @@ export class MonthlyReportGenerator {
       lines.push('')
 
       lines.push('')
+    }
+
+    // ── Sustentação do Mês ──────────────────────────────────
+    if (sustentacao) {
+      lines.push('## Sustentação do Mês', '')
+      lines.push(`- Tickets abertos: **${sustentacao.ticketsAbertos}**`)
+      lines.push(`- Em breach: **${sustentacao.ticketsEmBreach.length}**`)
+      if (sustentacao.complianceRate7d !== null) {
+        lines.push(`- Compliance SLA: **${sustentacao.complianceRate7d}%**`)
+      }
+      lines.push('')
+
+      const assigneeEntries = Object.entries(sustentacao.porAssignee)
+        .filter(([, count]) => count > 0)
+        .sort((a, b) => b[1] - a[1])
+
+      if (assigneeEntries.length > 0) {
+        lines.push('### Carga por Pessoa', '')
+        for (const [slug, count] of assigneeEntries) {
+          const person = personReports.find(p => p.slug === slug)
+          const nome = person?.nome ?? slug
+          const breachCount = sustentacao.ticketsEmBreach.filter(t => t.assignee === slug).length
+          const breachSuffix = breachCount > 0 ? ` (${breachCount} breach)` : ''
+          lines.push(`- **${nome}**: ${count} tickets${breachSuffix}`)
+        }
+        lines.push('')
+      }
+
+      if (sustentacao.topTipos.length > 0) {
+        const tiposStr = sustentacao.topTipos.slice(0, 3).map(t => `${t.tipo} (${t.count})`).join(', ')
+        lines.push(`> Top tipos: ${tiposStr}`, '')
+      }
     }
 
     if (allBlockers.length > 0) {
