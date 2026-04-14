@@ -121,6 +121,7 @@ ${historicoSaude || 'Sem histórico.'}
 ${externalData ? `
 ## Dados Externos (métricas objetivas Jira/GitHub)
 ${externalData}
+> Contagens de commits e PRs são contexto de volume — não refletem impacto ou qualidade. Use-as para formular perguntas, não como evidências de desempenho.
 ` : ''}
 ## Transcrição / anotação do 1:1
 <artefato>
