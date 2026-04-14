@@ -546,6 +546,7 @@ export function SustentacaoView() {
     totalTickets: number; emBreach: number; riskAlto: number
     blockers: number; workloadExterno: string; alertas: string[]
   }>>([])
+  const [totalBreachTickets, setTotalBreachTickets] = useState(0)
 
 
   async function loadData() {
@@ -595,6 +596,9 @@ export function SustentacaoView() {
       const ticketResult = await window.api.sustentacao.runTicketAnalysis()
       if (ticketResult.perAssigneeSummary) {
         setPerAssignee(ticketResult.perAssigneeSummary)
+      }
+      if (ticketResult.totalBreachTickets != null) {
+        setTotalBreachTickets(ticketResult.totalBreachTickets)
       }
 
       // Recarrega dados com intelligence atualizada
@@ -958,6 +962,11 @@ export function SustentacaoView() {
 
         {/* Tickets em Breach */}
         <Section title="Tickets em Breach de SLA">
+          {totalBreachTickets > 0 && totalBreachTickets > (snapshot.enrichedTickets?.length ?? 0) && (
+            <div style={{ padding: '8px 12px', margin: '8px 0', background: 'var(--bg-warning, #332b00)', borderRadius: 6, fontSize: 13, color: 'var(--text-secondary, #ccc)' }}>
+              Analisados {snapshot.enrichedTickets?.length ?? 0} de {totalBreachTickets} tickets em breach (limite por execução: 15)
+            </div>
+          )}
           {snapshot.ticketsEmBreach.length === 0 ? (
             <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '12px 0' }}>
               Nenhum ticket em breach de SLA.

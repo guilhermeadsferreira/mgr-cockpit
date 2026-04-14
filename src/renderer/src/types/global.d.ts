@@ -150,6 +150,7 @@ declare global {
             totalTickets: number; emBreach: number; riskAlto: number
             blockers: number; workloadExterno: string; alertas: string[]
           }>
+          totalBreachTickets?: number
           error?: string
         }>
         getAnalysisHistory: () => Promise<unknown>
