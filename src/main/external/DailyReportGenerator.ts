@@ -221,8 +221,8 @@ export class DailyReportGenerator {
           log.warn('falha ao persistir alertas no metricas.md', { slug: person.slug, error: err instanceof Error ? err.message : String(err) })
         }
 
-        // AlertBridge: propaga blocker e wip_alto para Pontos de Atenção no perfil.md
-        const profileAlerts = alerts.filter(a => a.tipo === 'blocker' || a.tipo === 'wip_alto')
+        // AlertBridge: propaga blocker, wip_alto e cycle_time para Pontos de Atenção no perfil.md
+        const profileAlerts = alerts.filter(a => a.tipo === 'blocker' || a.tipo === 'wip_alto' || a.tipo === 'cycle_time')
         if (profileAlerts.length > 0) {
           try {
             propagateAlertsToProfile(this.workspacePath, person.slug, profileAlerts, today)
