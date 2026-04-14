@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { RefreshCw, Loader2, Wrench, AlertTriangle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { useRouter } from '../router'
+import { MarkdownPreview } from '../components/MarkdownPreview'
 import type { SupportBoardSnapshot, SustentacaoHistoryEntry, InOutSemanalEntry, RecorrenteDetectado, SustentacaoAlerta, BlockerCategory } from '../types/ipc'
 
 /** Retorna delta absoluto vs snapshot de ~7 dias atrás. null se não há referência. */
@@ -539,6 +540,7 @@ export function SustentacaoView() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
+  const [boardAnalysis, setBoardAnalysis] = useState<string | null>(null)
   const [perAssignee, setPerAssignee] = useState<Array<{
     email: string; nome: string; nivel: string
     totalTickets: number; emBreach: number; riskAlto: number
@@ -583,7 +585,8 @@ export function SustentacaoView() {
     try {
       // Passo 1: análise do board (padrões, causa raiz)
       try {
-        await window.api.sustentacao.runAnalysis()
+        const boardResult = await window.api.sustentacao.runAnalysis()
+        if (boardResult?.analysis) setBoardAnalysis(boardResult.analysis)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro na análise do board')
       }
@@ -808,6 +811,20 @@ export function SustentacaoView() {
             deltaColor={deltaColor(deltaBreach, true)}
           />
         </div>
+
+        {/* Análise Executiva do Board (gerada por IA) */}
+        {boardAnalysis && (
+          <Section title="Análise Executiva">
+            <div style={{
+              padding: '12px 16px',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+            }}>
+              <MarkdownPreview content={boardAnalysis} />
+            </div>
+          </Section>
+        )}
 
         {/* Mini Charts de evolução */}
         {snapshot.history.length >= 2 && (
