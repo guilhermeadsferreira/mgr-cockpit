@@ -635,18 +635,14 @@ export class DailyReportGenerator {
         alerts.push(`⚠️ **${report.nome}** com ${report.activeTasks.length} tasks simultâneas no pipeline (${breakdown}) — risco de context switching`)
       }
 
-      // B5: Task moveu pra trás (simplified: issue in Dev status but was in Review yesterday)
-      for (const jiraItem of activity.jiraActivity) {
-        const isDev = categorizeStatus(jiraItem.status) === 'dev'
-        if (isDev) {
-          // Check if this issue was previously in review (appears in activity = was updated)
-          // If it's in Dev now but was "updated" yesterday, and we have an active task in Dev,
-          // we can infer it moved back if the type suggests it was reviewed
-          const matchingActive = report.activeTasks.find(t => t.key === jiraItem.issueKey)
-          if (matchingActive && matchingActive.daysInStatus <= 1 && matchingActive.statusCategory === 'dev') {
-            // Just entered Dev yesterday — could be new or moved back
-            // We flag it as "voltou para Dev" only if we detect it was in review before
-            // For now, we mark tasks that re-entered Dev recently as worth noting
+      // B5: Task moveu pra trás (issue em Dev com daysInStatus <= 1 que teve status review)
+      for (const task of report.activeTasks) {
+        if (task.statusCategory === 'dev' && task.daysInStatus <= 1) {
+          const hadReviewActivity = activity.jiraActivity.some(
+            j => j.issueKey === task.key && categorizeStatus(j.status) === 'review'
+          )
+          if (hadReviewActivity) {
+            alerts.push(`🔙 **${task.key}** voltou para Dev após review — verificar se há changes requested ou rejeição`)
           }
         }
       }
