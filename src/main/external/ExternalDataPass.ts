@@ -548,7 +548,11 @@ export class ExternalDataPass {
         lines.push(`- Issues: ${jira.sprintAtual.issuesConcluidas}/${jira.sprintAtual.totalIssues} concluídas`)
         lines.push(`- Story points: ${jira.sprintAtual.comprometido} comprometidos, ${jira.sprintAtual.entregue} entregues`)
       }
-      lines.push(`- Issues abertas: ${jira.issuesAbertas} | Workload: ${jira.workloadScore}`)
+      const sprintAbertas = (jira as Record<string, unknown>).issuesSprintAbertas as number | undefined
+      const issueLabel = sprintAbertas != null && sprintAbertas !== jira.issuesAbertas
+        ? `${sprintAbertas} no sprint, ${jira.issuesAbertas} total`
+        : `${jira.issuesAbertas}`
+      lines.push(`- Issues abertas: ${issueLabel} | Workload: ${jira.workloadScore}`)
       if (jira.bugsAtivos > 0) lines.push(`- Bugs ativos: ${jira.bugsAtivos}`)
       if (jira.tempoMedioCicloDias > 0) lines.push(`- Tempo médio de ciclo: ${jira.tempoMedioCicloDias} dias`)
       lines.push('')

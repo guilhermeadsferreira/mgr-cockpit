@@ -32,6 +32,7 @@ export interface CycleTimeByStage {
 
 export interface JiraPersonMetrics {
   issuesAbertas: number
+  issuesSprintAbertas: number
   issuesFechadasSprint: number
   storyPointsSprint: number
   workloadScore: 'alto' | 'medio' | 'baixo'
@@ -51,6 +52,7 @@ export interface JiraMetricsInput {
 
 const EMPTY_METRICS: JiraPersonMetrics = {
   issuesAbertas: 0,
+  issuesSprintAbertas: 0,
   issuesFechadasSprint: 0,
   storyPointsSprint: 0,
   workloadScore: 'baixo',
@@ -78,7 +80,7 @@ export async function fetchJiraMetrics(input: JiraMetricsInput): Promise<JiraPer
     const issuesFechadasSprint = closedIssues.length
     const storyPointsSprint = closedIssues.reduce((sum, i) => sum + (i.storyPoints || 0), 0)
 
-    const workloadScore = computeWorkloadScore(openIssues.length, allIssues.reduce((sum, i) => sum + (i.storyPoints || 0), 0))
+    const openSP = openIssues.reduce((sum, i) => sum + (i.storyPoints || 0), 0)
 
     const bugsAtivos = openIssues.filter(i => i.type.toLowerCase() === 'bug').length
 
@@ -145,8 +147,21 @@ export async function fetchJiraMetrics(input: JiraMetricsInput): Promise<JiraPer
       }
     }
 
+    // workloadScore baseado em sprint (se disponível) ou total de abertas
+    const sprintOpenCount = sprintAtual
+      ? sprintAtual.totalIssues - sprintAtual.issuesConcluidas
+      : openIssues.length
+    const sprintOpenSP = sprintAtual
+      ? sprintAtual.comprometido - sprintAtual.entregue
+      : openSP
+    const workloadScore = computeWorkloadScore(sprintOpenCount, sprintOpenSP)
+    const issuesSprintAbertas = sprintAtual
+      ? sprintAtual.totalIssues - sprintAtual.issuesConcluidas
+      : openIssues.length
+
     return {
       issuesAbertas: openIssues.length,
+      issuesSprintAbertas,
       issuesFechadasSprint,
       storyPointsSprint,
       workloadScore,
