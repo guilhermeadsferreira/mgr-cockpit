@@ -244,7 +244,9 @@ export async function generateAgendaForPerson(
       } catch { /* sustentação is optional context */ }
     }
 
-    const prompt = buildAgendaPrompt({ configYaml: configRaw, perfilMd: perfilData.raw, today, dadosStale, pautasAnteriores, openActions: enrichedActions, insightsRecentes, sinaisTerceiros: sinaisTerceiros + sustentacaoContext, pdiEstruturado, externalData, deltaSinceLastMeeting, pautaRatings, suggestionMemorySummary })
+    const fullExternalData = externalData + sustentacaoContext
+
+    const prompt = buildAgendaPrompt({ configYaml: configRaw, perfilMd: perfilData.raw, today, dadosStale, pautasAnteriores, openActions: enrichedActions, insightsRecentes, sinaisTerceiros, pdiEstruturado, externalData: fullExternalData, deltaSinceLastMeeting, pautaRatings, suggestionMemorySummary })
     const result = await runWithProvider('agendaGeneration', settings, prompt, {
       claudeBinPath,
       claudeTimeoutMs: 90_000,
