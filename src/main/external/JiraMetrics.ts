@@ -21,6 +21,7 @@ export interface SprintSummary {
   entregue: number
   totalIssues: number
   issuesConcluidas: number
+  issuesFeitas?: Array<{ key: string; summary: string }>
 }
 
 export interface CycleTimeByStage {
@@ -140,6 +141,7 @@ export async function fetchJiraMetrics(input: JiraMetricsInput): Promise<JiraPer
             entregue: deliveredSP,
             totalIssues: personSprintIssues.length,
             issuesConcluidas: doneSprintIssues.length,
+            issuesFeitas: doneSprintIssues.map(i => ({ key: i.key, summary: i.summary })),
           }
         }
       } catch (err) {

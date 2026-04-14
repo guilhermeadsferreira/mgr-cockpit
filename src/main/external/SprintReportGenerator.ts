@@ -141,12 +141,16 @@ export class SprintReportGenerator {
           }
         }
 
+        const entregas = jira?.sprintAtual?.issuesFeitas
+          ?.map(i => `${i.key}: ${i.summary}`)
+          .slice(0, 20) ?? []
+
         const sprintEntry: SprintEntry = {
           nome: sprint.name,
           spEntregues: jira?.sprintAtual?.entregue ?? 0,
           spPlanejados: jira?.sprintAtual?.comprometido ?? 0,
           cycleTimeMedio: jira?.tempoMedioCicloDias ?? 0,
-          entregas: [],
+          entregas,
           bloqueios,
         }
         metricsWriter.writeSprint(person.slug, sprintEntry)
