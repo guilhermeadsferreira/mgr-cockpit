@@ -59,7 +59,7 @@ export async function fetchGitHubMetrics(input: GitHubMetricsInput): Promise<Git
       client.getReviewCommentsByUser(username, since),
     ])
 
-    const openPRs = prs.filter(pr => pr.state === 'open')
+    const openPRs = prs.filter(pr => pr.state === 'open' && !pr.draft)
     const mergedPRs = prs.filter(pr => pr.merged)
     const closedPRs = prs.filter(pr => pr.state === 'closed' || pr.merged)
 
