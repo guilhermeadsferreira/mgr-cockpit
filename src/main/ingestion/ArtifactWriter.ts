@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, renameSync, copyFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync, renameSync, copyFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import type { IngestionAIResult } from '../prompts/ingestion.prompt'
 import type { CerimoniaSinalResult } from '../prompts/cerimonia-sinal.prompt'
@@ -45,7 +45,9 @@ export class ArtifactWriter {
             elogios_e_conquistas, temas_detectados, motivo_indicador, indicador_saude } = result
 
     const fileName = fileNameOverride ?? `${date}-${slug}.md`
-    const dest = join(this.pessoasDir, slug, 'historico', fileName)
+    const historicoDir = join(this.pessoasDir, slug, 'historico')
+    mkdirSync(historicoDir, { recursive: true })
+    const dest = join(historicoDir, fileName)
 
     const titulo = result.titulo ?? `${tipoLabel(tipo)} — ${slug} · ${date}`
     const participantes = result.participantes_nomes ?? []
