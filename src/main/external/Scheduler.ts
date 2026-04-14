@@ -67,50 +67,54 @@ export class Scheduler {
     const jiraEnabled = !!(settings.jiraEnabled && settings.jiraBaseUrl && settings.jiraApiToken)
     const githubEnabled = !!(settings.githubEnabled && settings.githubToken)
 
-    if (!jiraEnabled && !githubEnabled) {
-      log.debug('integrações externas desativadas, scheduler não roda')
-      return
-    }
+    const hasIntegrations = jiraEnabled || githubEnabled
+    const needsDailyRun = this.shouldRunDaily()
 
-    if (this.shouldRunDaily()) {
+    // 1. External data refresh — requires integrations
+    if (hasIntegrations && needsDailyRun) {
       log.info('daily trigger: iniciando refresh externo')
       await this.runForAllPeople()
       this.markDailyRun()
+    } else if (!hasIntegrations) {
+      log.info('integrações externas desativadas, pulando refresh de dados')
+    }
 
-      // Generate daily report if enabled
-      if (settings.dailyReportEnabled) {
-        try {
-          const generator = new DailyReportGenerator(this.workspacePath)
-          await generator.generate()
-          log.info('daily report gerado com sucesso')
-        } catch (err) {
-          log.warn('daily report falhou', { error: err instanceof Error ? err.message : String(err) })
-        }
+    // 2. Daily report — runs independently of integrations
+    if (needsDailyRun && settings.dailyReportEnabled !== false) {
+      try {
+        const generator = new DailyReportGenerator(this.workspacePath)
+        await generator.generate()
+        log.info('daily report gerado com sucesso')
+        if (!hasIntegrations) this.markDailyRun()
+      } catch (err) {
+        log.warn('daily report falhou', { error: err instanceof Error ? err.message : String(err) })
       }
+    }
 
-      // Ticket analysis automático de sustentação (após daily report)
-      if (settings.jiraSupportProjectKey && settings.claudeBinPath) {
-        try {
-          log.info('ticket analysis de sustentação: iniciando')
-          const { runTicketAnalysisInternal } = await import('../index')
-          const result = await runTicketAnalysisInternal()
-          if (result.error) {
-            log.warn('ticket analysis de sustentação: erro', { error: result.error })
-          } else {
-            log.info('ticket analysis de sustentação: concluído', {
-              tickets: result.enrichedTickets?.length ?? 0,
-            })
-          }
-        } catch (err) {
-          log.warn('ticket analysis de sustentação falhou (não crítico)', {
-            error: err instanceof Error ? err.message : String(err),
+    // 3. Ticket analysis automático de sustentação (após daily report)
+    if (needsDailyRun && hasIntegrations && settings.jiraSupportProjectKey && settings.claudeBinPath) {
+      try {
+        log.info('ticket analysis de sustentação: iniciando')
+        const { runTicketAnalysisInternal } = await import('../index')
+        const result = await runTicketAnalysisInternal()
+        if (result.error) {
+          log.warn('ticket analysis de sustentação: erro', { error: result.error })
+        } else {
+          log.info('ticket analysis de sustentação: concluído', {
+            tickets: result.enrichedTickets?.length ?? 0,
           })
         }
-      } else {
-        log.debug('sustentação não configurada, pulando ticket analysis')
+      } catch (err) {
+        log.warn('ticket analysis de sustentação falhou (não crítico)', {
+          error: err instanceof Error ? err.message : String(err),
+        })
       }
+    } else if (!settings.jiraSupportProjectKey) {
+      log.debug('sustentação não configurada, pulando ticket analysis')
+    }
 
-      // Brain risk detection (após ticket analysis)
+    // 4. Brain risk detection (runs once daily)
+    if (needsDailyRun) {
       try {
         log.info('[Brain] Rodando risk detection...')
         const brainResult = await detectConvergencia(this.workspacePath)
@@ -316,10 +320,13 @@ export class Scheduler {
   // ── Daily logic ───────────────────────────────────────────────
 
   private shouldRunDaily(): boolean {
+    return !this.hasRunDailyToday()
+  }
+
+  private hasRunDailyToday(): boolean {
     const state = this.loadState()
-    if (!state.lastDailyRun) return true
     const today = new Date().toISOString().slice(0, 10)
-    return state.lastDailyRun !== today
+    return state.lastDailyRun === today
   }
 
   private markDailyRun(): void {

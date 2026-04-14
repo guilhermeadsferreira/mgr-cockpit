@@ -38,6 +38,7 @@ export function RelatoriosView() {
       if (data.step === 'done') {
         setProgressMsg(null)
         setProgressPct(0)
+        void loadReports()
       } else {
         setProgressMsg(data.message)
         setProgressPct(data.percent)

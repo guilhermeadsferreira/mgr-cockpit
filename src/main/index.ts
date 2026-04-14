@@ -244,7 +244,9 @@ export async function generateAgendaForPerson(
       } catch { /* sustentação is optional context */ }
     }
 
-    const prompt = buildAgendaPrompt({ configYaml: configRaw, perfilMd: perfilData.raw, today, dadosStale, pautasAnteriores, openActions: enrichedActions, insightsRecentes, sinaisTerceiros: sinaisTerceiros + sustentacaoContext, pdiEstruturado, externalData, deltaSinceLastMeeting, pautaRatings, suggestionMemorySummary })
+    const fullExternalData = externalData + sustentacaoContext
+
+    const prompt = buildAgendaPrompt({ configYaml: configRaw, perfilMd: perfilData.raw, today, dadosStale, pautasAnteriores, openActions: enrichedActions, insightsRecentes, sinaisTerceiros, pdiEstruturado, externalData: fullExternalData, deltaSinceLastMeeting, pautaRatings, suggestionMemorySummary })
     const result = await runWithProvider('agendaGeneration', settings, prompt, {
       claudeBinPath,
       claudeTimeoutMs: 90_000,
@@ -389,6 +391,7 @@ export async function runTicketAnalysisInternal(): Promise<{
   enrichedTickets?: EnrichedSupportTicket[]
   executiveSummary?: TicketAnalysisSnapshot['executiveSummary'] | null
   perAssigneeSummary?: PerAssigneeSummary[]
+  totalBreachTickets?: number
   error?: string
 }> {
   const settings = SettingsManager.load()
@@ -406,14 +409,17 @@ export async function runTicketAnalysisInternal(): Promise<{
     if (a.ticketKey) ticketKeysSet.add(a.ticketKey)
   }
 
-  const ticketsToAnalyze = snapshot.ticketsEmBreach
+  const allBreachTickets = snapshot.ticketsEmBreach
     .filter((t) => ticketKeysSet.has(t.key))
+  const totalBreachTickets = allBreachTickets.length
+
+  const ticketsToAnalyze = allBreachTickets
     .sort((a, b) => b.ageDias - a.ageDias)
     .slice(0, 15)
     .map(buildEnrichedTicket)
 
   if (ticketsToAnalyze.length === 0) {
-    return { enrichedTickets: [], executiveSummary: null }
+    return { enrichedTickets: [], executiveSummary: null, totalBreachTickets: 0 }
   }
 
   const cacheDir = join(workspacePath, '..', 'cache')
@@ -593,7 +599,7 @@ export async function runTicketAnalysisInternal(): Promise<{
     }
   })
 
-  return { enrichedTickets: ticketsToAnalyze, executiveSummary, perAssigneeSummary }
+  return { enrichedTickets: ticketsToAnalyze, executiveSummary, perAssigneeSummary, totalBreachTickets }
 }
 
 function registerIpcHandlers(): void {
