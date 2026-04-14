@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs'
 import { extname } from 'path'
 
-const MAX_CHARS = 50_000
+const MAX_CHARS = 150_000
 
 export interface FileContent {
   text: string
@@ -11,7 +11,7 @@ export interface FileContent {
 
 /**
  * Reads a file and returns its text content.
- * Supports .md, .txt, and .pdf. Truncates at 50k characters.
+ * Supports .md, .txt, and .pdf. Truncates at 150k characters.
  */
 export async function readFile(filePath: string): Promise<FileContent> {
   const ext = extname(filePath).toLowerCase()
@@ -28,7 +28,7 @@ export async function readFile(filePath: string): Promise<FileContent> {
 
   const truncated = text.length > MAX_CHARS
   return {
-    text: truncated ? text.slice(0, MAX_CHARS) + '\n\n[CONTEÚDO TRUNCADO — limite de 50.000 caracteres atingido]' : text,
+    text: truncated ? text.slice(0, MAX_CHARS) + '\n\n[CONTEÚDO TRUNCADO — limite de 150.000 caracteres atingido]' : text,
     truncated,
     extension: ext,
   }

@@ -1460,7 +1460,7 @@ export class IngestionPipeline {
       let { text } = readResult
       if (readResult.truncated) {
         item.truncated = true
-        this.log.warn('artefato truncado', { filePath: item.filePath, maxChars: 50_000 })
+        this.log.warn('artefato truncado', { filePath: item.filePath, maxChars: 150_000 })
       }
 
       // Pass 0: Transcript preprocessing (optional)
